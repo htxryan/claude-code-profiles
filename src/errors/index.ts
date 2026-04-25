@@ -11,7 +11,9 @@ export type ResolverErrorCode =
   | "Cycle" // R4
   | "MissingInclude" // R7
   | "Conflict" // R11
-  | "InvalidManifest"; // unparseable JSON, etc.
+  | "InvalidManifest" // unparseable JSON, etc.
+  | "InvalidSettingsJson" // E2: settings.json failed to parse during deep-merge
+  | "MergeReadFailed"; // E2: contributor file read failed
 
 export class ResolverError extends Error {
   readonly code: ResolverErrorCode;
@@ -107,6 +109,50 @@ export class InvalidManifestError extends ResolverError {
     );
     this.name = "InvalidManifestError";
     this.path = path;
+    this.detail = detail;
+  }
+}
+
+/**
+ * E2: settings.json from one of the contributors did not parse as JSON during
+ * deep-merge. Names the contributor and relPath per §7 quality bar.
+ */
+export class InvalidSettingsJsonError extends ResolverError {
+  readonly relPath: string;
+  readonly contributor: string;
+  readonly detail: string;
+
+  constructor(relPath: string, contributor: string, detail: string) {
+    super(
+      "InvalidSettingsJson",
+      `Settings file "${relPath}" from contributor "${contributor}" is not valid JSON: ${detail}`,
+    );
+    this.name = "InvalidSettingsJsonError";
+    this.relPath = relPath;
+    this.contributor = contributor;
+    this.detail = detail;
+  }
+}
+
+/**
+ * E2: a contributor's file (declared in the ResolvedPlan) could not be read.
+ * Indicates plan/disk drift between resolution and merge.
+ */
+export class MergeReadFailedError extends ResolverError {
+  readonly relPath: string;
+  readonly contributor: string;
+  readonly absPath: string;
+  readonly detail: string;
+
+  constructor(relPath: string, contributor: string, absPath: string, detail: string) {
+    super(
+      "MergeReadFailed",
+      `Failed to read "${relPath}" from contributor "${contributor}" (${absPath}): ${detail}`,
+    );
+    this.name = "MergeReadFailedError";
+    this.relPath = relPath;
+    this.contributor = contributor;
+    this.absPath = absPath;
     this.detail = detail;
   }
 }
