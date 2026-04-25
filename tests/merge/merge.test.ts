@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { MergeReadFailedError } from "../../src/errors/index.js";
+import {
+  MergeError,
+  MergeReadFailedError,
+  PipelineError,
+  ResolverError,
+} from "../../src/errors/index.js";
 import { merge } from "../../src/merge/merge.js";
 import { resolve } from "../../src/resolver/resolve.js";
 import { makeFixture } from "../helpers/fixture.js";
@@ -220,6 +225,61 @@ describe("merge() orchestrator over ResolvedPlan", () => {
       const m = merged.find((x) => x.path === "subdir/settings.json")!;
       expect(m.mergePolicy).toBe("deep-merge");
       expect(JSON.parse(m.bytes.toString("utf8"))).toEqual({ a: 2, b: 3, c: 1 });
+    } finally {
+      await f.cleanup();
+    }
+  });
+
+  it("throws on conflicting mergePolicy within a single relPath group (defensive invariant guard)", async () => {
+    const f = await makeFixture({
+      profiles: {
+        base: {
+          manifest: {},
+          files: { "settings.json": JSON.stringify({ a: 1 }) },
+        },
+        leaf: {
+          manifest: { extends: "base" },
+          files: { "settings.json": JSON.stringify({ b: 2 }) },
+        },
+      },
+    });
+    try {
+      const plan = await resolve("leaf", { projectRoot: f.projectRoot });
+      // Synthesize a malformed plan: same relPath but two different policies
+      // across contributors. E1 should never produce this (policy is a pure
+      // function of relPath), but the orchestrator must fail loud if it does.
+      const malformed = {
+        ...plan,
+        files: plan.files.map((f, i) => ({
+          ...f,
+          mergePolicy: i === 0 ? "deep-merge" : "last-wins",
+        })),
+      } as typeof plan;
+      await expect(merge(malformed)).rejects.toThrow(/conflicting mergePolicy/);
+    } finally {
+      await f.cleanup();
+    }
+  });
+
+  it("MergeReadFailedError is a MergeError, not a ResolverError (callers can filter by phase)", async () => {
+    const f = await makeFixture({
+      profiles: { leaf: { manifest: {}, files: { "CLAUDE.md": "x" } } },
+    });
+    try {
+      const plan = await resolve("leaf", { projectRoot: f.projectRoot });
+      try {
+        await merge(plan, {
+          read: async () => {
+            throw new Error("boom");
+          },
+        });
+        expect.fail("should have thrown");
+      } catch (err) {
+        expect(err).toBeInstanceOf(MergeReadFailedError);
+        expect(err).toBeInstanceOf(MergeError);
+        expect(err).toBeInstanceOf(PipelineError);
+        expect(err).not.toBeInstanceOf(ResolverError);
+      }
     } finally {
       await f.cleanup();
     }

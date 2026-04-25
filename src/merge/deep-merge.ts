@@ -43,7 +43,7 @@ export const deepMergeStrategy: MergeStrategy = (
     throw new Error(`deep-merge invoked with no inputs for "${relPath}"`);
   }
 
-  const parsed: Array<{ id: string; value: JsonValue }> = [];
+  const parsed: Array<{ id: string; value: JsonObject }> = [];
   for (const input of inputs) {
     const text = input.bytes.toString("utf8");
     if (text.trim() === "") {
@@ -59,20 +59,33 @@ export const deepMergeStrategy: MergeStrategy = (
       const detail = err instanceof Error ? err.message : String(err);
       throw new InvalidSettingsJsonError(relPath, input.id, detail);
     }
+    // settings.json must be a JSON object at the top level. Arrays / null /
+    // scalars are valid JSON but invalid as settings — surface explicitly so
+    // a contributor doesn't get its data silently last-wins'd into the merged
+    // output by a later object contributor.
+    if (!isPlainObject(value)) {
+      throw new InvalidSettingsJsonError(
+        relPath,
+        input.id,
+        "top-level value is not a JSON object",
+      );
+    }
     parsed.push({ id: input.id, value });
   }
 
   // The merge proceeds left-to-right (oldest → newest). The result starts as
   // the first contributor's value and absorbs each subsequent contributor.
-  let acc: JsonValue = clone(parsed[0]!.value);
+  let acc: JsonObject = clone(parsed[0]!.value);
   for (let i = 1; i < parsed.length; i++) {
-    acc = mergeAt([], acc, parsed[i]!.value);
+    acc = mergeAt([], acc, parsed[i]!.value) as JsonObject;
   }
 
   // Track which contributors actually contributed — for settings.json we
   // consider all contributors that parsed to a non-empty object as having
   // contributed. An empty object `{}` adds nothing semantically but the
   // contributor still "owns" the file in provenance, so we include it.
+  // contract: see merged-file.md invariant 2 — empty-{} contributors are
+  // intentionally retained in provenance for E5 traceability.
   const contributors = parsed.map((p) => p.id);
 
   const out = JSON.stringify(acc, null, 2) + "\n";
@@ -103,13 +116,13 @@ function mergeAt(pathParts: string[], earlier: JsonValue, later: JsonValue): Jso
     const out: JsonObject = {};
     // Copy `earlier` keys (cloned so we don't share refs with input).
     for (const [k, v] of Object.entries(earlier)) {
-      out[k] = clone(v);
+      defineKey(out, k, clone(v));
     }
     for (const [k, v] of Object.entries(later)) {
-      if (k in out) {
-        out[k] = mergeAt([...pathParts, k], out[k]!, v);
+      if (Object.prototype.hasOwnProperty.call(out, k)) {
+        defineKey(out, k, mergeAt([...pathParts, k], out[k]!, v));
       } else {
-        out[k] = clone(v);
+        defineKey(out, k, clone(v));
       }
     }
     return out;
@@ -132,12 +145,27 @@ function isPlainObject(v: unknown): v is JsonObject {
   );
 }
 
+// `JSON.parse` produces own-enumerable `__proto__` keys (per ES2017
+// [[DefineOwnProperty]] semantics). Plain `out[k] = v` triggers the
+// prototype setter for that key instead of creating an own property, which
+// would silently elide it from `JSON.stringify(out)`. `defineProperty`
+// preserves the key as-is regardless of name — protecting both data fidelity
+// and ruling out incidental prototype pollution.
+function defineKey(out: JsonObject, key: string, value: JsonValue): void {
+  Object.defineProperty(out, key, {
+    value,
+    writable: true,
+    enumerable: true,
+    configurable: true,
+  });
+}
+
 function clone<T extends JsonValue>(v: T): T {
   if (v === null || typeof v !== "object") return v;
   if (Array.isArray(v)) return v.map((x) => clone(x)) as T;
   const out: JsonObject = {};
   for (const [k, val] of Object.entries(v)) {
-    out[k] = clone(val);
+    defineKey(out, k, clone(val));
   }
   return out as T;
 }

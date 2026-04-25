@@ -141,6 +141,45 @@ describe("deepMergeStrategy (R8)", () => {
     expect(JSON.stringify(a)).toBe(aJson);
     expect(JSON.stringify(b)).toBe(bJson);
   });
+
+  it("rejects valid JSON whose top-level value is not an object (array)", () => {
+    expect(() =>
+      deepMergeStrategy(
+        "settings.json",
+        [{ id: "arr", bytes: Buffer.from(JSON.stringify([{ a: 1 }]), "utf8") }],
+      ),
+    ).toThrowError(InvalidSettingsJsonError);
+  });
+
+  it("rejects valid JSON whose top-level value is null or a scalar", () => {
+    expect(() =>
+      deepMergeStrategy("settings.json", [
+        { id: "n", bytes: Buffer.from("null", "utf8") },
+      ]),
+    ).toThrowError(InvalidSettingsJsonError);
+    expect(() =>
+      deepMergeStrategy("settings.json", [
+        { id: "num", bytes: Buffer.from("42", "utf8") },
+      ]),
+    ).toThrowError(InvalidSettingsJsonError);
+  });
+
+  it("preserves __proto__ as a literal own key (no silent data loss via prototype setter)", () => {
+    // JSON.parse produces __proto__ as an own enumerable property (per ES2017
+    // [[DefineOwnProperty]] semantics). A naive `out["__proto__"] = v` would
+    // trigger the prototype setter and elide the key from JSON.stringify(out)
+    // — verify it survives both the deep merge and the round-trip intact.
+    const r = deepMergeStrategy("settings.json", [
+      { id: "a", bytes: Buffer.from('{"keep":"yes"}', "utf8") },
+      { id: "b", bytes: Buffer.from('{"__proto__":"surprise"}', "utf8") },
+    ]);
+    const text = r.bytes.toString("utf8");
+    expect(text).toContain('"__proto__"');
+    expect(text).toContain('"surprise"');
+    expect(text).toContain('"keep"');
+    // And global Object.prototype is untouched (no prototype pollution).
+    expect((Object.prototype as Record<string, unknown>)["surprise"]).toBeUndefined();
+  });
 });
 
 describe("deepMergeStrategy + R12 hooks-by-event", () => {

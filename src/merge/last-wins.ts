@@ -6,6 +6,12 @@
  * E1's resolver throws on multi-contributor conflicts (R11) before we get
  * here — but ancestor-only chains and profile-overrides are still routed
  * through this strategy, hence the multi-input case.
+ *
+ * Returns a fresh Buffer rather than aliasing the input — aligns with the
+ * other strategies and the contract's "byte-stable pure function" guarantee
+ * (merged-file.md invariant 4). A future caller that mutates the output
+ * Buffer (e.g. zeroing after a write) will not corrupt input bytes still held
+ * by the orchestrator.
  */
 
 import type { ContributorBytes, MergeStrategy, StrategyResult } from "./types.js";
@@ -19,7 +25,7 @@ export const lastWinsStrategy: MergeStrategy = (
   }
   const winner = inputs[inputs.length - 1]!;
   return {
-    bytes: winner.bytes,
+    bytes: Buffer.from(winner.bytes),
     contributors: [winner.id],
   };
 };

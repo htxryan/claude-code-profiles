@@ -1,9 +1,21 @@
 /**
- * Resolution-phase error types. All errors carry enough context to satisfy
- * the §7 quality bar: name the file/profile/path involved.
+ * Pipeline error types. All errors carry enough context to satisfy the §7
+ * quality bar: name the file/profile/path involved.
  *
  * Each error has a stable `code` for programmatic dispatch (e.g. CLI exit
  * code mapping in E5) and a human-readable `message`.
+ *
+ * Hierarchy:
+ *   PipelineError (base)
+ *     ├── ResolverError    — resolution-phase failures (R4/R5/R7/R11/...)
+ *     └── MergeError       — merge-phase failures (E2)
+ *
+ * E5 dispatch (informational, for downstream implementers): merge errors
+ * should map to a distinct exit code from resolver errors — they signal
+ * runtime drift between resolution and merge (e.g. a contributor file was
+ * deleted mid-flight) rather than a bad input manifest. Filter on
+ * `instanceof MergeError` vs `instanceof ResolverError`, or branch on
+ * `code` (`InvalidSettingsJson` / `MergeReadFailed` are merge-phase).
  */
 
 export type ResolverErrorCode =
@@ -11,18 +23,40 @@ export type ResolverErrorCode =
   | "Cycle" // R4
   | "MissingInclude" // R7
   | "Conflict" // R11
-  | "InvalidManifest" // unparseable JSON, etc.
+  | "InvalidManifest"; // unparseable JSON, etc.
+
+export type MergeErrorCode =
   | "InvalidSettingsJson" // E2: settings.json failed to parse during deep-merge
   | "MergeReadFailed"; // E2: contributor file read failed
 
-export class ResolverError extends Error {
-  readonly code: ResolverErrorCode;
+export type PipelineErrorCode = ResolverErrorCode | MergeErrorCode;
 
-  constructor(code: ResolverErrorCode, message: string) {
+export class PipelineError extends Error {
+  readonly code: PipelineErrorCode;
+
+  constructor(code: PipelineErrorCode, message: string) {
     super(message);
-    this.name = "ResolverError";
+    this.name = "PipelineError";
     this.code = code;
     Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+export class ResolverError extends PipelineError {
+  declare readonly code: ResolverErrorCode;
+
+  constructor(code: ResolverErrorCode, message: string) {
+    super(code, message);
+    this.name = "ResolverError";
+  }
+}
+
+export class MergeError extends PipelineError {
+  declare readonly code: MergeErrorCode;
+
+  constructor(code: MergeErrorCode, message: string) {
+    super(code, message);
+    this.name = "MergeError";
   }
 }
 
@@ -114,10 +148,16 @@ export class InvalidManifestError extends ResolverError {
 }
 
 /**
- * E2: settings.json from one of the contributors did not parse as JSON during
- * deep-merge. Names the contributor and relPath per §7 quality bar.
+ * E2: settings.json from one of the contributors did not parse as a JSON
+ * object during deep-merge. Names the contributor and relPath per §7 quality
+ * bar. Triggered both by syntactically invalid JSON and by valid JSON whose
+ * top-level value is not a JSON object (array/null/scalar).
+ *
+ * E5 dispatch: surface as a config error (the contributor's settings file
+ * itself is malformed) — distinct from MergeReadFailed which is a runtime IO
+ * fault.
  */
-export class InvalidSettingsJsonError extends ResolverError {
+export class InvalidSettingsJsonError extends MergeError {
   readonly relPath: string;
   readonly contributor: string;
   readonly detail: string;
@@ -136,9 +176,13 @@ export class InvalidSettingsJsonError extends ResolverError {
 
 /**
  * E2: a contributor's file (declared in the ResolvedPlan) could not be read.
- * Indicates plan/disk drift between resolution and merge.
+ * Indicates plan/disk drift between resolution and merge — most often a
+ * contributor file was deleted while a swap was in flight.
+ *
+ * E5 dispatch: surface as a transient/runtime error distinct from manifest
+ * config errors — re-running resolve will refresh the plan.
  */
-export class MergeReadFailedError extends ResolverError {
+export class MergeReadFailedError extends MergeError {
   readonly relPath: string;
   readonly contributor: string;
   readonly absPath: string;

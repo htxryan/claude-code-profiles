@@ -6,7 +6,8 @@
  *  1. Group plan.files by relPath, preserving canonical contributor order
  *     (E1 already lex-sorted with stable contributorIndex tie-break, so we
  *     re-sort by contributorIndex within each group).
- *  2. For each group, read each contributor's bytes from its absPath.
+ *  2. For each group, read each contributor's bytes from its absPath
+ *     (in parallel — order only matters for the assembled `inputs[]`, not IO).
  *  3. Dispatch via the strategy registry keyed by mergePolicy.
  *  4. Collect MergedFile[] sorted lex by path (matches plan.files order).
  *
@@ -67,8 +68,26 @@ export async function merge(
 
   const out: MergedFile[] = [];
   for (const group of groups) {
-    const inputs: ContributorBytes[] = [];
+    // All entries in a group share mergePolicy (it's a function of relPath,
+    // classified once in E1 by policyFor). Assert defensively — a regression
+    // in E1 that emitted conflicting policies for the same relPath would
+    // otherwise apply the wrong strategy to some contributor bytes silently.
+    const policy = group.entries[0]!.mergePolicy;
     for (const entry of group.entries) {
+      if (entry.mergePolicy !== policy) {
+        throw new Error(
+          `ResolvedPlan invariant violated: conflicting mergePolicy for "${group.relPath}" (${policy} vs ${entry.mergePolicy})`,
+        );
+      }
+    }
+
+    // Read all contributor bytes for this group concurrently. Order only
+    // matters when assembling `inputs[]`, not for the IO calls themselves —
+    // sequencing here serialized one fs.readFile per contributor. We resolve
+    // each entry's contributor up front so the read promise can carry the
+    // metadata needed to construct a MergeReadFailedError without a separate
+    // lookup after rejection.
+    const reads = group.entries.map((entry) => {
       const contributor = plan.contributors[entry.contributorIndex];
       if (!contributor) {
         // ResolvedPlan invariant; should be impossible.
@@ -76,18 +95,21 @@ export async function merge(
           `PlanFile "${entry.relPath}" references invalid contributorIndex ${entry.contributorIndex}`,
         );
       }
-      let bytes: Buffer;
-      try {
-        bytes = await read(entry.absPath);
-      } catch (err) {
-        const detail = err instanceof Error ? err.message : String(err);
-        throw new MergeReadFailedError(entry.relPath, contributor.id, entry.absPath, detail);
-      }
-      inputs.push({ id: contributor.id, bytes });
-    }
+      return read(entry.absPath).then(
+        (bytes) => ({ id: contributor.id, bytes }),
+        (err: unknown) => {
+          const detail = err instanceof Error ? err.message : String(err);
+          throw new MergeReadFailedError(
+            entry.relPath,
+            contributor.id,
+            entry.absPath,
+            detail,
+          );
+        },
+      );
+    });
+    const inputs: ContributorBytes[] = await Promise.all(reads);
 
-    // All entries in a group share mergePolicy (it's a function of relPath).
-    const policy = group.entries[0]!.mergePolicy;
     const strategy = getStrategy(policy);
     const result = strategy(group.relPath, inputs);
 

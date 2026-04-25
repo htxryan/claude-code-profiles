@@ -27,5 +27,7 @@ export { MERGED_FILE_SCHEMA_VERSION } from "./types.js";
 
 export {
   InvalidSettingsJsonError,
+  MergeError,
   MergeReadFailedError,
 } from "../errors/index.js";
+export type { MergeErrorCode } from "../errors/index.js";

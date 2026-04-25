@@ -16,8 +16,18 @@ describe("lastWinsStrategy (R10)", () => {
   it("single-contributor case is the trivial pass-through", () => {
     const buf = Buffer.from("solo");
     const r = lastWinsStrategy("agents/foo.json", [{ id: "only", bytes: buf }]);
-    expect(r.bytes).toBe(buf);
+    expect(Buffer.compare(r.bytes, buf)).toBe(0);
     expect(r.contributors).toEqual(["only"]);
+  });
+
+  it("returns a fresh Buffer (no aliasing of the input)", () => {
+    // Future callers (E3 dry-run, E5 validate) must be able to mutate the
+    // output without corrupting input bytes the orchestrator may still hold.
+    const buf = Buffer.from("payload");
+    const r = lastWinsStrategy("agents/foo.json", [{ id: "only", bytes: buf }]);
+    expect(r.bytes).not.toBe(buf);
+    r.bytes.fill(0);
+    expect(buf.toString("utf8")).toBe("payload");
   });
 
   it("ignores all but the last contributor in provenance", () => {

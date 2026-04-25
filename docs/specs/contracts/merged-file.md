@@ -44,7 +44,7 @@ Carve-out (R12, takes precedence over R8):
 - The carve-out fires only when both sides at that path are arrays. Type mismatches fall back to R8 last-wins. The carve-out does **not** fire at depth 1 (`{ hooks: [...] }`) or any depth deeper than 2.
 - A non-array value at `hooks.<EventName>` from any contributor "resets" the slot under R8: previously-accumulated action entries are discarded, and a later array contributor concatenates from that reset point only. This is rare in practice but tested in `tests/merge/deep-merge.test.ts`.
 
-Empty/whitespace bytes parse as `{}`. Unparseable JSON throws `InvalidSettingsJsonError`.
+Empty/whitespace bytes parse as `{}`. Unparseable JSON, or valid JSON whose top-level value is not an object (array/scalar/null), throws `InvalidSettingsJsonError`.
 
 ### `concat` — `*.md` (R9)
 
@@ -64,14 +64,14 @@ R11 conflict detection happens at resolve time (E1) — `merge` will never see a
 
 ## Errors thrown by `merge()`
 
-All extend `ResolverError`. Each carries enough context to satisfy §7 of the spec.
+All extend `MergeError` (which extends `PipelineError`, distinct from `ResolverError`). Each carries enough context to satisfy §7 of the spec. Use `instanceof MergeError` to filter merge-phase failures separately from resolver-phase failures.
 
-| Error                       | Trigger                                                  |
-|-----------------------------|----------------------------------------------------------|
-| `InvalidSettingsJsonError`  | A contributor's `settings.json` failed to parse as JSON. |
-| `MergeReadFailedError`      | A file declared in the plan could not be read from disk. |
+| Error                       | Trigger                                                                                  |
+|-----------------------------|------------------------------------------------------------------------------------------|
+| `InvalidSettingsJsonError`  | A contributor's `settings.json` failed to parse, or parsed to a non-object top-level value. |
+| `MergeReadFailedError`      | A file declared in the plan could not be read from disk.                                 |
 
-`MergeReadFailedError` indicates plan/disk drift between resolve and merge — most likely a contributor file was deleted while a swap was in flight.
+`MergeReadFailedError` indicates plan/disk drift between resolve and merge — most likely a contributor file was deleted while a swap was in flight. `InvalidSettingsJsonError` is a config-level fault in the contributor itself.
 
 ## IO surface
 
