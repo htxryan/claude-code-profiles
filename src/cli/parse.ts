@@ -1,0 +1,271 @@
+/**
+ * Hand-rolled argv parser. Avoids external deps so the CLI is dependency-free
+ * (matters for `npx claude-profiles`-style cold starts) and so the parsing
+ * surface is fully reviewable in one file.
+ *
+ * Conventions:
+ *  - First non-flag token is the verb (R29). `--help`/`--version` short-
+ *    circuit verb dispatch.
+ *  - Global flags (`--json`, `--cwd=<path>`, `--on-drift=<choice>`,
+ *    `--no-color`, `--help`, `--version`) may appear anywhere in argv —
+ *    before or after the verb.
+ *  - Verb-specific flags (`--description=<txt>` for `new`, `--pre-commit-warn`
+ *    for `drift`) are scoped per verb.
+ *  - Positional args after the verb are required (e.g. `use <name>`); we
+ *    return ParseError naming the missing arg, never throw.
+ *  - Unknown verbs / flags / values are ParseErrors with exit-code-1 semantics.
+ */
+
+import type { GlobalOptions, OnDriftFlag, ParsedInvocation } from "./types.js";
+
+export interface ParseError {
+  ok: false;
+  /** Human-readable error suitable for stderr. */
+  message: string;
+  /** True iff the user typed `--help` or `--version` (no args required). */
+  helpRequested: boolean;
+}
+
+export type ParseResult =
+  | { ok: true; invocation: ParsedInvocation }
+  | ParseError;
+
+const VERBS = new Set([
+  "init",
+  "list",
+  "use",
+  "status",
+  "drift",
+  "diff",
+  "new",
+  "validate",
+  "sync",
+  "hook",
+  "help",
+]);
+
+const ON_DRIFT_VALUES: ReadonlySet<OnDriftFlag> = new Set<OnDriftFlag>([
+  "discard",
+  "persist",
+  "abort",
+]);
+
+/**
+ * Parse argv (without the leading `node` + script path — caller slices off
+ * `process.argv.slice(2)`). Returns either a typed ParsedInvocation or a
+ * structured error.
+ *
+ * `defaultCwd` is the cwd to use when `--cwd=` is not passed; the bin entry
+ * supplies `process.cwd()`.
+ */
+export function parseArgs(argv: ReadonlyArray<string>, defaultCwd: string): ParseResult {
+  // Collect global flags + extract verb + remaining tokens in a single pass.
+  const tokens = [...argv];
+  const global: GlobalOptions = {
+    json: false,
+    cwd: defaultCwd,
+    onDrift: null,
+    noColor: false,
+  };
+
+  // Side-channel for help/version short-circuit. We still want to parse the
+  // verb (so `claude-profiles use --help` shows use-specific help), but we
+  // surface the request via the Command itself.
+  let helpFlagSeen = false;
+  let versionFlagSeen = false;
+
+  // First pass: pull global flags out of the token stream. We do this BEFORE
+  // verb dispatch so `--cwd=/tmp use foo` and `use foo --cwd=/tmp` both work.
+  const verbAndArgs: string[] = [];
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i]!;
+    if (t === "--json") {
+      global.json = true;
+    } else if (t === "--no-color") {
+      global.noColor = true;
+    } else if (t === "--help" || t === "-h") {
+      helpFlagSeen = true;
+    } else if (t === "--version" || t === "-V") {
+      versionFlagSeen = true;
+    } else if (t === "--cwd") {
+      const next = tokens[i + 1];
+      if (next === undefined || next.startsWith("-")) {
+        return parseError(`--cwd requires a path argument`);
+      }
+      global.cwd = next;
+      i++;
+    } else if (t.startsWith("--cwd=")) {
+      global.cwd = t.slice("--cwd=".length);
+      if (global.cwd === "") return parseError(`--cwd requires a non-empty path`);
+    } else if (t === "--on-drift") {
+      const next = tokens[i + 1];
+      if (next === undefined) return parseError(`--on-drift requires a value (discard|persist|abort)`);
+      const flag = parseOnDrift(next);
+      if (!flag) return parseError(`--on-drift must be discard|persist|abort, got "${next}"`);
+      global.onDrift = flag;
+      i++;
+    } else if (t.startsWith("--on-drift=")) {
+      const v = t.slice("--on-drift=".length);
+      const flag = parseOnDrift(v);
+      if (!flag) return parseError(`--on-drift must be discard|persist|abort, got "${v}"`);
+      global.onDrift = flag;
+    } else {
+      verbAndArgs.push(t);
+    }
+  }
+
+  // Version short-circuit beats verb dispatch (R29 doesn't list `--version`
+  // as a verb but it's a universal CLI affordance).
+  if (versionFlagSeen && verbAndArgs.length === 0) {
+    return ok({ command: { kind: "version" }, global });
+  }
+
+  // Help with no verb -> top-level help.
+  if (verbAndArgs.length === 0) {
+    if (helpFlagSeen) return ok({ command: { kind: "help", verb: null }, global });
+    return parseError(
+      `missing command; run "claude-profiles --help" for usage`,
+      true,
+    );
+  }
+
+  const verb = verbAndArgs[0]!;
+  const rest = verbAndArgs.slice(1);
+
+  if (!VERBS.has(verb)) {
+    return parseError(`unknown command "${verb}"; run "claude-profiles --help" for usage`);
+  }
+
+  // `help <verb>` is equivalent to `<verb> --help`. Both produce a help
+  // command for the given verb.
+  if (verb === "help") {
+    if (rest.length === 0) return ok({ command: { kind: "help", verb: null }, global });
+    if (rest.length > 1) return parseError(`help takes at most one argument; got "${rest.join(" ")}"`);
+    return ok({ command: { kind: "help", verb: rest[0]! }, global });
+  }
+
+  if (helpFlagSeen) {
+    return ok({ command: { kind: "help", verb }, global });
+  }
+
+  // Per-verb dispatch.
+  switch (verb) {
+    case "init":
+      if (rest.length > 0) return parseError(`init takes no arguments; got "${rest.join(" ")}"`);
+      return ok({ command: { kind: "init" }, global });
+
+    case "list":
+      if (rest.length > 0) return parseError(`list takes no arguments; got "${rest.join(" ")}"`);
+      return ok({ command: { kind: "list" }, global });
+
+    case "status":
+      if (rest.length > 0) return parseError(`status takes no arguments; got "${rest.join(" ")}"`);
+      return ok({ command: { kind: "status" }, global });
+
+    case "sync":
+      if (rest.length > 0) return parseError(`sync takes no arguments; got "${rest.join(" ")}"`);
+      return ok({ command: { kind: "sync" }, global });
+
+    case "use": {
+      if (rest.length === 0) return parseError(`use requires a profile name`);
+      if (rest.length > 1) return parseError(`use takes one argument; got "${rest.join(" ")}"`);
+      return ok({ command: { kind: "use", profile: rest[0]! }, global });
+    }
+
+    case "drift": {
+      let preCommitWarn = false;
+      const positional: string[] = [];
+      for (const t of rest) {
+        if (t === "--pre-commit-warn") preCommitWarn = true;
+        else if (t.startsWith("--")) return parseError(`drift: unknown flag "${t}"`);
+        else positional.push(t);
+      }
+      if (positional.length > 0) return parseError(`drift takes no positional arguments; got "${positional.join(" ")}"`);
+      return ok({ command: { kind: "drift", preCommitWarn }, global });
+    }
+
+    case "diff": {
+      const positional: string[] = [];
+      for (const t of rest) {
+        if (t.startsWith("--")) return parseError(`diff: unknown flag "${t}"`);
+        positional.push(t);
+      }
+      if (positional.length === 0) return parseError(`diff requires at least one profile name`);
+      if (positional.length > 2) return parseError(`diff takes one or two profile names; got "${positional.join(" ")}"`);
+      return ok({
+        command: { kind: "diff", a: positional[0]!, b: positional[1] ?? null },
+        global,
+      });
+    }
+
+    case "new": {
+      let description: string | null = null;
+      const positional: string[] = [];
+      for (let i = 0; i < rest.length; i++) {
+        const t = rest[i]!;
+        if (t === "--description") {
+          const next = rest[i + 1];
+          if (next === undefined || next.startsWith("--")) {
+            return parseError(`--description requires a value`);
+          }
+          description = next;
+          i++;
+        } else if (t.startsWith("--description=")) {
+          description = t.slice("--description=".length);
+        } else if (t.startsWith("--")) {
+          return parseError(`new: unknown flag "${t}"`);
+        } else {
+          positional.push(t);
+        }
+      }
+      if (positional.length === 0) return parseError(`new requires a profile name`);
+      if (positional.length > 1) return parseError(`new takes one positional argument; got "${positional.join(" ")}"`);
+      return ok({
+        command: { kind: "new", profile: positional[0]!, description },
+        global,
+      });
+    }
+
+    case "validate": {
+      const positional: string[] = [];
+      for (const t of rest) {
+        if (t.startsWith("--")) return parseError(`validate: unknown flag "${t}"`);
+        positional.push(t);
+      }
+      if (positional.length > 1) return parseError(`validate takes at most one profile name; got "${positional.join(" ")}"`);
+      return ok({
+        command: { kind: "validate", profile: positional[0] ?? null },
+        global,
+      });
+    }
+
+    case "hook": {
+      if (rest.length === 0) return parseError(`hook requires an action (install|uninstall)`);
+      if (rest.length > 1) return parseError(`hook takes one argument; got "${rest.join(" ")}"`);
+      const action = rest[0]!;
+      if (action !== "install" && action !== "uninstall") {
+        return parseError(`hook action must be install|uninstall, got "${action}"`);
+      }
+      return ok({ command: { kind: "hook", action }, global });
+    }
+
+    default: {
+      // Should be unreachable thanks to VERBS.has() guard above.
+      const _exhaustive: string = verb;
+      return parseError(`unknown command "${_exhaustive}"`);
+    }
+  }
+}
+
+function parseOnDrift(value: string): OnDriftFlag | null {
+  if (ON_DRIFT_VALUES.has(value as OnDriftFlag)) return value as OnDriftFlag;
+  return null;
+}
+
+function ok(invocation: ParsedInvocation): ParseResult {
+  return { ok: true, invocation };
+}
+
+function parseError(message: string, helpRequested = false): ParseError {
+  return { ok: false, message, helpRequested };
+}
