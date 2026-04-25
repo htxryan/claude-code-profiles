@@ -6,7 +6,6 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { applyGate } from "../../src/drift/apply.js";
 import type { MergedFile } from "../../src/merge/types.js";
 import { resolve } from "../../src/resolver/resolve.js";
-import type { ResolvedPlan } from "../../src/resolver/types.js";
 import { pathExists } from "../../src/state/atomic.js";
 import { listSnapshots } from "../../src/state/backup.js";
 import { materialize } from "../../src/state/materialize.js";

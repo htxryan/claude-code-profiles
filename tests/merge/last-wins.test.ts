@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import { lastWinsStrategy } from "../../src/merge/last-wins.js";
-import type { ContributorBytes } from "../../src/merge/types.js";
 
 describe("lastWinsStrategy (R10)", () => {
   it("returns the last contributor's bytes verbatim", () => {

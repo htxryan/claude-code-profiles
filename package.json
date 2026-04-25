@@ -28,7 +28,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "tsc --noEmit -p tsconfig.json",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
+    "typecheck:src": "tsc --noEmit -p tsconfig.json",
+    "typecheck:tests": "tsc --noEmit -p tsconfig.test.json"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

@@ -14,6 +14,7 @@ const cleanReport: DriftReport = {
   scannedFiles: 5,
   fastPathHits: 5,
   slowPathHits: 0,
+  warning: null,
 };
 
 const driftedReport: DriftReport = {
@@ -30,6 +31,7 @@ const driftedReport: DriftReport = {
   scannedFiles: 5,
   fastPathHits: 4,
   slowPathHits: 1,
+  warning: null,
 };
 
 const noActiveReport: DriftReport = {
@@ -40,6 +42,7 @@ const noActiveReport: DriftReport = {
   scannedFiles: 0,
   fastPathHits: 0,
   slowPathHits: 0,
+  warning: null,
 };
 
 describe("decideGate (R21, R23, R24)", () => {
@@ -103,10 +106,12 @@ describe("decideGate (R21, R23, R24)", () => {
     // must never produce a "prompt" outcome — that would block forever.
     for (const flag of [undefined, "discard", "persist", "abort"] as const) {
       for (const report of [cleanReport, driftedReport, noActiveReport]) {
+        // exactOptionalPropertyTypes: spread the optional only when defined,
+        // otherwise omit the key entirely (assigning `undefined` is rejected).
         const out = decideGate({
           report,
           mode: "non-interactive",
-          onDriftFlag: flag,
+          ...(flag !== undefined ? { onDriftFlag: flag } : {}),
         });
         expect(out.kind).not.toBe("prompt");
       }

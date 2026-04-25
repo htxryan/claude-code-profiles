@@ -71,20 +71,14 @@ export async function preCommitWarn(paths: StatePaths): Promise<PreCommitWarnRes
   // (e.g. git pre-commit driver disconnected before the hook finishes
   // writing), `process.stderr.write` can throw synchronously. Swallowing
   // the error here preserves the fail-open invariant — better to lose the
-  // message than block the commit. We also catch the loop in a try/catch
-  // for any other I/O surprise.
-  try {
-    for (const w of warnings) {
-      try {
-        process.stderr.write(w + "\n");
-      } catch {
-        // EPIPE or similar — abandon the rest of the output silently.
-        break;
-      }
+  // message than block the commit.
+  for (const w of warnings) {
+    try {
+      process.stderr.write(w + "\n");
+    } catch {
+      // EPIPE or similar — abandon the rest of the output silently.
+      break;
     }
-  } catch {
-    // Last-ditch belt: nothing should escape this function with a
-    // non-zero result, ever (R25a fail-open).
   }
   return { exitCode: 0, warnings, report };
 }

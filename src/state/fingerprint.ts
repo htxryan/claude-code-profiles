@@ -87,7 +87,7 @@ export async function recordMtimes(
  */
 export async function fingerprintTree(claudeDir: string): Promise<Fingerprint> {
   const out: Record<string, FingerprintEntry> = {};
-  await walk(claudeDir, claudeDir, out, "hash");
+  await walk(claudeDir, claudeDir, out);
   return { schemaVersion: FINGERPRINT_SCHEMA_VERSION, files: out };
 }
 
@@ -136,6 +136,10 @@ async function walkMetadata(
         if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
       }
     }
+    // Symlinks and other non-file entries are skipped — same rationale as
+    // `walk()` below. `.claude/` is a copy tree per R39, so any symlink
+    // would be a user artifact post-materialization. Drift detection
+    // intentionally ignores those rather than chasing them.
   }
 }
 
@@ -143,7 +147,6 @@ async function walk(
   root: string,
   current: string,
   out: Record<string, FingerprintEntry>,
-  mode: "hash",
 ): Promise<void> {
   let entries;
   try {
@@ -155,7 +158,7 @@ async function walk(
   for (const e of entries) {
     const abs = path.join(current, e.name);
     if (e.isDirectory()) {
-      await walk(root, abs, out, mode);
+      await walk(root, abs, out);
     } else if (e.isFile()) {
       const rel = path.relative(root, abs).split(path.sep).join("/");
       // Tolerate stat/readFile ENOENT (Opus review #4): a file deleted
