@@ -9,7 +9,13 @@ import {
 
 import { loadManifest } from "./manifest.js";
 import { isMergeable, policyFor } from "./merge-policy.js";
-import { buildPaths, classifyInclude, profileDir, type ResolverPaths } from "./paths.js";
+import {
+  buildPaths,
+  classifyInclude,
+  isValidProfileName,
+  profileDir,
+  type ResolverPaths,
+} from "./paths.js";
 import type {
   Contributor,
   ExternalTrustEntry,
@@ -69,6 +75,11 @@ export async function resolve(
   const includes: IncludeRef[] = [];
   const externalPaths: ExternalTrustEntry[] = [];
   const seenExternal = new Set<string>();
+  // Dedup include contributors by resolved path. Two raw strings (e.g.
+  // "compA" and "./../_components/compA") that resolve to the same dir
+  // would otherwise produce two contributors and falsely trip R11
+  // self-conflicts on non-mergeable files. Each duplicate yields a warning.
+  const seenContributorPaths = new Set<string>();
 
   const leafIndex = oldestFirst.length - 1;
   for (let i = 0; i < oldestFirst.length; i++) {
@@ -87,6 +98,8 @@ export async function resolve(
         includes,
         externalPaths,
         seenExternal,
+        seenContributorPaths,
+        warnings,
       );
     } else {
       // Leaf: emit its includes first, then the leaf last.
@@ -99,6 +112,8 @@ export async function resolve(
         includes,
         externalPaths,
         seenExternal,
+        seenContributorPaths,
+        warnings,
       );
       contributors.push(makeProfileContributor(entry.name, paths, entry.manifest));
     }
@@ -168,19 +183,28 @@ async function buildExtendsChain(
   paths: ResolverPaths,
 ): Promise<ChainEntry[]> {
   const chain: ChainEntry[] = [];
-  const visited: string[] = []; // for cycle detection, ordered for messages
+  const visitedOrder: string[] = []; // for ordered cycle messages
+  const visitedSet = new Set<string>(); // O(1) membership for cycle check
   let current: string | undefined = profileName;
   let referencedBy: string | undefined;
 
   while (current !== undefined) {
-    if (visited.includes(current)) {
+    // R2: profile identifiers are bare directory names. Reject anything
+    // that could escape `.claude-profiles/` via traversal, slashes, or the
+    // hidden/`_components` conventions before touching the filesystem.
+    if (!isValidProfileName(current)) {
+      throw new MissingProfileError(current, referencedBy);
+    }
+
+    if (visitedSet.has(current)) {
       // Cycle: slice starting at the first occurrence and append `current`
       // again so the cycle reads naturally: a → b → a.
-      const start = visited.indexOf(current);
-      const cycle = [...visited.slice(start), current];
+      const start = visitedOrder.indexOf(current);
+      const cycle = [...visitedOrder.slice(start), current];
       throw new CycleError(cycle);
     }
-    visited.push(current);
+    visitedSet.add(current);
+    visitedOrder.push(current);
 
     const dir = profileDir(paths, current);
     if (!(await isDirectory(dir))) {
@@ -215,6 +239,8 @@ async function emitIncludes(
   includes: IncludeRef[],
   externalPaths: ExternalTrustEntry[],
   seenExternal: Set<string>,
+  seenContributorPaths: Set<string>,
+  warnings: ResolutionWarning[],
 ): Promise<void> {
   for (const raw of rawIncludes) {
     const ref = classifyInclude(raw, referencingProfileDir, paths, referencedBy);
@@ -223,6 +249,20 @@ async function emitIncludes(
     if (!(await isDirectory(ref.resolvedPath))) {
       throw new MissingIncludeError(raw, ref.resolvedPath, referencedBy);
     }
+
+    if (seenContributorPaths.has(ref.resolvedPath)) {
+      // Same directory already contributed (possibly via a different raw
+      // form). Skip to avoid duplicate Contributor entries; otherwise R11
+      // would self-conflict on non-mergeable files and mergeable files
+      // would be processed twice.
+      warnings.push({
+        code: "DuplicateInclude",
+        message: `Include "${raw}" in profile "${referencedBy}" resolves to "${ref.resolvedPath}", which was already included; skipping duplicate`,
+        source: referencedBy,
+      });
+      continue;
+    }
+    seenContributorPaths.add(ref.resolvedPath);
 
     contributors.push({
       kind: "include",

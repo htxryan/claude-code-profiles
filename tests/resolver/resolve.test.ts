@@ -719,6 +719,104 @@ describe("resolve()", () => {
     });
   });
 
+  describe("R2 — profile name validation (path traversal)", () => {
+    it("rejects '..' as a profile name (no path traversal)", async () => {
+      fx = await makeFixture({ profiles: { p: { manifest: {} } } });
+      // Create a directory at the project root that has a .claude subdir, which
+      // a traversal attack would otherwise resolve to.
+      const { promises: fsp } = await import("node:fs");
+      await fsp.mkdir(path.join(fx.projectRoot, "outside", ".claude"), {
+        recursive: true,
+      });
+      await expect(
+        resolve("../outside", { projectRoot: fx.projectRoot }),
+      ).rejects.toThrow(MissingProfileError);
+    });
+
+    it("rejects an extends value containing '../' (no traversal via extends)", async () => {
+      fx = await makeFixture({
+        profiles: {
+          attacker: {
+            manifest: { extends: "../../etc" } as Record<string, unknown>,
+          },
+        },
+      });
+      await expect(
+        resolve("attacker", { projectRoot: fx.projectRoot }),
+      ).rejects.toThrow(MissingProfileError);
+    });
+
+    it("rejects an extends value containing '/' (no traversal via extends)", async () => {
+      fx = await makeFixture({
+        profiles: {
+          attacker: {
+            manifest: { extends: "_components/compA" } as Record<string, unknown>,
+          },
+        },
+        components: { compA: { files: { "f": "1" } } },
+      });
+      await expect(
+        resolve("attacker", { projectRoot: fx.projectRoot }),
+      ).rejects.toThrow(MissingProfileError);
+    });
+
+    it("rejects '_components' or any '_'-prefixed name as a profile (consistency with listProfiles)", async () => {
+      fx = await makeFixture({
+        profiles: {},
+        components: { compA: { files: { "f": "1" } } },
+      });
+      await expect(
+        resolve("_components", { projectRoot: fx.projectRoot }),
+      ).rejects.toThrow(MissingProfileError);
+    });
+
+    it("rejects empty profile name", async () => {
+      fx = await makeFixture({ profiles: {} });
+      await expect(resolve("", { projectRoot: fx.projectRoot })).rejects.toThrow(
+        MissingProfileError,
+      );
+    });
+  });
+
+  describe("duplicate include dedup", () => {
+    it("collapses two identical raw includes into a single contributor with a warning", async () => {
+      fx = await makeFixture({
+        profiles: {
+          p: { manifest: { includes: ["compA", "compA"] } },
+        },
+        components: { compA: { files: { "agents/x.json": "{}" } } },
+      });
+      const plan = await resolve("p", { projectRoot: fx.projectRoot });
+      const includeContribs = plan.contributors.filter((c) => c.kind === "include");
+      // Only one contributor — the second "compA" was deduped.
+      expect(includeContribs.length).toBe(1);
+      // No false-positive R11 conflict on agents/x.json.
+      const xs = plan.files.filter((f) => f.relPath === "agents/x.json");
+      expect(xs.length).toBe(1);
+      // A warning surfaced.
+      const dups = plan.warnings.filter((w) => w.code === "DuplicateInclude");
+      expect(dups.length).toBe(1);
+      expect(dups[0]!.source).toBe("p");
+    });
+
+    it("collapses two raw forms that resolve to the same dir into a single contributor", async () => {
+      // "compA" (bare) and an explicit relative path to the same dir.
+      fx = await makeFixture({
+        profiles: {
+          p: {
+            manifest: { includes: ["compA", "./../_components/compA"] },
+          },
+        },
+        components: { compA: { files: { "agents/x.json": "{}" } } },
+      });
+      const plan = await resolve("p", { projectRoot: fx.projectRoot });
+      const includeContribs = plan.contributors.filter((c) => c.kind === "include");
+      expect(includeContribs.length).toBe(1);
+      const dups = plan.warnings.filter((w) => w.code === "DuplicateInclude");
+      expect(dups.length).toBe(1);
+    });
+  });
+
   describe("empty edge cases", () => {
     it("works for a profile with no manifest fields and no files", async () => {
       fx = await makeFixture({ profiles: { p: { manifest: {} } } });

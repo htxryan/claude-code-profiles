@@ -3,9 +3,15 @@ import * as path from "node:path";
 
 /**
  * Recursively enumerate every regular file under `dir`, returning entries
- * relative to `dir` in lex-sorted, posix-style form. Symlinks are followed
- * for directories (a deliberate v1 choice — users may symlink components in)
- * but their leaves are returned as files.
+ * relative to `dir` in lex-sorted, posix-style form.
+ *
+ * Symlink behavior (v1):
+ *  - Symlinks-to-files are followed and returned as files.
+ *  - Symlinks-to-directories *inside* a contributor's `.claude/` subtree are
+ *    NOT traversed (no cycle protection, so this avoids accidental loops).
+ *  - The contributor root itself may still be a symlink to a directory —
+ *    callers resolve existence via `isDirectory` (uses `fs.stat`) before
+ *    invoking this function, so a symlinked component dir works at the root.
  *
  * Returns [] if `dir` does not exist or is not a directory; callers higher
  * up are responsible for validating existence (R7).
@@ -54,15 +60,6 @@ async function walk(
       }
       out.push({ relPath: childRel, absPath: childAbs });
     }
-  }
-}
-
-export async function pathExists(p: string): Promise<boolean> {
-  try {
-    await fs.access(p);
-    return true;
-  } catch {
-    return false;
   }
 }
 

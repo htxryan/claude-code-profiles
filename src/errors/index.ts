@@ -89,18 +89,24 @@ export class ConflictError extends ResolverError {
   }
 }
 
-/** profile.json is unparseable (vs R36 which is recoverable). */
+/**
+ * profile.json is unparseable (vs R36 which is recoverable).
+ *
+ * `detail` carries the human-readable reason (e.g. "JSON parse error: …").
+ * Note: avoids the name `cause` so it does not shadow ES2022's standard
+ * `Error.cause` property, which carries chained Error instances.
+ */
 export class InvalidManifestError extends ResolverError {
   readonly path: string;
-  readonly cause: string;
+  readonly detail: string;
 
-  constructor(path: string, cause: string) {
+  constructor(path: string, detail: string) {
     super(
       "InvalidManifest",
-      `Manifest at "${path}" is invalid: ${cause}`,
+      `Manifest at "${path}" is invalid: ${detail}`,
     );
     this.name = "InvalidManifestError";
     this.path = path;
-    this.cause = cause;
+    this.detail = detail;
   }
 }

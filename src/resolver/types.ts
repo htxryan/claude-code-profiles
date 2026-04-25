@@ -107,7 +107,11 @@ export interface PlanFile {
  * etc.).
  */
 export interface ResolutionWarning {
-  code: "UnknownManifestField" | "ManifestParseError" | "MissingManifest";
+  code:
+    | "UnknownManifestField"
+    | "ManifestParseError"
+    | "MissingManifest"
+    | "DuplicateInclude";
   message: string;
   /** Profile or component the warning relates to, if applicable. */
   source?: string;
@@ -126,6 +130,13 @@ export interface ExternalTrustEntry {
 }
 
 /**
+ * Schema version for ResolvedPlan. Bumped only when consumers (E2/E3/E4/E5)
+ * must update for a breaking shape change. Per the E1 fitness function, this
+ * should not change for >= 2 weeks once 1 ships.
+ */
+export const RESOLVED_PLAN_SCHEMA_VERSION = 1 as const;
+
+/**
  * The cross-epic, load-bearing contract. Produced by `resolve(profileName)`.
  *
  * Invariants (enforced by tests):
@@ -137,13 +148,6 @@ export interface ExternalTrustEntry {
  *    throws ConflictError instead
  *  - Same `(relPath, contributorIndex)` pair never appears twice
  */
-/**
- * Schema version for ResolvedPlan. Bumped only when consumers (E2/E3/E4/E5)
- * must update for a breaking shape change. Per the E1 fitness function, this
- * should not change for >= 2 weeks once 1 ships.
- */
-export const RESOLVED_PLAN_SCHEMA_VERSION = 1 as const;
-
 export interface ResolvedPlan {
   /** Schema version (see RESOLVED_PLAN_SCHEMA_VERSION). */
   schemaVersion: typeof RESOLVED_PLAN_SCHEMA_VERSION;

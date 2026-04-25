@@ -4,7 +4,12 @@ import * as path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { InvalidManifestError } from "../../src/errors/index.js";
-import { buildPaths, classifyInclude, isExternal } from "../../src/resolver/paths.js";
+import {
+  buildPaths,
+  classifyInclude,
+  isExternal,
+  isValidProfileName,
+} from "../../src/resolver/paths.js";
 
 describe("classifyInclude() — R37", () => {
   const projectRoot = path.resolve("/tmp/some-project");
@@ -64,6 +69,12 @@ describe("classifyInclude() — R37", () => {
     );
   });
 
+  it("rejects bare-with-backslashes strings on every platform", () => {
+    expect(() => classifyInclude("foo\\bar", referencingDir, paths, "p")).toThrow(
+      InvalidManifestError,
+    );
+  });
+
   it("rejects '~user' form as unsupported", () => {
     expect(() => classifyInclude("~bob/path", referencingDir, paths, "p")).toThrow(
       InvalidManifestError,
@@ -74,6 +85,27 @@ describe("classifyInclude() — R37", () => {
     expect(() => classifyInclude("", referencingDir, paths, "p")).toThrow(
       InvalidManifestError,
     );
+  });
+});
+
+describe("isValidProfileName()", () => {
+  it("accepts a plain bare name", () => {
+    expect(isValidProfileName("frontend")).toBe(true);
+    expect(isValidProfileName("staging-leaf")).toBe(true);
+  });
+
+  it("rejects path traversal forms", () => {
+    expect(isValidProfileName("..")).toBe(false);
+    expect(isValidProfileName(".")).toBe(false);
+    expect(isValidProfileName("../outside")).toBe(false);
+    expect(isValidProfileName("foo/bar")).toBe(false);
+    expect(isValidProfileName("foo\\bar")).toBe(false);
+  });
+
+  it("rejects empty / hidden / underscore-prefixed names", () => {
+    expect(isValidProfileName("")).toBe(false);
+    expect(isValidProfileName("_components")).toBe(false);
+    expect(isValidProfileName(".hidden")).toBe(false);
   });
 });
 
