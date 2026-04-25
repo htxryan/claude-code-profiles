@@ -44,13 +44,24 @@ export async function dispatch(
 ): Promise<number> {
   switch (command.kind) {
     case "version":
-      ctx.output.print(versionString(ctx.version));
+      // print() is silenced under --json (per the OutputChannel contract). For
+      // consumers running `claude-profiles --version --json` we still emit a
+      // structured payload so the output is non-empty and machine-parseable.
+      if (ctx.output.jsonMode) ctx.output.json({ version: ctx.version });
+      else ctx.output.print(versionString(ctx.version));
       return EXIT_OK;
 
-    case "help":
-      if (command.verb !== null) ctx.output.print(verbHelp(command.verb));
-      else ctx.output.print(topLevelHelp());
+    case "help": {
+      const text = command.verb !== null ? verbHelp(command.verb) : topLevelHelp();
+      // Same rationale as version: emit JSON shape under --json so the channel
+      // never silently produces an empty stdout for a successful command.
+      if (ctx.output.jsonMode) {
+        ctx.output.json(command.verb !== null ? { help: text, verb: command.verb } : { help: text });
+      } else {
+        ctx.output.print(text);
+      }
       return EXIT_OK;
+    }
 
     case "list":
       return runList({ cwd: global.cwd, output: ctx.output });

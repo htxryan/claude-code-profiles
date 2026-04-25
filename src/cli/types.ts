@@ -25,6 +25,11 @@ export type OnDriftFlag = Exclude<GateChoice, "no-drift-proceed">;
 /**
  * Global flags accepted on every verb. `cwd` is the project root the CLI
  * operates against — defaults to process.cwd(); tests inject a fixture path.
+ *
+ * Note: a `--no-color` flag is intentionally absent — formatters don't emit
+ * ANSI colour today, so advertising the flag would be a no-op. When colour is
+ * added (future polish pass), a `noColor` field belongs here and must be
+ * threaded through `createOutput` and the formatters in the same change.
  */
 export interface GlobalOptions {
   /** When true, all human-readable output is suppressed; only JSON to stdout. */
@@ -33,8 +38,6 @@ export interface GlobalOptions {
   cwd: string;
   /** Honored gate flag for `use`/`sync` non-interactive paths. */
   onDrift: OnDriftFlag | null;
-  /** Disable ANSI colour even when stderr is a TTY. */
-  noColor: boolean;
 }
 
 export type CommandKind =

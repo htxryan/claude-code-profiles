@@ -33,20 +33,25 @@ export async function runNew(opts: NewOptions): Promise<number> {
     );
   }
 
-  const profileDir = path.join(opts.cwd, ".claude-profiles", opts.profile);
-  // Check existence first; refuse rather than overwrite.
+  const profilesRoot = path.join(opts.cwd, ".claude-profiles");
+  const profileDir = path.join(profilesRoot, opts.profile);
+  // Atomically refuse to overwrite: ensure .claude-profiles/ exists, then
+  // create the profile dir non-recursively so a parallel `new` racing past
+  // an `fs.access` check can't sneak in (mkdir-non-recursive returns EEXIST
+  // and we map that to the user-facing "refusing to overwrite" error).
+  await fs.mkdir(profilesRoot, { recursive: true });
   try {
-    await fs.access(profileDir);
-    throw new CliUserError(
-      `new: ".claude-profiles/${opts.profile}/" already exists; refusing to overwrite`,
-      EXIT_USER_ERROR,
-    );
+    await fs.mkdir(profileDir);
   } catch (err: unknown) {
-    if (err instanceof CliUserError) throw err;
-    if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+    if ((err as NodeJS.ErrnoException).code === "EEXIST") {
+      throw new CliUserError(
+        `new: ".claude-profiles/${opts.profile}/" already exists; refusing to overwrite`,
+        EXIT_USER_ERROR,
+      );
+    }
+    throw err;
   }
-
-  await fs.mkdir(path.join(profileDir, ".claude"), { recursive: true });
+  await fs.mkdir(path.join(profileDir, ".claude"));
 
   const manifest: Record<string, unknown> = { name: opts.profile };
   if (opts.description !== null) manifest["description"] = opts.description;

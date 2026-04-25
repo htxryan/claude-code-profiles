@@ -31,7 +31,6 @@ import {
   applyGate,
   decideGate,
   detectDrift,
-  type ApplyGateResult,
   type GateChoice,
   type GateMode,
 } from "../../drift/index.js";
@@ -156,33 +155,54 @@ export async function runSwap(opts: SwapOptions): Promise<SwapResult> {
 
   // 6. Lock + re-detect + apply. Lock brackets detect-inside + applyGate +
   //    state-write so partial-success windows are unobservable.
-  let applyResult: ApplyGateResult;
-  let activeBefore: string | null = null;
-  await withLock(
+  //
+  //    The withLock callback returns the apply result so we don't have to
+  //    declare an outer `let applyResult` and reach for non-null assertions —
+  //    if anything inside the callback throws before applyGate completes,
+  //    the throw propagates and we never read an uninitialized binding.
+  const applyResult = await withLock(
     opts.paths,
     async () => {
-    // Re-read state inside the lock — needed for persist's `activeProfileName`.
-    const { state } = await readStateFile(opts.paths);
-    activeBefore = state.activeProfile;
+      // Re-read state inside the lock — needed for persist's `activeProfileName`.
+      const { state } = await readStateFile(opts.paths);
+      const activeBeforeInside = state.activeProfile;
 
-    // Re-detect inside the lock (TOCTOU defense per apply.ts).
-    const reportInside = await detectDrift(opts.paths);
-    // Re-decide using the inside report; if drift cleared between the
-    // outside read and the lock, downgrade choice to no-drift-proceed.
-    let appliedChoice: GateChoice = chosen;
-    if (
-      reportInside.entries.length === 0 ||
-      !reportInside.fingerprintOk
-    ) {
-      appliedChoice = "no-drift-proceed";
-    }
+      // Re-detect inside the lock (TOCTOU defense per apply.ts).
+      const reportInside = await detectDrift(opts.paths);
+      // Re-decide using the inside report. Two distinct cases:
+      //
+      //  (a) reportInside.entries.length === 0 — drift cleared between the
+      //      outside detect and lock acquisition (a parallel editor reverted
+      //      the file). The user's chosen action is moot; downgrade to
+      //      no-drift-proceed so we don't take a backup snapshot or persist
+      //      an unchanged tree. This is a benign race.
+      //
+      //  (b) !reportInside.fingerprintOk — `.state.json` became unreadable or
+      //      schema-mismatched between outside and inside. The user's chosen
+      //      action depended on having a valid state file (persist needs the
+      //      active profile name; discard's R23a backup is rooted in the
+      //      live `.claude/`). Refuse rather than silently downgrade and
+      //      overwrite live bytes without honouring the chosen contract —
+      //      the user can re-run after investigating the state file.
+      //      Exception: if we were going to no-op anyway (entries===0), the
+      //      first branch already covered it; we only land here when the
+      //      user explicitly chose discard/persist on a non-empty drift set.
+      let appliedChoice: GateChoice = chosen;
+      if (reportInside.entries.length === 0) {
+        appliedChoice = "no-drift-proceed";
+      } else if (!reportInside.fingerprintOk) {
+        throw new CliUserError(
+          `swap aborted: state file became unreadable between drift detection and lock acquisition; re-run after inspecting .claude-profiles/.state.json`,
+          EXIT_USER_ERROR,
+        );
+      }
 
-    applyResult = await applyGate(appliedChoice, {
-      paths: opts.paths,
-      plan,
-      merged,
-      activeProfileName: activeBefore,
-    });
+      return await applyGate(appliedChoice, {
+        paths: opts.paths,
+        plan,
+        merged,
+        activeProfileName: activeBeforeInside,
+      });
     },
     { signalHandlers: opts.signalHandlers },
   );
@@ -190,9 +210,9 @@ export async function runSwap(opts: SwapOptions): Promise<SwapResult> {
   // The materialize() call already wrote the new state; we surface the
   // observable outcome to the caller for messaging.
   return {
-    action: applyResult!.action,
+    action: applyResult.action,
     choice: chosen,
-    backupSnapshot: applyResult!.backupSnapshot,
-    activeAfter: applyResult!.materializeResult?.state.activeProfile ?? null,
+    backupSnapshot: applyResult.backupSnapshot,
+    activeAfter: applyResult.materializeResult?.state.activeProfile ?? null,
   };
 }

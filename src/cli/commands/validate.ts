@@ -7,17 +7,26 @@
  * are caught per-profile so one bad manifest doesn't mask others.
  */
 
+import { PipelineError, type PipelineErrorCode } from "../../errors/index.js";
 import { listProfiles, resolve } from "../../resolver/index.js";
 import { merge } from "../../merge/index.js";
 import { CliUserError, EXIT_CONFLICT } from "../exit.js";
 import { formatResolutionWarnings } from "../format.js";
 import type { OutputChannel } from "../output.js";
 
+/**
+ * Stable union of error-code strings the `validate` command may emit in its
+ * structured payload. `Unknown` is the catch-all for non-PipelineError throws
+ * (filesystem faults, etc.) so --json consumers see a closed set instead of
+ * arbitrary class names like "TypeError" leaking through.
+ */
+export type ValidateErrorCode = PipelineErrorCode | "Unknown";
+
 export interface ValidateProfileResult {
   profile: string;
   ok: boolean;
-  /** Error code from a thrown PipelineError, or null. */
-  errorCode: string | null;
+  /** Error code from a thrown PipelineError, or "Unknown" for non-pipeline errors. */
+  errorCode: ValidateErrorCode | null;
   errorMessage: string | null;
   warnings: Array<{ code: string; message: string; source: string | null }>;
   externalPaths: string[];
@@ -110,12 +119,10 @@ async function validateOne(cwd: string, name: string): Promise<ValidateProfileRe
       externalPaths: plan.externalPaths.map((e) => e.resolvedPath),
     };
   } catch (err: unknown) {
-    const code =
-      err instanceof Error && "code" in err && typeof (err as { code: unknown }).code === "string"
-        ? (err as { code: string }).code
-        : err instanceof Error
-          ? err.name
-          : "Unknown";
+    // Pin errorCode to PipelineErrorCode | "Unknown" so the --json payload
+    // never leaks arbitrary class names (e.g. "TypeError", "SyntaxError")
+    // into a field downstream tooling parses against the documented union.
+    const code: ValidateErrorCode = err instanceof PipelineError ? err.code : "Unknown";
     const message = err instanceof Error ? err.message : String(err);
     return {
       profile: name,

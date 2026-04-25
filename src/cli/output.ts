@@ -48,7 +48,22 @@ export function createOutput(opts: OutputChannelOptions): OutputChannel {
     json(payload: unknown): void {
       // JSON output is canonical newline-terminated single-object-per-line so
       // downstream pipelines can `| jq -s 'add'` or read line-by-line.
-      writeSafe(out, JSON.stringify(payload) + "\n");
+      //
+      // JSON.stringify can throw on BigInt or circular structures. Command
+      // payloads are reviewed to be JSON-serializable, but a defensive
+      // try/catch keeps a programmer-error throw from escaping through the
+      // output channel and surfacing as the bin's exit-2 "internal error".
+      let line: string;
+      try {
+        line = JSON.stringify(payload) + "\n";
+      } catch (err) {
+        line =
+          JSON.stringify({
+            error: "json-serialize-failed",
+            detail: err instanceof Error ? err.message : String(err),
+          }) + "\n";
+      }
+      writeSafe(out, line);
     },
     warn(text: string): void {
       if (jsonMode) return;

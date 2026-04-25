@@ -7,8 +7,9 @@
  *  - First non-flag token is the verb (R29). `--help`/`--version` short-
  *    circuit verb dispatch.
  *  - Global flags (`--json`, `--cwd=<path>`, `--on-drift=<choice>`,
- *    `--no-color`, `--help`, `--version`) may appear anywhere in argv —
- *    before or after the verb.
+ *    `--help`, `--version`) may appear anywhere in argv — before or after the
+ *    verb. (`--no-color` is intentionally absent until colour is wired
+ *    through the formatters.)
  *  - Verb-specific flags (`--description=<txt>` for `new`, `--pre-commit-warn`
  *    for `drift`) are scoped per verb.
  *  - Positional args after the verb are required (e.g. `use <name>`); we
@@ -65,7 +66,6 @@ export function parseArgs(argv: ReadonlyArray<string>, defaultCwd: string): Pars
     json: false,
     cwd: defaultCwd,
     onDrift: null,
-    noColor: false,
   };
 
   // Side-channel for help/version short-circuit. We still want to parse the
@@ -81,8 +81,6 @@ export function parseArgs(argv: ReadonlyArray<string>, defaultCwd: string): Pars
     const t = tokens[i]!;
     if (t === "--json") {
       global.json = true;
-    } else if (t === "--no-color") {
-      global.noColor = true;
     } else if (t === "--help" || t === "-h") {
       helpFlagSeen = true;
     } else if (t === "--version" || t === "-V") {
@@ -92,6 +90,10 @@ export function parseArgs(argv: ReadonlyArray<string>, defaultCwd: string): Pars
       if (next === undefined || next.startsWith("-")) {
         return parseError(`--cwd requires a path argument`);
       }
+      // Empty-string is rejected here as well as in the `--cwd=` branch — a
+      // bare `""` arg silently running against cwd="" would later look up
+      // `.claude-profiles/` in whatever directory the OS normalises "" to.
+      if (next === "") return parseError(`--cwd requires a non-empty path`);
       global.cwd = next;
       i++;
     } else if (t.startsWith("--cwd=")) {
@@ -109,14 +111,25 @@ export function parseArgs(argv: ReadonlyArray<string>, defaultCwd: string): Pars
       const flag = parseOnDrift(v);
       if (!flag) return parseError(`--on-drift must be discard|persist|abort, got "${v}"`);
       global.onDrift = flag;
+    } else if (t === "--no-color") {
+      // --no-color is intentionally unsupported until colour is wired through
+      // the formatters (see types.ts). Reject explicitly here so the user
+      // sees "unknown flag --no-color" rather than the verb dispatcher's
+      // "list takes no arguments" diagnostic, which makes it look like the
+      // flag was treated as a positional.
+      return parseError(`unknown flag "--no-color" (colour output is not yet implemented)`);
     } else {
       verbAndArgs.push(t);
     }
   }
 
   // Version short-circuit beats verb dispatch (R29 doesn't list `--version`
-  // as a verb but it's a universal CLI affordance).
-  if (versionFlagSeen && verbAndArgs.length === 0) {
+  // as a verb but it's a universal CLI affordance). Fires regardless of
+  // whether a verb is also present — silently consuming `--version` when a
+  // verb is supplied (`claude-profiles list --version`) hides the user's
+  // intent. The verb form `--help` keeps the verb (renders verb-specific
+  // help), but `--version` always means "print version and exit".
+  if (versionFlagSeen) {
     return ok({ command: { kind: "version" }, global });
   }
 

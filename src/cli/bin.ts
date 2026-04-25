@@ -23,7 +23,7 @@ import * as path from "node:path";
 // TTY props (`process.stdin.isTTY`) bind correctly. The namespace form
 // surfaces internals like `_events` but loses prototype methods.
 import process from "node:process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { dispatch } from "./dispatch.js";
 import { exitCodeFor } from "./exit.js";
@@ -89,9 +89,17 @@ export async function main(argv: ReadonlyArray<string>): Promise<number> {
 // Run when invoked as a script. The conditional avoids running on import (the
 // dispatch module is also exported so embedding contexts can call it
 // directly).
+//
+// Compare via pathToFileURL so the equality is correct on Windows (where
+// `file:///C:/...` doesn't match a naive `file://${argv[1]}` template), and
+// drop the basename `endsWith("bin.js")` fallback — that fallback used to
+// fire on any importer file ending in `bin.js`/`bin.ts`, which would auto-
+// run main() inside an embedder named e.g. `mybin.js`.
 const isDirect = (() => {
+  const argv1 = process.argv[1];
+  if (typeof argv1 !== "string" || argv1 === "") return false;
   try {
-    return import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith("bin.js") || process.argv[1]?.endsWith("bin.ts");
+    return import.meta.url === pathToFileURL(argv1).href;
   } catch {
     return false;
   }

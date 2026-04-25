@@ -82,6 +82,9 @@ describe("parseArgs — global flags", () => {
   it("--cwd requires a non-empty path", () => {
     expect(err(["--cwd=", "list"])).toContain("non-empty");
     expect(err(["--cwd", "--json"])).toContain("requires a path");
+    // Regression: the space-form previously accepted "" silently because the
+    // check was `next === undefined || next.startsWith("-")`.
+    expect(err(["--cwd", "", "list"])).toContain("non-empty");
   });
 
   it("--on-drift accepts discard|persist|abort and rejects others", () => {
@@ -92,8 +95,14 @@ describe("parseArgs — global flags", () => {
     expect(err(["--on-drift=keep", "use", "x"])).toContain("discard|persist|abort");
   });
 
-  it("--no-color sets noColor", () => {
-    expect(run(["--no-color", "list"]).global.noColor).toBe(true);
+  it("--no-color is rejected explicitly with a flag-shaped diagnostic", () => {
+    // Until colour is wired through formatters, --no-color is rejected at the
+    // parser level so the message names the flag — earlier the flag fell
+    // through to the verb dispatcher and produced "list takes no arguments",
+    // which made it look like the flag was a positional.
+    const m = err(["list", "--no-color"]);
+    expect(m).toContain("--no-color");
+    expect(m).toContain("unknown flag");
   });
 
   it("--help with no verb returns help command", () => {
@@ -112,6 +121,13 @@ describe("parseArgs — global flags", () => {
   it("--version emits version command", () => {
     expect(run(["--version"]).command).toEqual({ kind: "version" });
     expect(run(["-V"]).command).toEqual({ kind: "version" });
+  });
+
+  it("--version short-circuits even when a verb is also present", () => {
+    // Regression: previously `claude-profiles list --version` ran `list` and
+    // silently dropped the flag; users who type --version always want version.
+    expect(run(["list", "--version"]).command).toEqual({ kind: "version" });
+    expect(run(["--version", "use", "x"]).command).toEqual({ kind: "version" });
   });
 });
 

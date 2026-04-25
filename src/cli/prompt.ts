@@ -28,31 +28,75 @@ export interface PromptInput {
 export type GatePrompt = (input: PromptInput) => Promise<OnDriftFlag>;
 
 /**
+ * Streams the readline prompt reads from / writes to. Production binds to
+ * `process.stdin` / `process.stderr`; tests inject PassThrough pairs.
+ */
+export interface ReadlinePromptStreams {
+  input: NodeJS.ReadableStream;
+  output: NodeJS.WritableStream;
+  /** True iff the input stream is a real TTY — affects readline's terminal mode. */
+  terminal: boolean;
+}
+
+/**
+ * Build a readline-backed prompt. Exported so tests can inject streams; the
+ * bin entry uses the default `readlinePrompt` binding which captures
+ * process.stdin / process.stderr.
+ */
+export function makeReadlinePrompt(streams: ReadlinePromptStreams): GatePrompt {
+  return async (input) => {
+    const rl = readline.createInterface({
+      input: streams.input,
+      output: streams.output,
+      terminal: streams.terminal,
+    });
+    // On Node 20, closing the input stream (Ctrl-D, pipe end) does NOT reject a
+    // pending rl.question() — it just stops feeding lines, and the await hangs
+    // forever. The only way to observe EOF is to wire an AbortController to the
+    // 'close' event and pass the signal into question(); that path *does*
+    // reject (with AbortError), which we translate to "abort" per the
+    // GatePrompt contract.
+    const ac = new AbortController();
+    const onClose = () => ac.abort();
+    rl.once("close", onClose);
+    try {
+      streams.output.write(
+        `\nDrift detected: ${input.driftedCount} file(s) in .claude/ vs active profile "${input.activeProfile}"\n` +
+          `  discard - destroy live edits, materialize "${input.targetProfile}" (snapshots .claude/ first)\n` +
+          `  persist - save live .claude/ into "${input.activeProfile}", then materialize "${input.targetProfile}"\n` +
+          `  abort   - make no changes\n`,
+      );
+      while (true) {
+        let answer: string;
+        try {
+          answer = (
+            await rl.question("[d]iscard / [p]ersist / [a]bort? ", { signal: ac.signal })
+          )
+            .trim()
+            .toLowerCase();
+        } catch {
+          streams.output.write(`\n(input closed — aborting)\n`);
+          return "abort";
+        }
+        if (answer === "discard" || answer === "d") return "discard";
+        if (answer === "persist" || answer === "p") return "persist";
+        if (answer === "abort" || answer === "a") return "abort";
+        streams.output.write(`Please answer discard, persist, or abort.\n`);
+      }
+    } finally {
+      rl.off("close", onClose);
+      rl.close();
+    }
+  };
+}
+
+/**
  * Default implementation backed by readline. Prints a brief explanation to
  * stderr (so it doesn't pollute --json stdout — but --json mode never reaches
  * this path because non-interactive sessions auto-resolve at the gate).
  */
-export const readlinePrompt: GatePrompt = async (input) => {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stderr,
-    terminal: true,
-  });
-  try {
-    process.stderr.write(
-      `\nDrift detected: ${input.driftedCount} file(s) in .claude/ vs active profile "${input.activeProfile}"\n` +
-        `  discard - destroy live edits, materialize "${input.targetProfile}" (snapshots .claude/ first)\n` +
-        `  persist - save live .claude/ into "${input.activeProfile}", then materialize "${input.targetProfile}"\n` +
-        `  abort   - make no changes\n`,
-    );
-    while (true) {
-      const answer = (await rl.question("[d]iscard / [p]ersist / [a]bort? ")).trim().toLowerCase();
-      if (answer === "discard" || answer === "d") return "discard";
-      if (answer === "persist" || answer === "p") return "persist";
-      if (answer === "abort" || answer === "a") return "abort";
-      process.stderr.write(`Please answer discard, persist, or abort.\n`);
-    }
-  } finally {
-    rl.close();
-  }
-};
+export const readlinePrompt: GatePrompt = makeReadlinePrompt({
+  input: process.stdin,
+  output: process.stderr,
+  terminal: true,
+});

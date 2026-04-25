@@ -26,7 +26,7 @@ function ctxFor(json = false) {
 }
 
 function global(json = false): GlobalOptions {
-  return { json, cwd: ".", onDrift: null, noColor: false };
+  return { json, cwd: ".", onDrift: null };
 }
 
 describe("dispatch — top-level routes", () => {
@@ -37,6 +37,16 @@ describe("dispatch — top-level routes", () => {
     expect(cap.stdout()).toContain("claude-profiles 9.9.9");
   });
 
+  it("version under --json → emits {version} payload (not silenced)", async () => {
+    // Regression: ctx.output.print is silenced in --json mode; without an
+    // explicit JSON branch, `--version --json` produced empty stdout.
+    const { cap, ctx } = ctxFor(true);
+    const code = await dispatch({ kind: "version" }, global(true), ctx);
+    expect(code).toBe(0);
+    const out = cap.stdout().trim();
+    expect(JSON.parse(out)).toEqual({ version: "9.9.9" });
+  });
+
   it("help (no verb) → prints top-level help with all R29 verbs", async () => {
     const { cap, ctx } = ctxFor();
     await dispatch({ kind: "help", verb: null }, global(), ctx);
@@ -44,6 +54,14 @@ describe("dispatch — top-level routes", () => {
     for (const verb of ["init", "list", "use", "status", "drift", "diff", "new", "validate", "sync", "hook"]) {
       expect(out).toContain(verb);
     }
+  });
+
+  it("help under --json → emits {help} payload (not silenced)", async () => {
+    const { cap, ctx } = ctxFor(true);
+    await dispatch({ kind: "help", verb: null }, global(true), ctx);
+    const parsed = JSON.parse(cap.stdout().trim());
+    expect(typeof parsed.help).toBe("string");
+    expect(parsed.help).toContain("USAGE");
   });
 
   it("help <verb> → prints verb-specific help", async () => {
