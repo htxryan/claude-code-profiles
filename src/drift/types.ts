@@ -14,6 +14,7 @@
  * with the report shape they protect.
  */
 
+import type { StateReadWarning } from "../state/state-file.js";
 import type { ResolvedSourceRef } from "../state/types.js";
 
 /**
@@ -85,6 +86,14 @@ export interface DriftReport {
   fastPathHits: number;
   /** Files that required content-hash comparison or were add/delete. */
   slowPathHits: number;
+  /**
+   * Non-fatal warning surfaced when `.state.json` was unparseable or
+   * schema-mismatched (R42 / S17). Null when the state file was healthy.
+   * E5's `status` and `drift` commands print this so the user knows the
+   * underlying state is degraded — without it, a degraded state file looks
+   * indistinguishable from a fresh project.
+   */
+  warning: StateReadWarning | null;
 }
 
 /**

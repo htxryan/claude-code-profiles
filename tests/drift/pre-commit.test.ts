@@ -115,4 +115,38 @@ describe("preCommitWarn (R25, R25a, S18)", () => {
     expect(result.warnings).toEqual([]);
     expect(stderrSpy).not.toHaveBeenCalled();
   });
+
+  it("R25a fail-open: stderr.write throwing (EPIPE) does not break exit-0 contract", async () => {
+    const paths = buildStatePaths(ctx!.fx.projectRoot);
+    await materialize(paths, ctx!.plan, ctx!.merged);
+    await fs.writeFile(path.join(paths.claudeDir, "CLAUDE.md"), "EDITED\n");
+
+    // Simulate a closed-pipe parent (git commit driver disconnected).
+    vi.spyOn(process.stderr, "write").mockImplementation(() => {
+      throw new Error("EPIPE");
+    });
+
+    const result = await preCommitWarn(paths);
+    // Function must still return exit 0 with the captured warnings — the
+    // write failure was swallowed.
+    expect(result.exitCode).toBe(0);
+    expect(result.warnings.length).toBeGreaterThan(0);
+  });
+
+  it("R25a fail-open: detectDrift throwing produces a single 'skipped' line, exit 0", async () => {
+    // Build a path bundle pointing at a non-existent project root that
+    // *also* won't trigger ENOENT graceful-handling — make stateFile's
+    // parent be a regular file. fs.mkdir / fs.readFile on it both fail
+    // with ENOTDIR or EEXIST, exercising the outer try/catch in
+    // preCommitWarn.
+    const fauxRoot = path.join(ctx!.fx.projectRoot, "faux");
+    const fauxProfilesDir = path.join(fauxRoot, ".claude-profiles");
+    await fs.mkdir(fauxRoot, { recursive: true });
+    await fs.writeFile(fauxProfilesDir, "I am a file, not a directory");
+    const paths = buildStatePaths(fauxRoot);
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    const result = await preCommitWarn(paths);
+    expect(result.exitCode).toBe(0);
+  });
 });

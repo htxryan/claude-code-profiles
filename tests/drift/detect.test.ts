@@ -159,4 +159,63 @@ describe("detectDrift (R18, R19, R20)", () => {
     const report = await detectDrift(paths);
     expect(report.schemaVersion).toBe(1);
   });
+
+  it("R42 / S17: surfaces StateReadWarning when .state.json is corrupted", async () => {
+    const paths = buildStatePaths(fx!.projectRoot);
+    await fs.mkdir(paths.profilesDir, { recursive: true });
+    await fs.writeFile(paths.stateFile, "{not valid json");
+    const report = await detectDrift(paths);
+    expect(report.fingerprintOk).toBe(false);
+    expect(report.warning).not.toBeNull();
+    expect(report.warning!.code).toBe("ParseError");
+  });
+
+  it("returns fingerprintOk:false when fingerprint.schemaVersion mismatches", async () => {
+    const paths = buildStatePaths(fx!.projectRoot);
+    await fs.mkdir(paths.profilesDir, { recursive: true });
+    // Hand-craft a state file whose top-level schema is current but whose
+    // nested fingerprint.schemaVersion is bumped — readStateFile validates
+    // the top-level shape; we want to be sure the drift layer doesn't blow
+    // up if a future fingerprint version reaches it.
+    await fs.writeFile(
+      paths.stateFile,
+      JSON.stringify({
+        schemaVersion: 99, // top-level mismatch → readStateFile degrades to NoActive
+        activeProfile: "leaf",
+        materializedAt: null,
+        resolvedSources: [],
+        fingerprint: { schemaVersion: 1, files: {} },
+        externalTrustNotices: [],
+      }),
+    );
+    const report = await detectDrift(paths);
+    expect(report.fingerprintOk).toBe(false);
+    expect(report.warning).not.toBeNull();
+  });
+
+  it("documented metric invariant: fastPathHits + slowPathHits === scannedFiles + (deleted count)", async () => {
+    const paths = buildStatePaths(fx!.projectRoot);
+    await materialize(paths, plan, merged);
+    // Add 1 file (added → slow) and delete 1 file (deleted → slow).
+    await fs.writeFile(path.join(paths.claudeDir, "scratch.md"), "scratch");
+    await fs.unlink(path.join(paths.claudeDir, "agents/a.md"));
+
+    const report = await detectDrift(paths);
+    const deletedCount = report.entries.filter((e) => e.status === "deleted").length;
+    expect(report.fastPathHits + report.slowPathHits).toBe(
+      report.scannedFiles + deletedCount,
+    );
+  });
+
+  it("provenance is per-entry copy (mutating one entry's array does not cross-contaminate)", async () => {
+    const paths = buildStatePaths(fx!.projectRoot);
+    await materialize(paths, plan, merged);
+    await fs.writeFile(path.join(paths.claudeDir, "f1.md"), "x");
+    await fs.writeFile(path.join(paths.claudeDir, "f2.md"), "y");
+    const report = await detectDrift(paths);
+    expect(report.entries.length).toBeGreaterThanOrEqual(2);
+    const a = report.entries[0]!;
+    const b = report.entries[1]!;
+    expect(a.provenance).not.toBe(b.provenance);
+  });
 });

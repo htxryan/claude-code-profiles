@@ -28,7 +28,7 @@ import {
  * stays silent.
  */
 export async function detectDrift(paths: StatePaths): Promise<DriftReport> {
-  const { state } = await readStateFile(paths);
+  const { state, warning } = await readStateFile(paths);
 
   if (state.activeProfile === null) {
     return {
@@ -39,6 +39,7 @@ export async function detectDrift(paths: StatePaths): Promise<DriftReport> {
       scannedFiles: 0,
       fastPathHits: 0,
       slowPathHits: 0,
+      warning,
     };
   }
 
@@ -50,10 +51,14 @@ export async function detectDrift(paths: StatePaths): Promise<DriftReport> {
   const entries: DriftEntry[] = [];
   for (const e of result.entries) {
     if (e.kind === "unchanged") continue;
+    // Spread provenance per entry rather than sharing a single array
+    // reference — defends against any future caller that mutates the
+    // entry (e.g. sorts or filters provenance) from cross-contaminating
+    // siblings (multi-reviewer P2-4).
     entries.push({
       relPath: e.relPath,
       status: e.kind,
-      provenance: state.resolvedSources,
+      provenance: [...state.resolvedSources],
     });
   }
 
@@ -65,5 +70,6 @@ export async function detectDrift(paths: StatePaths): Promise<DriftReport> {
     scannedFiles: result.metrics.scannedFiles,
     fastPathHits: result.metrics.fastPathHits,
     slowPathHits: result.metrics.slowPathHits,
+    warning,
   };
 }

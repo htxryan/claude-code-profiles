@@ -16,7 +16,7 @@
  *     `fingerprintOk: false` is also treated as no-drift (nothing to gate on)
  */
 
-import type { GateChoice, GateInput, GateOutcome } from "./types.js";
+import type { GateInput, GateOutcome } from "./types.js";
 
 /**
  * Decide what the orchestrator should do at the drift gate.
@@ -43,9 +43,10 @@ export function decideGate(input: GateInput): GateOutcome {
   }
 
   if (input.onDriftFlag) {
+    // The flag's value type is a strict subset of GateChoice — no cast.
     return {
       kind: "auto",
-      choice: input.onDriftFlag as GateChoice,
+      choice: input.onDriftFlag,
       reason: `--on-drift=${input.onDriftFlag} flag`,
     };
   }
