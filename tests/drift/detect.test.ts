@@ -207,6 +207,31 @@ describe("detectDrift (R18, R19, R20)", () => {
     );
   });
 
+  it("zero-mtime sentinel forces slow path (post-crash recordMtimes-skipped state)", async () => {
+    const paths = buildStatePaths(fx!.projectRoot);
+    await materialize(paths, plan, merged);
+    // Simulate the post-crash "fingerprint written but recordMtimes never
+    // ran" scenario by zeroing every mtimeMs in the state file. The fast
+    // path's `r.mtimeMs !== 0` guard should force slow-path hashing for
+    // every entry; absent that, we'd silently report all files unchanged.
+    const stateRaw = await fs.readFile(paths.stateFile, "utf8");
+    const state = JSON.parse(stateRaw) as {
+      fingerprint: { files: Record<string, { mtimeMs: number }> };
+    };
+    for (const k of Object.keys(state.fingerprint.files)) {
+      state.fingerprint.files[k]!.mtimeMs = 0;
+    }
+    await fs.writeFile(paths.stateFile, JSON.stringify(state));
+
+    // No actual drift, just zeroed mtimes — every file hits the slow path
+    // but should still verify identical → unchanged → 0 drift entries.
+    const report = await detectDrift(paths);
+    expect(report.fingerprintOk).toBe(true);
+    expect(report.entries).toEqual([]);
+    expect(report.fastPathHits).toBe(0);
+    expect(report.slowPathHits).toBe(2);
+  });
+
   it("provenance is per-entry copy (mutating one entry's array does not cross-contaminate)", async () => {
     const paths = buildStatePaths(fx!.projectRoot);
     await materialize(paths, plan, merged);

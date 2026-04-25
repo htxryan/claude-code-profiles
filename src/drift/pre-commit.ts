@@ -47,6 +47,18 @@ export async function preCommitWarn(paths: StatePaths): Promise<PreCommitWarnRes
   let report: DriftReport | null = null;
   try {
     report = await detectDrift(paths);
+    // Surface a degraded-state notice (S17 / R42) before drift output.
+    // Without it, a corrupted .state.json looks indistinguishable from a
+    // fresh project — the user gets no hint that the underlying state
+    // file is broken (multi-reviewer second-pass P1). We deliberately
+    // skip code "Missing": that's the normal NoActive case for projects
+    // that haven't run `init` yet, and we don't want a warning on every
+    // commit in those repos.
+    if (report.warning && report.warning.code !== "Missing") {
+      warnings.push(
+        `claude-profiles: state file degraded (${report.warning.code}): ${report.warning.detail}`,
+      );
+    }
     if (report.fingerprintOk && report.entries.length > 0) {
       warnings.push(...formatWarning(report));
     }

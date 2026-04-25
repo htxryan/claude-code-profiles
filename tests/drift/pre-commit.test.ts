@@ -133,6 +133,28 @@ describe("preCommitWarn (R25, R25a, S18)", () => {
     expect(result.warnings.length).toBeGreaterThan(0);
   });
 
+  it("S17: surfaces a degraded-state warning when .state.json is corrupted", async () => {
+    const paths = buildStatePaths(ctx!.fx.projectRoot);
+    await materialize(paths, ctx!.plan, ctx!.merged);
+    // Corrupt the state file so detectDrift returns a warning.
+    await fs.writeFile(paths.stateFile, "{ not json");
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    const result = await preCommitWarn(paths);
+    expect(result.exitCode).toBe(0);
+    expect(result.warnings.some((w) => /state file degraded/.test(w))).toBe(true);
+    expect(result.report?.warning?.code).toBe("ParseError");
+  });
+
+  it("does NOT print 'state file degraded' for a Missing state file (fresh project)", async () => {
+    const paths = buildStatePaths(ctx!.fx.projectRoot);
+    // No materialize — state file absent → 'Missing' warning. The hook
+    // should be silent in this case (matches a fresh-project user
+    // experience).
+    const result = await preCommitWarn(paths);
+    expect(result.warnings.some((w) => /state file degraded/.test(w))).toBe(false);
+  });
+
   it("R25a fail-open: detectDrift throwing produces a single 'skipped' line, exit 0", async () => {
     // Build a path bundle pointing at a non-existent project root that
     // *also* won't trigger ENOENT graceful-handling — make stateFile's
