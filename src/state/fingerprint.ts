@@ -192,6 +192,31 @@ export interface FileDrift {
 }
 
 /**
+ * Two-tier comparison metrics. E4's DriftReport surfaces these to give users
+ * insight into how the fingerprint check performed (e.g. "0 fast-path hits
+ * across 200 files" is a smell for clock-skew / atomic-write tools).
+ */
+export interface CompareMetrics {
+  /** Total live files scanned by the metadata walk. */
+  scannedFiles: number;
+  /**
+   * Files where size+mtime matched recorded values and we skipped hashing.
+   * Counts only files in the live∩recorded intersection.
+   */
+  fastPathHits: number;
+  /**
+   * Files where metadata diverged (or one side was missing) and we either
+   * hashed or attributed an add/delete. Includes added/deleted entries.
+   */
+  slowPathHits: number;
+}
+
+export interface CompareResult {
+  entries: FileDrift[];
+  metrics: CompareMetrics;
+}
+
+/**
  * Compare a recorded fingerprint against the live tree at `claudeDir`. Two-
  * tier (multi-reviewer P3, both): the fast path is a metadata-only walk
  * (stat for size+mtime); only files whose metadata signals a possible
@@ -204,27 +229,47 @@ export async function compareFingerprint(
   claudeDir: string,
   recorded: Fingerprint,
 ): Promise<FileDrift[]> {
+  const { entries } = await compareFingerprintWithMetrics(claudeDir, recorded);
+  return entries;
+}
+
+/**
+ * Variant of `compareFingerprint` that also returns fast/slow-path metrics.
+ * E4's drift detector consumes this to populate `DriftReport.{scannedFiles,
+ * fastPathHits, slowPathHits}`. Same comparison logic; metrics are tallied
+ * during the walk so callers don't pay a double-traversal cost.
+ */
+export async function compareFingerprintWithMetrics(
+  claudeDir: string,
+  recorded: Fingerprint,
+): Promise<CompareResult> {
   const liveMeta = await fingerprintTreeMetadataOnly(claudeDir);
 
   const recordedKeys = new Set(Object.keys(recorded.files));
   const liveKeys = new Set(Object.keys(liveMeta));
   const union = new Set([...recordedKeys, ...liveKeys]);
 
+  let fastPathHits = 0;
+  let slowPathHits = 0;
+
   const out: FileDrift[] = [];
   for (const relPath of union) {
     const r = recorded.files[relPath];
     const l = liveMeta[relPath];
     if (!r && l) {
+      slowPathHits++;
       out.push({ relPath, kind: "added" });
       continue;
     }
     if (r && !l) {
+      slowPathHits++;
       out.push({ relPath, kind: "deleted" });
       continue;
     }
     if (r && l) {
       // Fast path: stat metadata matches → definitely unchanged.
       if (r.size === l.size && r.mtimeMs !== 0 && l.mtimeMs === r.mtimeMs) {
+        fastPathHits++;
         out.push({ relPath, kind: "unchanged" });
         continue;
       }
@@ -232,6 +277,7 @@ export async function compareFingerprint(
       // hash. Avoids hashing the whole tree. Tolerate ENOENT (Opus review
       // #4): the file may have been deleted between metadata walk and
       // readFile; treat as deleted.
+      slowPathHits++;
       try {
         const bytes = await fs.readFile(l.abs);
         const liveHash = hashBytes(bytes);
@@ -246,5 +292,12 @@ export async function compareFingerprint(
     }
   }
   out.sort((a, b) => a.relPath.localeCompare(b.relPath));
-  return out;
+  return {
+    entries: out,
+    metrics: {
+      scannedFiles: liveKeys.size,
+      fastPathHits,
+      slowPathHits,
+    },
+  };
 }

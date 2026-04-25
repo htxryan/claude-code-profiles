@@ -42,12 +42,18 @@ export type { ReconcileOutcome } from "./reconcile.js";
 
 export {
   compareFingerprint,
+  compareFingerprintWithMetrics,
   fingerprintFromMergedFiles,
   fingerprintTree,
   hashBytes,
   recordMtimes,
 } from "./fingerprint.js";
-export type { DriftKind, FileDrift } from "./fingerprint.js";
+export type {
+  CompareMetrics,
+  CompareResult,
+  DriftKind,
+  FileDrift,
+} from "./fingerprint.js";
 
 export { snapshotForDiscard, listSnapshots } from "./backup.js";
 
