@@ -98,6 +98,19 @@ describe("persist transactional pair (R22b)", () => {
     expect(result.state.activeProfile).toBe("v2");
   });
 
+  it("rejects profile names containing path separators or traversal", async () => {
+    const paths = buildStatePaths(fx.projectRoot);
+    await expect(persistLiveIntoProfile(paths, "../escape")).rejects.toThrow(
+      /Invalid profile name/,
+    );
+    await expect(persistLiveIntoProfile(paths, "../..")).rejects.toThrow(
+      /Invalid profile name/,
+    );
+    await expect(persistLiveIntoProfile(paths, "a/b")).rejects.toThrow(
+      /Invalid profile name/,
+    );
+  });
+
   it("persists an empty target when live .claude/ is missing", async () => {
     const paths = buildStatePaths(fx.projectRoot);
     // No live .claude/ at all.

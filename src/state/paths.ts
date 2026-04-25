@@ -75,6 +75,18 @@ export interface PersistPaths {
 }
 
 export function buildPersistPaths(paths: StatePaths, profileName: string): PersistPaths {
+  // Defense-in-depth (multi-reviewer P2, Gemini #5): profile names are
+  // validated by the resolver (`isValidProfileName`) before they reach this
+  // path, but we re-validate here so any caller that bypasses the resolver
+  // can't traverse the profilesDir boundary. `path.basename(x) !== x` flags
+  // anything containing a separator or `..`.
+  if (
+    profileName.length === 0 ||
+    profileName.startsWith(".") ||
+    path.basename(profileName) !== profileName
+  ) {
+    throw new Error(`Invalid profile name for persist target: ${JSON.stringify(profileName)}`);
+  }
   const profileDir = path.join(paths.profilesDir, profileName);
   return {
     profileDir,

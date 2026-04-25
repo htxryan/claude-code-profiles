@@ -99,4 +99,30 @@ describe("fingerprint", () => {
     const drift = await compareFingerprint(root, fp);
     expect(drift).toEqual([{ relPath: "f.md", kind: "unchanged" }]);
   });
+
+  it("compareFingerprint handles many files with mostly-unchanged metadata efficiently", async () => {
+    // Build a fingerprint of 20 files; touch only one to invalidate via mtime.
+    const merged: MergedFile[] = [];
+    for (let i = 0; i < 20; i++) {
+      merged.push({
+        path: `f-${i}.md`,
+        bytes: Buffer.from(`v-${i}`),
+        contributors: ["a"],
+        mergePolicy: "concat",
+      });
+      await fs.writeFile(path.join(root, `f-${i}.md`), `v-${i}`);
+    }
+    let fp = fingerprintFromMergedFiles(merged);
+    fp = await recordMtimes(root, fp);
+
+    // Modify one file's content + mtime.
+    const target = path.join(root, "f-7.md");
+    await new Promise((r) => setTimeout(r, 10));
+    await fs.writeFile(target, "MODIFIED");
+
+    const drift = await compareFingerprint(root, fp);
+    const modified = drift.filter((d) => d.kind === "modified");
+    expect(modified).toEqual([{ relPath: "f-7.md", kind: "modified" }]);
+    expect(drift.filter((d) => d.kind === "unchanged")).toHaveLength(19);
+  });
 });

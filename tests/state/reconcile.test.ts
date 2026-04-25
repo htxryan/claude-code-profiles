@@ -88,6 +88,18 @@ describe("reconcile (R16a)", () => {
     expect(out.kind).toBe("none");
   });
 
+  it("does not leave a `.claude.reconcile-*` scratch dir behind on success", async () => {
+    const paths = buildStatePaths(root);
+    await fs.mkdir(paths.priorDir, { recursive: true });
+    await fs.writeFile(path.join(paths.priorDir, "a"), "PRIOR");
+    await fs.mkdir(paths.claudeDir, { recursive: true });
+    await fs.writeFile(path.join(paths.claudeDir, "a"), "PARTIAL");
+    await reconcileMaterialize(paths);
+    const entries = await fs.readdir(path.dirname(paths.claudeDir));
+    const scratch = entries.filter((e) => e.startsWith(".claude.reconcile-"));
+    expect(scratch).toEqual([]);
+  });
+
   it("reconcilePersist: restores per-profile prior", async () => {
     const paths = buildStatePaths(root);
     const profileDir = path.join(paths.profilesDir, "myprofile");

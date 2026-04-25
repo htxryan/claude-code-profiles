@@ -19,7 +19,6 @@
  */
 
 import { promises as fs } from "node:fs";
-import * as path from "node:path";
 
 import type { MergedFile } from "../merge/types.js";
 import type { ResolvedPlan } from "../resolver/types.js";
@@ -28,7 +27,7 @@ import { atomicRename, pathExists, rmrf } from "./atomic.js";
 import { copyTree } from "./copy.js";
 import { materialize, type MaterializeResult } from "./materialize.js";
 import { buildPersistPaths, type StatePaths } from "./paths.js";
-import { reconcilePersist } from "./reconcile.js";
+import { reconcileMaterialize, reconcilePersist } from "./reconcile.js";
 
 export interface PersistAndMaterializeOptions {
   /** Profile that owns the live `.claude/` (we copy live into THIS profile). */
@@ -43,13 +42,23 @@ export interface PersistAndMaterializeOptions {
  * Persist live `.claude/` into `<activeProfileName>/.claude/`, then
  * materialize the new plan as live `.claude/`. This is the "drift → persist"
  * gate flow (R22 / R22a / R22b).
+ *
+ * Lock precondition: caller MUST hold the project lock (E5 swap orchestration
+ * wraps this in `withLock`). The function does not acquire its own lock so
+ * the persist + materialize pair is bracketed by a single lock acquisition,
+ * matching the spec's "lock brackets the rename pair AND the state-write"
+ * invariant (multi-reviewer P1, Codex #2).
  */
 export async function persistAndMaterialize(
   paths: StatePaths,
   opts: PersistAndMaterializeOptions,
 ): Promise<MaterializeResult> {
-  // Step 0: reconcile any leftover persist artifacts from a previous crash
-  // for THIS profile. Materialize-side reconciliation runs inside materialize().
+  // Reconciliation order (multi-reviewer P2, Gemini #4): materialize-side
+  // first, then persist-side. The previous order risked persisting a
+  // partially-reconciled `.claude/` (a prior-restored state) into the
+  // profile. With this order, reconcileMaterialize fixes the live tree
+  // first, then persistLiveIntoProfile copies a coherent snapshot.
+  await reconcileMaterialize(paths);
   await reconcilePersist(paths, opts.activeProfileName);
 
   await persistLiveIntoProfile(paths, opts.activeProfileName);
@@ -97,8 +106,18 @@ export async function persistLiveIntoProfile(
     await atomicRename(persist.pendingDir, persist.targetClaudeDir);
   } catch (err: unknown) {
     if (await pathExists(persist.priorDir)) {
+      // Surface restore failures to stderr (multi-reviewer P3, Gemini #6) —
+      // the original step-c failure is the primary error, but a failed
+      // restore leaves the profile dir in an unrecoverable state and the
+      // user needs to know.
       await atomicRename(persist.priorDir, persist.targetClaudeDir).catch(
-        () => undefined,
+        (restoreErr: unknown) => {
+          const detail =
+            restoreErr instanceof Error ? restoreErr.message : String(restoreErr);
+          process.stderr.write(
+            `claude-profiles: persist restore failed for ${persist.targetClaudeDir}: ${detail}\n`,
+          );
+        },
       );
     }
     await rmrf(persist.pendingDir).catch(() => undefined);
@@ -115,8 +134,4 @@ export async function persistLiveIntoProfile(
   // required but matches user expectation that a "persist" updates the
   // profile's last-modified.
   await fs.utimes(persist.targetClaudeDir, new Date(), new Date()).catch(() => undefined);
-
-  // path is unused after this point but kept for symmetry with future
-  // logging additions.
-  void path;
 }

@@ -84,6 +84,21 @@ describe("lock primitive", () => {
     await expect(fs.access(paths.lockFile)).rejects.toThrow();
   });
 
+  it("uses a unique temp path per attempt (no shared .lock.tmp)", async () => {
+    const paths = buildStatePaths(root);
+    const lock = await acquireLock(paths, { signalHandlers: false });
+    // The shared paths.lockFileTmp must NOT remain — and acquire must NOT
+    // have written to it. Per-attempt unique tmps go into the same dir but
+    // with PID + nonce in the name; we only verify the canonical shared
+    // path stays clean.
+    await expect(fs.access(paths.lockFileTmp)).rejects.toThrow();
+    // No `.tmp` files should linger in the profilesDir.
+    const entries = await fs.readdir(paths.profilesDir);
+    const tmps = entries.filter((e) => e.endsWith(".tmp"));
+    expect(tmps).toEqual([]);
+    await lock.release();
+  });
+
   it("withLock releases on throw", async () => {
     const paths = buildStatePaths(root);
     await expect(

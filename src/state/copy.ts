@@ -28,16 +28,20 @@ import { fsyncDir } from "./atomic.js";
  * Recursively copy `src` directory to `dest`, creating `dest` and any parent
  * dirs. Existing files at `dest` are overwritten (force: true). The target
  * directory should be the destination *root*, not its parent.
+ *
+ * Symlink handling (multi-reviewer P2, Codex #5): `.claude/` is documented
+ * as a copy tree (R39 — Windows is copy-only), so any symlinks the user
+ * created post-materialization are user artifacts that we should not lift
+ * verbatim. On Windows, copying symlinks requires elevation or Developer
+ * Mode and frequently fails for non-admin users; we always dereference to
+ * keep the discard-backup and persist paths cross-platform reliable.
  */
 export async function copyTree(src: string, dest: string): Promise<void> {
   await fs.mkdir(path.dirname(dest), { recursive: true });
   await fs.cp(src, dest, {
     recursive: true,
     force: true,
-    // We don't need symlink dereferencing — `.claude/` should not contain
-    // user-created symlinks, and any that exist are preserved as-is so the
-    // copy is byte-faithful.
-    dereference: false,
+    dereference: true,
     errorOnExist: false,
   });
 }

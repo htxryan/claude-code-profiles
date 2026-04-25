@@ -23,6 +23,8 @@ import { promises as fs } from "node:fs";
 import { atomicRename, pathExists, rmrf } from "./atomic.js";
 import { buildPersistPaths, type StatePaths } from "./paths.js";
 
+let reconcileCounter = 0;
+
 /**
  * Outcome of a single reconciliation step. Surfaced upward so E5 can print
  * the "(reconciled crashed materialization: restored .claude/ from .prior/)"
@@ -51,18 +53,39 @@ export async function reconcilePendingPrior(
   const pendingExists = await pathExists(pendingDir);
 
   if (priorExists) {
-    // The prior dir was rolled aside (step b) but step c didn't complete or
-    // wasn't observed. Restore: drop whatever is at target (could be a
-    // half-renamed pending or nothing) and rename prior back.
+    // The prior dir was rolled aside (step b). Two distinct on-disk states
+    // can land us here:
+    //   (i)  step c never ran or partially renamed — `.claude/` is missing
+    //        or holds half-renamed bytes;
+    //   (ii) step c finished but the cleanup of `.prior/` didn't run before
+    //        a crash — `.claude/` is the freshly committed content and
+    //        `.prior/` is the previous version.
+    // Spec invariant ("live `.claude/` is the last successful state") says
+    // restore from `.prior/` in both cases — case (ii) is rare and the
+    // re-materialize after restore is idempotent.
+    //
+    // Window-narrowing (multi-reviewer P2, Gemini #3): rename `.claude/` to
+    // a per-attempt scratch dir before renaming prior back. Concurrent
+    // readers (R43) see EITHER the original `.claude/` OR the restored one,
+    // never an empty/missing tree, except for the brief rename window.
     if (await pathExists(target)) {
-      // A partial step c may have left a half-written .claude/. Remove it so
-      // the rename of prior succeeds — Windows won't atomic-overwrite a dir.
-      await rmrf(target);
+      const scratch = `${target}.reconcile-${reconcileCounter++}-${Math.random()
+        .toString(36)
+        .slice(2, 8)}`;
+      try {
+        await atomicRename(target, scratch);
+      } catch {
+        // Rename failed (filesystem doesn't support move-into-existing-dir,
+        // or .claude/ is locked). Fall back to rmrf — wider window but the
+        // recovery still completes.
+        await rmrf(target);
+      }
+      // Best-effort cleanup of the scratch path; if cleanup fails the user
+      // sees a `.claude.reconcile-*` dir but recovery already succeeded.
+      await rmrf(scratch).catch(() => undefined);
     }
     await atomicRename(priorDir, target);
     if (pendingExists) {
-      // Don't await — pending is dead weight at this point. But we DO await
-      // so reconciliation has fully settled before any subsequent step runs.
       await rmrf(pendingDir);
     }
     return { kind: "restored-from-prior", targetLabel };

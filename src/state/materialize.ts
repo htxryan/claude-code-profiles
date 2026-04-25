@@ -12,9 +12,11 @@
  * between (b) and (c), rename `.prior/` back. Any inconsistency observed at
  * the *next* CLI invocation is fixed by `reconcileMaterialize` (R16a).
  *
- * Locking: this function does NOT acquire the lock — the caller (E5 swap
- * orchestration) wraps the whole sequence (drift gate, materialize, persist
- * if requested, state write) in `withLock`. Reads bypass the lock (R43).
+ * Locking precondition: caller MUST hold the project lock (E5 swap
+ * orchestration wraps drift gate + materialize + persist + state-write in a
+ * single `withLock`). The lock brackets the rename pair AND the state-write
+ * so partial-success windows are not observable (multi-reviewer P1, Codex #2).
+ * Reads bypass the lock (R43).
  *
  * Concurrency: a single materialize call is serialized internally — files
  * are written with bounded concurrency (see copy.ts), but no caller-visible
@@ -22,6 +24,7 @@
  */
 
 import { promises as fs } from "node:fs";
+import * as path from "node:path";
 
 import type { MergedFile } from "../merge/types.js";
 import type { ResolvedPlan } from "../resolver/types.js";
@@ -111,8 +114,18 @@ export async function materialize(
     await atomicRename(paths.pendingDir, paths.claudeDir);
   } catch (err: unknown) {
     // Restore prior. We've already wiped the in-progress live state.
+    // Surface restore failures (multi-reviewer P3, Gemini #6) — the
+    // user must know if both the swap AND the rollback failed.
     if (await pathExists(paths.priorDir)) {
-      await atomicRename(paths.priorDir, paths.claudeDir).catch(() => undefined);
+      await atomicRename(paths.priorDir, paths.claudeDir).catch(
+        (restoreErr: unknown) => {
+          const detail =
+            restoreErr instanceof Error ? restoreErr.message : String(restoreErr);
+          process.stderr.write(
+            `claude-profiles: rollback failed restoring ${paths.claudeDir}: ${detail}\n`,
+          );
+        },
+      );
     }
     await rmrf(paths.pendingDir).catch(() => undefined);
     throw err;
@@ -220,7 +233,10 @@ export async function isLiveConsistentWithRecord(paths: StatePaths): Promise<boo
   if (state.activeProfile === null) return false;
   for (const [relPath, entry] of Object.entries(state.fingerprint.files)) {
     try {
-      const stat = await fs.stat(`${paths.claudeDir}/${relPath}`);
+      // path.join handles the posix-relPath / OS-native rootDir mismatch
+      // (multi-reviewer P3, Gemini #9) — Node tolerates mixed separators on
+      // Windows but consistency with the rest of the module matters.
+      const stat = await fs.stat(path.join(paths.claudeDir, relPath));
       if (stat.size !== entry.size) return false;
     } catch {
       return false;

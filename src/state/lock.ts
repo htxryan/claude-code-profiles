@@ -3,17 +3,27 @@
  *
  * Contract:
  *  - Acquire writes `<PID> <ISO-8601>` to `.claude-profiles/.lock` atomically
- *    (write to .lock.tmp, rename), only if no live holder exists.
+ *    (write to a per-attempt unique tmp path, fsync, rename), only if no live
+ *    holder exists.
  *  - If `.lock` exists with a live PID (kill -0 succeeds), abort with
  *    `LockHeldError` naming the holder.
  *  - If `.lock` exists with a dead PID, atomically replace it (stale-recovery).
  *  - Release deletes the lock file (idempotent — safe to call from signal
  *    handler and from finally block).
- *  - Signal handlers (SIGINT/SIGTERM) call release synchronously and re-emit
- *    the signal so the process exits with the conventional code.
+ *  - Signal handlers (SIGINT/SIGTERM) call release synchronously and exit.
  *
  * Reads (R43) bypass the lock entirely — they're never serialized through
  * acquireLock. The lock is only acquired before mutating ops.
+ *
+ * Concurrency notes:
+ *  - Per-attempt tmp paths (`.lock.<pid>.<nonce>.tmp`) prevent two acquirers
+ *    racing on a shared `.lock.tmp` (multi-reviewer P1, Gemini #1).
+ *  - Verify-read after rename handles the case where another acquirer's
+ *    rename came after ours: a live holder triggers LockHeldError; a dead
+ *    holder triggers a bounded retry to re-claim (multi-reviewer P1, Codex #1).
+ *  - On Windows, `process.kill(pid, 0)` can be ambiguous for cross-session or
+ *    recycled PIDs. We supplement with a max-age threshold so a long-stale
+ *    lock from a recycled PID is reclaimable (multi-reviewer P1, Gemini #2).
  */
 
 import { promises as fs, unlinkSync } from "node:fs";
@@ -23,6 +33,20 @@ import * as process from "node:process";
 import { atomicWriteFile, pathExists } from "./atomic.js";
 import type { StatePaths } from "./paths.js";
 import type { LockHandle } from "./types.js";
+
+/**
+ * Maximum time a lock is considered live on Windows when `kill(0)` succeeds.
+ * 1 hour is generous for a CLI op (sub-second normally) but conservative
+ * enough that a recycled PID from yesterday won't perpetually block.
+ *
+ * Not applied on POSIX where kill(0) semantics are unambiguous (ESRCH means
+ * "PID definitely does not exist", and PID recycling is bounded by PID_MAX
+ * which is high enough to make collisions rare in practice).
+ */
+const WINDOWS_LOCK_MAX_AGE_MS = 60 * 60 * 1000;
+
+/** Bounded retry count for stale-on-stale acquire races. */
+const ACQUIRE_MAX_RETRIES = 3;
 
 /**
  * Raised when `.lock` exists and the holding PID is still alive (R41a). The
@@ -83,25 +107,53 @@ function parseLockContents(raw: string): ParsedLock | null {
  * but we don't have permission to signal) is treated as alive — conservative
  * choice that prefers "abort and ask the user" over "stomp on someone else's
  * lock". The user can `rm` the lock manually if they're sure.
+ *
+ * On Windows, `kill(0)` can be a false positive for cross-session or recycled
+ * PIDs. We supplement with a max-age check: if the lock is older than
+ * `WINDOWS_LOCK_MAX_AGE_MS`, we treat it as stale even when kill(0) succeeds.
  */
-function isPidAlive(pid: number): boolean {
+function isPidAlive(pid: number, timestamp: string): boolean {
   try {
     process.kill(pid, 0);
+    if (process.platform === "win32") {
+      const tsMs = Date.parse(timestamp);
+      if (Number.isFinite(tsMs) && Date.now() - tsMs > WINDOWS_LOCK_MAX_AGE_MS) {
+        return false;
+      }
+    }
     return true;
   } catch (err: unknown) {
     const code = (err as NodeJS.ErrnoException).code;
     if (code === "ESRCH") return false;
     if (code === "EPERM") return true;
-    // Unknown — be conservative.
+    // Unknown — be conservative on POSIX, but on Windows fall through to the
+    // age check so a wedged lock is recoverable.
+    if (process.platform === "win32") {
+      const tsMs = Date.parse(timestamp);
+      if (Number.isFinite(tsMs) && Date.now() - tsMs > WINDOWS_LOCK_MAX_AGE_MS) {
+        return false;
+      }
+    }
     return true;
   }
 }
 
 /**
+ * Build a unique tmp path for a single acquire attempt. PID + monotonic
+ * counter + random suffix gives strong uniqueness even under fork() bursts
+ * where multiple children would otherwise share `process.pid`.
+ */
+let attemptCounter = 0;
+function uniqueTmpPath(lockFile: string): string {
+  const nonce = `${attemptCounter++}-${Math.random().toString(36).slice(2, 10)}`;
+  return `${lockFile}.${process.pid}.${nonce}.tmp`;
+}
+
+/**
  * Acquire the project lock. Returns a `LockHandle` with idempotent release.
  * `signalHandlers` defaults to true — registers SIGINT/SIGTERM handlers that
- * release the lock and re-emit the signal (R41c). Tests pass false so they
- * can synchronize on release without process-level handlers.
+ * release the lock and exit (R41c). Tests pass false so they can synchronize
+ * on release without process-level handlers.
  */
 export async function acquireLock(
   paths: StatePaths,
@@ -109,95 +161,95 @@ export async function acquireLock(
 ): Promise<LockHandle> {
   await fs.mkdir(paths.profilesDir, { recursive: true });
 
-  // Check existing lock (if any). Stale recovery is built into the loop:
-  // we replace a dead-PID lock and proceed. We never loop on retry — a single
-  // attempt is enough; concurrent acquirers will see one of: ENOENT (try
-  // again), live PID (LockHeldError), dead PID (replace).
-  if (await pathExists(paths.lockFile)) {
-    let raw: string;
-    try {
-      raw = await fs.readFile(paths.lockFile, "utf8");
-    } catch (err: unknown) {
-      if ((err as NodeJS.ErrnoException).code === "ENOENT") {
-        // Race: holder released between exists check and read. Fall through.
-        raw = "";
-      } else {
-        throw err;
-      }
-    }
-    if (raw.length > 0) {
-      const parsed = parseLockContents(raw);
-      if (!parsed) {
-        // Treat unparseable as stale; replace. (Don't propagate
-        // LockCorruptError — recovery is the right behavior here.)
-      } else if (isPidAlive(parsed.pid)) {
-        throw new LockHeldError(paths.lockFile, parsed.pid, parsed.timestamp);
-      }
-      // else: dead PID, fall through and overwrite.
-    }
-  }
-
-  // Atomic write of our claim. The temp+rename ensures another process never
-  // reads a half-written lock file. The rename overwrites any stale lock that
-  // survived the existence check above.
   const pid = process.pid;
-  const timestamp = new Date().toISOString();
-  const contents = `${pid} ${timestamp}${os.EOL}`;
-  await atomicWriteFile(paths.lockFile, paths.lockFileTmp, contents);
+  let lastError: Error | undefined;
+  for (let attempt = 0; attempt < ACQUIRE_MAX_RETRIES; attempt++) {
+    // Pre-check: if a live holder exists, fail fast without writing.
+    if (await pathExists(paths.lockFile)) {
+      let raw = "";
+      try {
+        raw = await fs.readFile(paths.lockFile, "utf8");
+      } catch (err: unknown) {
+        if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+        // ENOENT race — fall through to write.
+      }
+      if (raw.length > 0) {
+        const parsed = parseLockContents(raw);
+        if (parsed && isPidAlive(parsed.pid, parsed.timestamp)) {
+          throw new LockHeldError(paths.lockFile, parsed.pid, parsed.timestamp);
+        }
+        // Unparseable or dead PID — fall through and overwrite.
+      }
+    }
 
-  // Verify we actually acquired it (concurrent acquirer may have raced us).
-  // If the lock now contains a different PID, we lost the race; re-check
-  // liveness and either back off or claim a stale slot.
-  const verifyRaw = await fs.readFile(paths.lockFile, "utf8");
-  const verified = parseLockContents(verifyRaw);
-  if (!verified || verified.pid !== pid || verified.timestamp !== timestamp) {
-    // Someone else's writeFile beat ours after our verification. Their lock
-    // is now canonical — abort with LockHeldError naming whatever's there.
-    if (verified && isPidAlive(verified.pid)) {
+    const timestamp = new Date().toISOString();
+    const contents = `${pid} ${timestamp}${os.EOL}`;
+    const tmpPath = uniqueTmpPath(paths.lockFile);
+    try {
+      await atomicWriteFile(paths.lockFile, tmpPath, contents);
+    } catch (err) {
+      // Best-effort cleanup of our own tmp file in case write succeeded but
+      // rename did not. Other tmp paths (other attempts) are not our concern.
+      await fs.unlink(tmpPath).catch(() => undefined);
+      throw err;
+    }
+
+    // Verify the rename actually landed our content. A racing acquirer's
+    // rename may have come after ours, in which case `.lock` reflects them.
+    const verifyRaw = await fs.readFile(paths.lockFile, "utf8");
+    const verified = parseLockContents(verifyRaw);
+    if (verified && verified.pid === pid && verified.timestamp === timestamp) {
+      // We won. Build the handle.
+      let released = false;
+      let signalCleanup: (() => void) | undefined;
+      const release = async (): Promise<void> => {
+        if (released) return;
+        released = true;
+        if (signalCleanup) {
+          signalCleanup();
+          signalCleanup = undefined;
+        }
+        try {
+          await fs.unlink(paths.lockFile);
+        } catch (err: unknown) {
+          if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+        }
+      };
+      if (opts.signalHandlers !== false) {
+        signalCleanup = registerSignalRelease(paths.lockFile, () => {
+          released = true;
+        });
+      }
+      return {
+        path: paths.lockFile,
+        pid,
+        acquiredAt: timestamp,
+        release,
+      };
+    }
+
+    // Lost the race. If the winner is alive, fail fast. Otherwise retry —
+    // the winner crashed before releasing.
+    if (verified && isPidAlive(verified.pid, verified.timestamp)) {
       throw new LockHeldError(paths.lockFile, verified.pid, verified.timestamp);
     }
-    // If verified is null or the holder is dead, fall through with a warning
-    // — stale-on-stale is rare enough we don't loop.
     if (!verified) {
-      throw new LockCorruptError(
+      lastError = new LockCorruptError(
         paths.lockFile,
         "lock file content unrecognised after acquire",
       );
+      continue;
     }
+    // Dead PID; loop will retry the whole acquire from scratch.
+    lastError = new LockHeldError(
+      paths.lockFile,
+      verified.pid,
+      verified.timestamp,
+    );
   }
 
-  let released = false;
-  let signalCleanup: (() => void) | undefined;
-
-  const release = async (): Promise<void> => {
-    if (released) return;
-    released = true;
-    if (signalCleanup) {
-      signalCleanup();
-      signalCleanup = undefined;
-    }
-    try {
-      await fs.unlink(paths.lockFile);
-    } catch (err: unknown) {
-      // Already gone (e.g. concurrent reconciliation cleaned it). Idempotent.
-      if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
-        throw err;
-      }
-    }
-  };
-
-  if (opts.signalHandlers !== false) {
-    signalCleanup = registerSignalRelease(paths.lockFile, () => {
-      released = true;
-    });
-  }
-
-  return {
-    path: paths.lockFile,
-    pid,
-    acquiredAt: timestamp,
-    release,
-  };
+  // Exhausted retries — surface the last seen error.
+  throw lastError ?? new LockCorruptError(paths.lockFile, "acquire retries exhausted");
 }
 
 /**
@@ -249,4 +301,3 @@ function registerSignalRelease(lockPath: string, markReleased: () => void): () =
     process.removeListener("SIGTERM", sigtermHandler);
   };
 }
-

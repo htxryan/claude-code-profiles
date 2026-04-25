@@ -81,11 +81,7 @@ export async function atomicWriteFile(
   // the rename is observable.
   const handle = await fs.open(tmpPath, "w");
   try {
-    if (typeof contents === "string") {
-      await handle.writeFile(contents);
-    } else {
-      await handle.writeFile(contents);
-    }
+    await handle.writeFile(contents);
     await handle.sync();
   } finally {
     await handle.close();

@@ -14,6 +14,7 @@
 
 import { promises as fs } from "node:fs";
 
+import { atomicWriteFile } from "./atomic.js";
 import type { StatePaths } from "./paths.js";
 
 /**
@@ -76,10 +77,14 @@ export async function ensureGitignoreEntries(paths: StatePaths): Promise<Gitigno
 
   // Append; ensure a single blank-line separator between existing content
   // and our section header so the file stays readable.
+  //
+  // Atomic write (multi-reviewer P2, Codex #6): use atomicWriteFile so a
+  // crash mid-write doesn't truncate the user's `.gitignore`. Consistent
+  // with the rest of E3's write discipline.
   const trimmed = existing.replace(/\s+$/, "");
   const sep = trimmed.length === 0 ? "" : "\n\n";
   const block = `${sep}${SECTION_HEADER}\n${toAdd.join("\n")}\n`;
   const next = trimmed + block;
-  await fs.writeFile(paths.gitignoreFile, next);
+  await atomicWriteFile(paths.gitignoreFile, `${paths.gitignoreFile}.tmp`, next);
   return { added: [...toAdd], created };
 }

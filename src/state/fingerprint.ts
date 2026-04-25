@@ -78,22 +78,40 @@ export async function recordMtimes(
 
 /**
  * Walk the live `.claude/` tree and produce a fingerprint by reading every
- * file. Used by drift detection's slow-path / forced-recompute mode. The
- * fast path compares mtimes against a recorded fingerprint (see
- * `compareFingerprint`).
+ * file. Used by drift detection's slow-path / forced-recompute mode and as
+ * the baseline for a fingerprint comparison. The fast path in
+ * `compareFingerprint` avoids calling this for files whose stat metadata
+ * has not changed.
  *
  * Returns posix-relative keys to match MergedFile.path conventions.
  */
 export async function fingerprintTree(claudeDir: string): Promise<Fingerprint> {
   const out: Record<string, FingerprintEntry> = {};
-  await walk(claudeDir, claudeDir, out);
+  await walk(claudeDir, claudeDir, out, "hash");
   return { schemaVersion: FINGERPRINT_SCHEMA_VERSION, files: out };
 }
 
-async function walk(
+/**
+ * Metadata-only walk: returns stat-derived entries (size + mtime) without
+ * reading file bytes or computing content hashes. Used by `compareFingerprint`
+ * to avoid sha256-ing every file when most haven't changed.
+ *
+ * Two-tier (multi-reviewer P3, both): the fast path compares stat metadata;
+ * the slow path opens and hashes only the small subset of files whose
+ * metadata signals a possible change.
+ */
+async function fingerprintTreeMetadataOnly(
+  claudeDir: string,
+): Promise<Record<string, { size: number; mtimeMs: number; abs: string }>> {
+  const out: Record<string, { size: number; mtimeMs: number; abs: string }> = {};
+  await walkMetadata(claudeDir, claudeDir, out);
+  return out;
+}
+
+async function walkMetadata(
   root: string,
   current: string,
-  out: Record<string, FingerprintEntry>,
+  out: Record<string, { size: number; mtimeMs: number; abs: string }>,
 ): Promise<void> {
   let entries;
   try {
@@ -105,7 +123,32 @@ async function walk(
   for (const e of entries) {
     const abs = path.join(current, e.name);
     if (e.isDirectory()) {
-      await walk(root, abs, out);
+      await walkMetadata(root, abs, out);
+    } else if (e.isFile()) {
+      const rel = path.relative(root, abs).split(path.sep).join("/");
+      const stat = await fs.stat(abs);
+      out[rel] = { size: stat.size, mtimeMs: stat.mtimeMs, abs };
+    }
+  }
+}
+
+async function walk(
+  root: string,
+  current: string,
+  out: Record<string, FingerprintEntry>,
+  mode: "hash",
+): Promise<void> {
+  let entries;
+  try {
+    entries = await fs.readdir(current, { withFileTypes: true });
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return;
+    throw err;
+  }
+  for (const e of entries) {
+    const abs = path.join(current, e.name);
+    if (e.isDirectory()) {
+      await walk(root, abs, out, mode);
     } else if (e.isFile()) {
       const rel = path.relative(root, abs).split(path.sep).join("/");
       const stat = await fs.stat(abs);
@@ -136,9 +179,9 @@ export interface FileDrift {
 
 /**
  * Compare a recorded fingerprint against the live tree at `claudeDir`. Two-
- * tier: fast-path (size + mtime) decides "definitely unchanged"; slow-path
- * (content hash) confirms "actually unchanged" or flags `modified` for files
- * whose metadata changed but content might not have.
+ * tier (multi-reviewer P3, both): the fast path is a metadata-only walk
+ * (stat for size+mtime); only files whose metadata signals a possible
+ * change are opened and sha256-hashed.
  *
  * Returns one entry per relPath in the union of recorded + live trees.
  * Unchanged files are included so callers can compute summaries by kind.
@@ -147,16 +190,16 @@ export async function compareFingerprint(
   claudeDir: string,
   recorded: Fingerprint,
 ): Promise<FileDrift[]> {
-  const live = await fingerprintTree(claudeDir);
+  const liveMeta = await fingerprintTreeMetadataOnly(claudeDir);
 
   const recordedKeys = new Set(Object.keys(recorded.files));
-  const liveKeys = new Set(Object.keys(live.files));
+  const liveKeys = new Set(Object.keys(liveMeta));
   const union = new Set([...recordedKeys, ...liveKeys]);
 
   const out: FileDrift[] = [];
   for (const relPath of union) {
     const r = recorded.files[relPath];
-    const l = live.files[relPath];
+    const l = liveMeta[relPath];
     if (!r && l) {
       out.push({ relPath, kind: "added" });
       continue;
@@ -165,22 +208,22 @@ export async function compareFingerprint(
       out.push({ relPath, kind: "deleted" });
       continue;
     }
-    // Both present — fast-path first.
     if (r && l) {
+      // Fast path: stat metadata matches → definitely unchanged.
       if (r.size === l.size && r.mtimeMs !== 0 && l.mtimeMs === r.mtimeMs) {
         out.push({ relPath, kind: "unchanged" });
         continue;
       }
-      // Slow-path: content hash. We already computed l.contentHash during
-      // fingerprintTree; comparison is a string equality.
-      if (r.contentHash === l.contentHash) {
-        out.push({ relPath, kind: "unchanged" });
-      } else {
-        out.push({ relPath, kind: "modified" });
-      }
+      // Slow path: hash this single file and compare against the recorded
+      // hash. Avoids hashing the whole tree.
+      const bytes = await fs.readFile(l.abs);
+      const liveHash = hashBytes(bytes);
+      out.push({
+        relPath,
+        kind: liveHash === r.contentHash ? "unchanged" : "modified",
+      });
     }
   }
-  // Stable order keeps test snapshots and CLI output deterministic.
   out.sort((a, b) => a.relPath.localeCompare(b.relPath));
   return out;
 }
