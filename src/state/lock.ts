@@ -33,7 +33,13 @@
 
 import { promises as fs, unlinkSync } from "node:fs";
 import * as os from "node:os";
-import * as process from "node:process";
+// Default import (NOT namespace import) — `process.on` is an EventEmitter
+// method that loses `this` binding via namespace import in Node.js ESM
+// (`import * as process from "node:process"` exposes process internals like
+// `_events` but not the EventEmitter prototype methods). The namespace form
+// happens to work in test contexts where signal handlers are disabled, but
+// fails at runtime when bin.js actually tries to register a signal handler.
+import process from "node:process";
 
 import { fsyncDir } from "./atomic.js";
 import type { StatePaths } from "./paths.js";

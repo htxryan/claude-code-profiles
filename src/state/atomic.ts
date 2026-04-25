@@ -25,7 +25,10 @@
 
 import { promises as fs, openSync, fsyncSync, closeSync } from "node:fs";
 import * as path from "node:path";
-import * as process from "node:process";
+// Default import — namespace import omits prototype methods (`process.on`)
+// and TTY props in Node ESM; we only need `process.pid` here, but keep the
+// idiom consistent across the codebase.
+import process from "node:process";
 
 /**
  * Build a unique tmp staging path inside `tmpDir` for an atomic write of

@@ -8,7 +8,7 @@
  * outside src/cli/ are allowed (the bin entry is the only exception).
  */
 
-import * as process from "node:process";
+import process from "node:process";
 
 export interface OutputChannel {
   /** Print human-readable text to stdout. No-op in --json mode. */
