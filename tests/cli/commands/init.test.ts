@@ -192,6 +192,29 @@ describe("init (R26, R27, R28)", () => {
     expect(cap.stdout()).toContain("not a git project");
   });
 
+  it("treats a populated .backup/ as already-initialised", async () => {
+    // Opus review P3: classifyProfilesDir previously skipped `.backup`
+    // unconditionally with the comment "empty backup dir from prior tooling
+    // is fine", but never verified emptiness — so `.backup/` left behind by
+    // a prior init was being mistaken for a fresh project.
+    fx = await makeFixture({});
+    await fs.mkdir(
+      path.join(fx.projectRoot, ".claude-profiles", ".backup", "stale-snapshot"),
+      { recursive: true },
+    );
+    const cap = captureOutput(false);
+    await expect(
+      runInit({
+        cwd: fx.projectRoot,
+        output: cap.channel,
+        starterName: "default",
+        seedFromClaudeDir: false,
+        installHook: false,
+        signalHandlers: false,
+      }),
+    ).rejects.toBeInstanceOf(CliUserError);
+  });
+
   it("preserves existing .gitignore content (idempotent re-run)", async () => {
     fx = await makeFixture({});
     await fs.writeFile(

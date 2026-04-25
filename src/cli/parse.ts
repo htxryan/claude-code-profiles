@@ -174,7 +174,10 @@ export function parseArgs(argv: ReadonlyArray<string>, defaultCwd: string): Pars
         else if (t === "--no-hook") hook = false;
         else if (t === "--starter") {
           const next = rest[i + 1];
-          if (next === undefined || next.startsWith("--")) {
+          // Treat any leading `-` as a missing value: profile names never
+          // start with `-`, so `init --starter -force` (a typo) would
+          // otherwise silently bind `starter = "-force"`.
+          if (next === undefined || next.startsWith("-")) {
             return parseError(`--starter requires a value`);
           }
           starter = next;
@@ -292,6 +295,13 @@ export function parseArgs(argv: ReadonlyArray<string>, defaultCwd: string): Pars
       const action = positional[0]!;
       if (action !== "install" && action !== "uninstall") {
         return parseError(`hook action must be install|uninstall, got "${action}"`);
+      }
+      // `--force` is only meaningful for `install` (overwrite a foreign
+      // hook). Silently accepting it on `uninstall` invites scripts that
+      // think they're forcing removal — but our policy is to NEVER remove
+      // a non-matching hook. Reject explicitly so the contract is clear.
+      if (action === "uninstall" && force) {
+        return parseError(`hook uninstall does not accept --force (a non-matching hook is never removed)`);
       }
       return ok({ command: { kind: "hook", action, force }, global });
     }

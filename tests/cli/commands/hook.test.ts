@@ -219,6 +219,36 @@ describe("runHook command", () => {
     ).rejects.toBeInstanceOf(CliUserError);
   });
 
+  it("install --json: still throws CliUserError on foreign-hook block (exit-code parity)", async () => {
+    // Sonnet/Opus review P2: in JSON mode the function previously emitted
+    // {installed: false, preExisting: "other"} and returned 0, while human
+    // mode threw and exited 1. JSON consumers can't rely on exit codes.
+    // After the fix, JSON mode emits the payload AND throws, so the exit
+    // code matches human mode.
+    fx = await makeFixture({});
+    await gitInit(fx.projectRoot);
+    await fs.writeFile(
+      path.join(fx.projectRoot, ".git", "hooks", "pre-commit"),
+      "#!/bin/sh\necho other\n",
+    );
+    const cap = captureOutput(true);
+    await expect(
+      runHook({
+        cwd: fx.projectRoot,
+        output: cap.channel,
+        action: "install",
+        force: false,
+      }),
+    ).rejects.toBeInstanceOf(CliUserError);
+    // Payload is still emitted before the throw — scripts get visibility
+    // into preExisting/hookPath even when the install was refused.
+    const lines = cap.jsonLines();
+    expect(lines).toHaveLength(1);
+    const payload = lines[0] as Record<string, unknown>;
+    expect(payload["installed"]).toBe(false);
+    expect(payload["preExisting"]).toBe("other");
+  });
+
   it("uninstall: reports removal", async () => {
     fx = await makeFixture({});
     await gitInit(fx.projectRoot);

@@ -99,6 +99,22 @@ describe("parseArgs — verbs (R29)", () => {
     expect(err(["new", "x", "--bogus"])).toContain("--bogus");
     expect(err(["validate", "--bogus"])).toContain("--bogus");
   });
+
+  it("--starter rejects single-dash values (typo guard)", () => {
+    // Opus review P3: previously only `--`-prefixed values were rejected,
+    // so `init --starter -force` silently bound starter="-force".
+    expect(err(["init", "--starter", "-force"])).toContain("requires a value");
+    expect(err(["init", "--starter", "--no-hook"])).toContain("requires a value");
+  });
+
+  it("hook uninstall rejects --force (no-op flag is misleading)", () => {
+    // Sonnet review P3: silently accepting --force on uninstall implies
+    // it forces removal, but uninstallHook NEVER removes a non-matching
+    // hook regardless. Reject at parse time so the contract is explicit.
+    const m = err(["hook", "uninstall", "--force"]);
+    expect(m).toContain("uninstall");
+    expect(m).toContain("--force");
+  });
 });
 
 describe("parseArgs — global flags", () => {

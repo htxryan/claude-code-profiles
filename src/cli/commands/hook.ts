@@ -34,6 +34,20 @@ import { CliUserError, EXIT_USER_ERROR } from "../exit.js";
 import type { OutputChannel } from "../output.js";
 
 /**
+ * Sentinel thrown by `resolveHooksDir` when the project has no `.git`
+ * directory or `.git`-file pointer. Lets callers branch on a typed
+ * `instanceof` check instead of string-sniffing the message (which would
+ * silently break if the message text changed).
+ */
+export class NotAGitRepoError extends Error {
+  readonly code = "NOT_GIT_REPO" as const;
+  constructor(message: string) {
+    super(message);
+    this.name = "NotAGitRepoError";
+  }
+}
+
+/**
  * The verbatim R25a script. Any change here MUST be accompanied by a
  * deliberate spec bump (the integration epic asserts byte equality).
  *
@@ -112,6 +126,17 @@ export async function runHook(opts: HookCommandOptions): Promise<number> {
         preExisting: result.preExisting,
         installed: result.installed,
       });
+      // JSON mode still throws on the foreign-hook block path so the exit
+      // code matches human mode (exit 1). Without this, scripts using
+      // `--json` would see exit 0 + `installed: false` and have to parse
+      // payload fields to detect failure — defeating the point of a
+      // consistent exit-code policy.
+      if (!result.installed && result.preExisting === "other") {
+        throw new CliUserError(
+          `hook install: ${result.hookPath} contains a different script; pass --force to overwrite`,
+          EXIT_USER_ERROR,
+        );
+      }
     } else if (result.installed) {
       opts.output.print(
         result.preExisting === "absent"
@@ -162,8 +187,7 @@ export async function installHook(opts: InstallHookOptions): Promise<InstallHook
   try {
     hooksDir = await resolveHooksDir(opts.cwd);
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    if (opts.allowSkip && message.includes("not a git project")) {
+    if (opts.allowSkip && err instanceof NotAGitRepoError) {
       return {
         hookPath: path.join(opts.cwd, ".git", "hooks", "pre-commit"),
         preExisting: "absent",
@@ -202,8 +226,7 @@ export async function uninstallHook(
   try {
     hooksDir = await resolveHooksDir(opts.cwd);
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    if (message.includes("not a git project")) {
+    if (err instanceof NotAGitRepoError) {
       // No git dir → no hook to uninstall. Treat as a no-op rather than
       // erroring; the caller's intent ("ensure no hook is present") is
       // satisfied vacuously.
@@ -253,7 +276,7 @@ async function resolveHooksDir(cwd: string): Promise<string> {
     stat = await fs.stat(dotGit);
   } catch (err: unknown) {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") {
-      throw new Error(
+      throw new NotAGitRepoError(
         `hook: not a git project — ${dotGit} does not exist (run "git init" first)`,
       );
     }
@@ -265,11 +288,16 @@ async function resolveHooksDir(cwd: string): Promise<string> {
   // Worktree linkage: `.git` is a file with `gitdir: <path>` pointer.
   const raw = await fs.readFile(dotGit, "utf8");
   const m = raw.match(/^gitdir:\s*(.+?)\s*$/m);
-  if (!m) {
-    throw new Error(
-      `hook: cannot resolve .git directory — ${dotGit} is not a directory and contains no gitdir: pointer`,
+  // Defence in depth: even if the regex captures a whitespace-only sliver
+  // (edge cases with mixed-whitespace content + the multiline flag), reject
+  // empty/blank captures so we never `path.resolve(cwd, "")` and silently
+  // land back inside the project root.
+  const captured = m ? m[1]!.trim() : "";
+  if (!m || captured === "") {
+    throw new NotAGitRepoError(
+      `hook: cannot resolve .git directory — ${dotGit} is not a directory and contains no usable gitdir: pointer`,
     );
   }
-  const gitdir = path.isAbsolute(m[1]!) ? m[1]! : path.resolve(cwd, m[1]!);
+  const gitdir = path.isAbsolute(captured) ? captured : path.resolve(cwd, captured);
   return path.join(gitdir, "hooks");
 }

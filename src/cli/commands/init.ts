@@ -95,6 +95,23 @@ export async function runInit(opts: InitOptions): Promise<number> {
         );
       }
 
+      // R28 + R25a: install the pre-commit hook FIRST under the lock so an
+      // unexpected hook failure (EACCES on `.git/hooks/`, EPERM on chmod,
+      // malformed gitdir pointer, …) leaves no destructive state behind.
+      // If we ran seed/gitignore first, an exception here would commit a
+      // partial init that re-running could not recover from without the
+      // user manually deleting `.claude-profiles/`. With this ordering, a
+      // throw releases the lock, leaves only `.lock`/`.tmp/` (which
+      // classifyProfilesDir treats as "fresh"), and a retry just works.
+      let hook: InstallHookResult | null = null;
+      if (opts.installHook) {
+        hook = await installHook({
+          cwd: opts.cwd,
+          force: false,
+          allowSkip: true,
+        });
+      }
+
       // R27: seed from `.claude/` if present and the user hasn't disabled it.
       let starterProfileSeeded: string | null = null;
       if (opts.seedFromClaudeDir) {
@@ -109,19 +126,6 @@ export async function runInit(opts: InitOptions): Promise<number> {
       // R28: ensure `.gitignore` lists the canonical entries. The shared
       // writer already covers `.claude/`, `.state.json`, `.backup/`, etc.
       const gitignore = await ensureGitignoreEntries(paths);
-
-      // R28 + R25a: optionally install the pre-commit hook. We do this
-      // *under* the same lock so an interrupted init never leaves a half-
-      // configured project (lock release on signal also tears down our
-      // partial state through the lock's signal handler).
-      let hook: InstallHookResult | null = null;
-      if (opts.installHook) {
-        hook = await installHook({
-          cwd: opts.cwd,
-          force: false,
-          allowSkip: true,
-        });
-      }
 
       return {
         profilesDirCreated: profilesDirCreated === "fresh",
@@ -140,21 +144,19 @@ export async function runInit(opts: InitOptions): Promise<number> {
 async function classifyProfilesDir(
   profilesDir: string,
 ): Promise<"fresh" | "already-initialised"> {
-  // After `withLock`, `.claude-profiles/` always exists and contains at
-  // minimum `.lock` + `.tmp/`. "Already initialised" means: a profile
-  // directory or a `.state.json` is present.
-  let entries: string[];
-  try {
-    entries = await fs.readdir(profilesDir);
-  } catch (err: unknown) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") return "fresh";
-    throw err;
-  }
+  // Invariant: `withLock` ran `fs.mkdir(profilesDir, { recursive: true })`
+  // before invoking us, so `profilesDir` always exists here. The directory
+  // contains at minimum `.lock` + `.tmp/`. "Already initialised" means: a
+  // profile directory, a `.state.json`, or a non-empty `.backup/` is
+  // present.
+  const entries = await fs.readdir(profilesDir);
   for (const e of entries) {
     if (e === ".lock" || e === ".tmp" || e === ".pending" || e === ".prior") continue;
-    if (e === ".backup") continue; // empty backup dir from prior tooling is fine
-    // Anything else (including `.state.json` or a profile dir) means init
-    // has already run.
+    // Anything else (including `.state.json`, `.backup/`, or a profile dir)
+    // means init has already run. We previously skipped `.backup/`
+    // unconditionally with the rationale "empty backup dir from prior
+    // tooling is fine", but we never verified emptiness, so a populated
+    // `.backup/` from a prior init was being mistaken for a fresh project.
     return "already-initialised";
   }
   return "fresh";
@@ -194,6 +196,14 @@ async function maybeSeedStarter(
   // here rather than going through state/copy.copyTree because that helper
   // is internal to the materialization path; init's copy is a one-shot
   // bootstrap operation, not a transactional rename.
+  //
+  // `dereference: true` follows symlinks: if the user's `.claude/` contains
+  // links pointing outside the project (e.g. a shared config in $HOME),
+  // those targets are physically copied into the seeded profile. This is
+  // intentional — a profile must be self-contained so it can later be
+  // checked into git, and a dangling cross-project symlink would defeat
+  // that — but it does mean the seed may bring in more bytes than a naive
+  // tree-copy would.
   const targetClaude = path.join(profileDir, ".claude");
   await fs.cp(claudeDir, targetClaude, {
     recursive: true,
