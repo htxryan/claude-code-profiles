@@ -3,3 +3,14 @@
 .dolt/
 *.db
 .beads-credential-key
+
+# compound-agent managed
+.compound-agent/
+
+# Build output
+dist/
+node_modules/
+
+# Test artifacts
+coverage/
+.vitest/
