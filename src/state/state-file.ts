@@ -1,0 +1,154 @@
+/**
+ * `.state.json` IO. R14, R14a, R42.
+ *
+ *  - Writes: temp-file + atomic rename, fsync of file and parent dir (R14a).
+ *  - Reads: tolerate missing/unparseable/schema-mismatched files by returning
+ *    `defaultState()` with a warning (R42). Never throws on a malformed state
+ *    file — the rest of the system treats that as NoActive.
+ */
+
+import { promises as fs } from "node:fs";
+
+import { atomicWriteFile } from "./atomic.js";
+import type { StatePaths } from "./paths.js";
+import {
+  STATE_FILE_SCHEMA_VERSION,
+  FINGERPRINT_SCHEMA_VERSION,
+  type StateFile,
+  defaultState,
+} from "./types.js";
+
+/**
+ * Result of a state-file read. `warning` is non-null when the on-disk file
+ * was missing/unparseable/schema-mismatched and we degraded to defaultState.
+ * Callers (E5 status) decide whether to surface the warning to the user.
+ */
+export interface ReadStateResult {
+  state: StateFile;
+  warning: StateReadWarning | null;
+}
+
+export type StateReadWarning =
+  | { code: "Missing"; path: string }
+  | { code: "ParseError"; path: string; detail: string }
+  | { code: "SchemaMismatch"; path: string; detail: string };
+
+/**
+ * Read `.state.json`, validating shape. Never throws on file-content
+ * problems — those produce `defaultState()` + warning per R42. Filesystem
+ * errors other than ENOENT (permission denied, IO error) are surfaced.
+ */
+export async function readStateFile(paths: StatePaths): Promise<ReadStateResult> {
+  let raw: string;
+  try {
+    raw = await fs.readFile(paths.stateFile, "utf8");
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      return { state: defaultState(), warning: { code: "Missing", path: paths.stateFile } };
+    }
+    throw err;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err: unknown) {
+    const detail = err instanceof Error ? err.message : String(err);
+    return {
+      state: defaultState(),
+      warning: { code: "ParseError", path: paths.stateFile, detail },
+    };
+  }
+
+  const validation = validateStateShape(parsed);
+  if (!validation.ok) {
+    return {
+      state: defaultState(),
+      warning: {
+        code: "SchemaMismatch",
+        path: paths.stateFile,
+        detail: validation.detail,
+      },
+    };
+  }
+  return { state: validation.value, warning: null };
+}
+
+interface Ok {
+  ok: true;
+  value: StateFile;
+}
+interface Bad {
+  ok: false;
+  detail: string;
+}
+
+/**
+ * Validate the parsed JSON against the StateFile schema. We accept schemas
+ * with the current version only; mismatches produce a SchemaMismatch warning
+ * so we degrade gracefully (R42). The check is intentionally narrow — we
+ * only verify enough structure to safely consume the file.
+ */
+function validateStateShape(value: unknown): Ok | Bad {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return { ok: false, detail: "top-level value is not a JSON object" };
+  }
+  const obj = value as Record<string, unknown>;
+  if (obj["schemaVersion"] !== STATE_FILE_SCHEMA_VERSION) {
+    return {
+      ok: false,
+      detail: `schemaVersion ${JSON.stringify(obj["schemaVersion"])} (expected ${STATE_FILE_SCHEMA_VERSION})`,
+    };
+  }
+  // activeProfile: string | null
+  const activeProfile = obj["activeProfile"];
+  if (activeProfile !== null && typeof activeProfile !== "string") {
+    return { ok: false, detail: "activeProfile must be string or null" };
+  }
+  // materializedAt: string | null
+  const materializedAt = obj["materializedAt"];
+  if (materializedAt !== null && typeof materializedAt !== "string") {
+    return { ok: false, detail: "materializedAt must be string or null" };
+  }
+  // resolvedSources: array
+  if (!Array.isArray(obj["resolvedSources"])) {
+    return { ok: false, detail: "resolvedSources must be an array" };
+  }
+  // fingerprint: object with schemaVersion + files
+  const fp = obj["fingerprint"];
+  if (typeof fp !== "object" || fp === null || Array.isArray(fp)) {
+    return { ok: false, detail: "fingerprint must be a JSON object" };
+  }
+  const fingerprint = fp as Record<string, unknown>;
+  if (fingerprint["schemaVersion"] !== FINGERPRINT_SCHEMA_VERSION) {
+    return {
+      ok: false,
+      detail: `fingerprint.schemaVersion ${JSON.stringify(fingerprint["schemaVersion"])} (expected ${FINGERPRINT_SCHEMA_VERSION})`,
+    };
+  }
+  if (
+    typeof fingerprint["files"] !== "object" ||
+    fingerprint["files"] === null ||
+    Array.isArray(fingerprint["files"])
+  ) {
+    return { ok: false, detail: "fingerprint.files must be a JSON object" };
+  }
+  if (!Array.isArray(obj["externalTrustNotices"])) {
+    return { ok: false, detail: "externalTrustNotices must be an array" };
+  }
+  return { ok: true, value: obj as unknown as StateFile };
+}
+
+/**
+ * Atomically write `.state.json`. Ensures `.claude-profiles/` exists, writes
+ * to `.state.json.tmp`, fsyncs, and renames into place (R14a). The directory
+ * fsync after rename is handled inside `atomicWriteFile`.
+ *
+ * Pretty-printed (2-space indent) so `git diff` on the .state.json (if
+ * accidentally checked in) is readable. Trailing newline for tool friendliness.
+ */
+export async function writeStateFile(paths: StatePaths, state: StateFile): Promise<void> {
+  await fs.mkdir(paths.profilesDir, { recursive: true });
+  const json = `${JSON.stringify(state, null, 2)}\n`;
+  await atomicWriteFile(paths.stateFile, paths.stateFileTmp, json);
+}
