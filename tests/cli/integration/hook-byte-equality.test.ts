@@ -16,23 +16,13 @@ import { afterEach, describe, expect, it } from "vitest";
 import { HOOK_SCRIPT } from "../../../src/cli/commands/hook.js";
 import { makeFixture, type Fixture } from "../../helpers/fixture.js";
 
-import { BIN_PATH, runCli } from "./spawn.js";
+import { ensureBuilt, runCli } from "./spawn.js";
 
 let fx: Fixture | undefined;
 afterEach(async () => {
   if (fx) await fx.cleanup();
   fx = undefined;
 });
-
-async function ensureBuilt() {
-  try {
-    await fs.access(BIN_PATH);
-  } catch {
-    throw new Error(
-      `dist/cli/bin.js not found at ${BIN_PATH} — run \`npm run build\` before integration tests`,
-    );
-  }
-}
 
 describe("R25a hook script byte equality (E6 fitness function)", () => {
   it("hook install writes the verbatim spec script", async () => {

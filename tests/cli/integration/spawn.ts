@@ -9,12 +9,28 @@
  */
 
 import { spawn } from "node:child_process";
+import { promises as fs } from "node:fs";
 import * as path from "node:path";
 
 import { fileURLToPath } from "node:url";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const BIN_PATH = path.resolve(HERE, "..", "..", "..", "dist", "cli", "bin.js");
+
+/**
+ * Asserts the built bin exists. Every integration test calls this — if it
+ * fails, the contributor forgot `npm run build`. Lifted into spawn.ts so
+ * each test file doesn't reimplement the check.
+ */
+export async function ensureBuilt(): Promise<void> {
+  try {
+    await fs.access(BIN_PATH);
+  } catch {
+    throw new Error(
+      `dist/cli/bin.js not found at ${BIN_PATH} — run \`npm run build\` before integration tests`,
+    );
+  }
+}
 
 export interface SpawnResult {
   stdout: string;

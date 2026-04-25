@@ -16,23 +16,13 @@ import { materialize } from "../../../src/state/materialize.js";
 import { buildStatePaths } from "../../../src/state/paths.js";
 import { makeFixture, type Fixture } from "../../helpers/fixture.js";
 
-import { BIN_PATH, runCli } from "./spawn.js";
+import { ensureBuilt, runCli } from "./spawn.js";
 
 let fx: Fixture | undefined;
 afterEach(async () => {
   if (fx) await fx.cleanup();
   fx = undefined;
 });
-
-async function ensureBuilt() {
-  try {
-    await fs.access(BIN_PATH);
-  } catch {
-    throw new Error(
-      `dist/cli/bin.js not found at ${BIN_PATH} — run \`npm run build\` before integration tests`,
-    );
-  }
-}
 
 describe("exit-code matrix (AC-16)", () => {
   it("--version → 0", async () => {

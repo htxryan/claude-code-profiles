@@ -1,18 +1,6 @@
-import { promises as fs } from "node:fs";
-
 import { describe, expect, it } from "vitest";
 
-import { BIN_PATH, runCli } from "./spawn.js";
-
-async function ensureBuilt() {
-  try {
-    await fs.access(BIN_PATH);
-  } catch {
-    throw new Error(
-      `dist/cli/bin.js not found at ${BIN_PATH} — run \`npm run build\` before integration tests`,
-    );
-  }
-}
+import { ensureBuilt, runCli } from "./spawn.js";
 
 describe("--help / --version (AC-20)", () => {
   it("--version prints package version + exits 0", async () => {
