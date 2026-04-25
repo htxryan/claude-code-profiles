@@ -278,9 +278,11 @@ describe("E7 scenarios S1-S18 (cross-epic CLI gate)", () => {
     });
     expect(r.exitCode).toBe(3);
     expect(r.stderr.toLowerCase()).toContain("cycle");
-    // Both members appear in the message.
-    expect(r.stderr).toContain("a");
-    expect(r.stderr).toContain("b");
+    // CycleError formats members in cycle order joined with " → " (see
+    // src/errors/index.ts:CycleError). A loose `toContain("a")` would also
+    // match incidental letters in words like "Cycle" or "extends"; assert
+    // the full ordered chain instead so this gate fails on the right thing.
+    expect(r.stderr).toMatch(/a\s*→\s*b\s*→\s*a/);
   });
 
   // ──────────────────────────────────────────────────────────────────────
@@ -295,9 +297,12 @@ describe("E7 scenarios S1-S18 (cross-epic CLI gate)", () => {
     });
     // The hook contract is: never block the commit. R25.
     expect(r.exitCode).toBe(0);
-    // Warning is on stderr (R25 printed to stderr).
-    const out = `${r.stdout}${r.stderr}`;
-    expect(out.toLowerCase()).toMatch(/drift/);
+    // Hook output goes to stderr per R25, with the canonical phrasing from
+    // src/drift/pre-commit.ts: "claude-profiles: <N> drifted file(s)
+    // in .claude/ vs active profile '<name>'". Asserting against just
+    // "drift" would also pass on the no-drift "drift: clean" output and
+    // would mask a regression that flipped the hook to read-only mode.
+    expect(r.stderr).toMatch(/claude-profiles: \d+ drifted file\(s\)/);
   });
 
   // ──────────────────────────────────────────────────────────────────────

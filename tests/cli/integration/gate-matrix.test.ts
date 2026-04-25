@@ -84,10 +84,18 @@ describe("E7 gate state machine matrix — non-interactive cells", () => {
     // the snapshot bytes must equal the drifted live tree at the moment of
     // discard (R23a — pre-swap snapshot, not the post-swap content).
     const backupDir = path.join(fx.projectRoot, ".claude-profiles", ".backup");
-    const entries = await fs.readdir(backupDir);
-    expect(entries.length).toBeGreaterThan(0);
+    // Filter to directories and sort by name (snapshot dirs are timestamped
+    // and lexicographically sortable). A stray file in .backup/ must not
+    // confuse the lookup; the production prune path applies the same
+    // filter (see src/state/backup.ts:pruneOldSnapshots).
+    const dirents = await fs.readdir(backupDir, { withFileTypes: true });
+    const snapshotDirs = dirents
+      .filter((d) => d.isDirectory())
+      .map((d) => d.name)
+      .sort();
+    expect(snapshotDirs.length).toBeGreaterThan(0);
     const snapshot = await fs.readFile(
-      path.join(backupDir, entries[0]!, "CLAUDE.md"),
+      path.join(backupDir, snapshotDirs[0]!, "CLAUDE.md"),
       "utf8",
     );
     expect(snapshot).toBe("EDIT\n");

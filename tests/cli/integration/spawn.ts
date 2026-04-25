@@ -46,7 +46,8 @@ export interface SpawnOptions {
   args: string[];
   /** Optional stdin payload. */
   stdin?: string;
-  /** Timeout in ms; default 10s. */
+  /** Timeout in ms; default 15s. Bumped from 10s so a slow CI runner doesn't
+   *  flake the full matrix on first slow spawn. Individual tests can opt down. */
   timeoutMs?: number;
 }
 
@@ -70,15 +71,19 @@ export async function runCli(opts: SpawnOptions): Promise<SpawnResult> {
 
     const timer = setTimeout(() => {
       child.kill("SIGTERM");
-      reject(new Error(`spawn timed out after ${opts.timeoutMs ?? 10000}ms`));
-    }, opts.timeoutMs ?? 10000);
+      reject(new Error(`spawn timed out after ${opts.timeoutMs ?? 15000}ms`));
+    }, opts.timeoutMs ?? 15000);
 
     child.on("close", (code, signal) => {
       clearTimeout(timer);
+      // If the process was killed by a signal, `code` is null. Reporting 0
+      // would silently let signal-killed losers count as winners in race
+      // tests. Use -1 as a sentinel; tests that need a clean-exit invariant
+      // should also assert `signal === null`.
       resolve({
         stdout,
         stderr,
-        exitCode: code ?? 0,
+        exitCode: code ?? -1,
         signal,
       });
     });
