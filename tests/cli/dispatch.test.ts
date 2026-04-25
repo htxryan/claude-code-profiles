@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import { dispatch } from "../../src/cli/dispatch.js";
-import { CliNotImplementedError } from "../../src/cli/exit.js";
 import type { Command, GlobalOptions } from "../../src/cli/types.js";
 import { makeFixture, type Fixture } from "../helpers/fixture.js";
 import { captureOutput } from "./helpers/output-sink.js";
@@ -97,25 +96,27 @@ describe("dispatch — every command kind dispatches without throwing on baselin
   });
 });
 
-describe("dispatch — E5/E6 stubs", () => {
-  it("init → CliNotImplementedError", async () => {
+describe("dispatch — E6 init/hook routes", () => {
+  it("init in a fresh project → 0", async () => {
+    fx = await makeFixture({});
     const { ctx } = ctxFor();
-    await expect(dispatch({ kind: "init" }, global(), ctx)).rejects.toBeInstanceOf(
-      CliNotImplementedError,
+    const code = await dispatch(
+      { kind: "init", starter: "default", seed: false, hook: false },
+      { ...global(), cwd: fx.projectRoot },
+      ctx,
     );
+    expect(code).toBe(0);
   });
 
-  it("hook install → CliNotImplementedError", async () => {
-    const { ctx } = ctxFor();
-    await expect(
-      dispatch({ kind: "hook", action: "install" }, global(), ctx),
-    ).rejects.toBeInstanceOf(CliNotImplementedError);
-  });
-
-  it("hook uninstall → CliNotImplementedError", async () => {
-    const { ctx } = ctxFor();
-    await expect(
-      dispatch({ kind: "hook", action: "uninstall" }, global(), ctx),
-    ).rejects.toBeInstanceOf(CliNotImplementedError);
+  it("hook uninstall in a fresh project (no .git) → 0 with absent classification", async () => {
+    fx = await makeFixture({});
+    const { cap, ctx } = ctxFor();
+    const code = await dispatch(
+      { kind: "hook", action: "uninstall", force: false },
+      { ...global(), cwd: fx.projectRoot },
+      ctx,
+    );
+    expect(code).toBe(0);
+    expect(cap.stdout()).toContain("No pre-commit hook to remove");
   });
 });

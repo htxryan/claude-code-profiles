@@ -19,7 +19,30 @@ function err(argv: string[]): string {
 
 describe("parseArgs — verbs (R29)", () => {
   it("parses every R29 verb into a typed Command", () => {
-    expect(run(["init"]).command).toEqual({ kind: "init" });
+    expect(run(["init"]).command).toEqual({
+      kind: "init",
+      starter: "default",
+      seed: true,
+      hook: true,
+    });
+    expect(run(["init", "--no-seed", "--no-hook"]).command).toEqual({
+      kind: "init",
+      starter: "default",
+      seed: false,
+      hook: false,
+    });
+    expect(run(["init", "--starter=base"]).command).toEqual({
+      kind: "init",
+      starter: "base",
+      seed: true,
+      hook: true,
+    });
+    expect(run(["init", "--starter", "main"]).command).toEqual({
+      kind: "init",
+      starter: "main",
+      seed: true,
+      hook: true,
+    });
     expect(run(["list"]).command).toEqual({ kind: "list" });
     expect(run(["use", "minimal"]).command).toEqual({ kind: "use", profile: "minimal" });
     expect(run(["status"]).command).toEqual({ kind: "status" });
@@ -43,10 +66,20 @@ describe("parseArgs — verbs (R29)", () => {
     expect(run(["validate"]).command).toEqual({ kind: "validate", profile: null });
     expect(run(["validate", "x"]).command).toEqual({ kind: "validate", profile: "x" });
     expect(run(["sync"]).command).toEqual({ kind: "sync" });
-    expect(run(["hook", "install"]).command).toEqual({ kind: "hook", action: "install" });
+    expect(run(["hook", "install"]).command).toEqual({
+      kind: "hook",
+      action: "install",
+      force: false,
+    });
+    expect(run(["hook", "install", "--force"]).command).toEqual({
+      kind: "hook",
+      action: "install",
+      force: true,
+    });
     expect(run(["hook", "uninstall"]).command).toEqual({
       kind: "hook",
       action: "uninstall",
+      force: false,
     });
   });
 
@@ -148,7 +181,7 @@ describe("parseArgs — positional arity", () => {
   });
 
   it("init/list/status/sync take no positionals", () => {
-    expect(err(["init", "x"])).toContain("no arguments");
+    expect(err(["init", "x"])).toContain("no positional arguments");
     expect(err(["list", "x"])).toContain("no arguments");
     expect(err(["status", "x"])).toContain("no arguments");
     expect(err(["sync", "x"])).toContain("no arguments");

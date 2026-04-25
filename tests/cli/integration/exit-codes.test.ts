@@ -56,17 +56,17 @@ describe("exit-code matrix (AC-16)", () => {
     expect(r.stderr).toContain("missing command");
   });
 
-  it("init (E5 stub) → 2", async () => {
+  it("init in a fresh project (no .claude, no hook) → 0", async () => {
     await ensureBuilt();
     fx = await makeFixture({});
     const r = await runCli({
-      args: ["--cwd", fx.projectRoot, "init"],
+      args: ["--cwd", fx.projectRoot, "init", "--no-seed", "--no-hook"],
     });
-    expect(r.exitCode).toBe(2);
-    expect(r.stderr).toContain("not yet implemented");
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("Initialised claude-profiles");
   });
 
-  it("hook install (E6 stub) → 2", async () => {
+  it("hook install in a project without .git/ → 2 (ENOENT)", async () => {
     await ensureBuilt();
     fx = await makeFixture({});
     const r = await runCli({

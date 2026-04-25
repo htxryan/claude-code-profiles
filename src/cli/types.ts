@@ -61,7 +61,15 @@ export type HookAction = "install" | "uninstall";
  * GlobalOptions are bundled separately by the parser to keep verbs minimal.
  */
 export type Command =
-  | { kind: "init" }
+  | {
+      kind: "init";
+      /** Name to give a seeded starter profile (default "default"). */
+      starter: string;
+      /** When false, skip seeding even if `.claude/` exists. */
+      seed: boolean;
+      /** When false, skip the pre-commit hook install step. */
+      hook: boolean;
+    }
   | { kind: "list" }
   | { kind: "use"; profile: string }
   | { kind: "status" }
@@ -70,7 +78,7 @@ export type Command =
   | { kind: "new"; profile: string; description: string | null }
   | { kind: "validate"; profile: string | null }
   | { kind: "sync" }
-  | { kind: "hook"; action: HookAction }
+  | { kind: "hook"; action: HookAction; force: boolean }
   | { kind: "help"; verb: string | null }
   | { kind: "version" };
 

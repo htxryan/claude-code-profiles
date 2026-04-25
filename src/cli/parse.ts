@@ -163,9 +163,36 @@ export function parseArgs(argv: ReadonlyArray<string>, defaultCwd: string): Pars
 
   // Per-verb dispatch.
   switch (verb) {
-    case "init":
-      if (rest.length > 0) return parseError(`init takes no arguments; got "${rest.join(" ")}"`);
-      return ok({ command: { kind: "init" }, global });
+    case "init": {
+      let starter = "default";
+      let seed = true;
+      let hook = true;
+      const positional: string[] = [];
+      for (let i = 0; i < rest.length; i++) {
+        const t = rest[i]!;
+        if (t === "--no-seed") seed = false;
+        else if (t === "--no-hook") hook = false;
+        else if (t === "--starter") {
+          const next = rest[i + 1];
+          if (next === undefined || next.startsWith("--")) {
+            return parseError(`--starter requires a value`);
+          }
+          starter = next;
+          i++;
+        } else if (t.startsWith("--starter=")) {
+          starter = t.slice("--starter=".length);
+          if (starter === "") return parseError(`--starter requires a non-empty value`);
+        } else if (t.startsWith("--")) {
+          return parseError(`init: unknown flag "${t}"`);
+        } else {
+          positional.push(t);
+        }
+      }
+      if (positional.length > 0) {
+        return parseError(`init takes no positional arguments; got "${positional.join(" ")}"`);
+      }
+      return ok({ command: { kind: "init", starter, seed, hook }, global });
+    }
 
     case "list":
       if (rest.length > 0) return parseError(`list takes no arguments; got "${rest.join(" ")}"`);
@@ -253,13 +280,20 @@ export function parseArgs(argv: ReadonlyArray<string>, defaultCwd: string): Pars
     }
 
     case "hook": {
-      if (rest.length === 0) return parseError(`hook requires an action (install|uninstall)`);
-      if (rest.length > 1) return parseError(`hook takes one argument; got "${rest.join(" ")}"`);
-      const action = rest[0]!;
+      let force = false;
+      const positional: string[] = [];
+      for (const t of rest) {
+        if (t === "--force") force = true;
+        else if (t.startsWith("--")) return parseError(`hook: unknown flag "${t}"`);
+        else positional.push(t);
+      }
+      if (positional.length === 0) return parseError(`hook requires an action (install|uninstall)`);
+      if (positional.length > 1) return parseError(`hook takes one positional argument; got "${positional.join(" ")}"`);
+      const action = positional[0]!;
       if (action !== "install" && action !== "uninstall") {
         return parseError(`hook action must be install|uninstall, got "${action}"`);
       }
-      return ok({ command: { kind: "hook", action }, global });
+      return ok({ command: { kind: "hook", action, force }, global });
     }
 
     default: {

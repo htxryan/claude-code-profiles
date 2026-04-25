@@ -38,7 +38,17 @@ EXIT CODES
 `;
 
 const VERBS: Record<string, string> = {
-  init: `claude-profiles init — bootstrap .claude-profiles/ (E6, not yet implemented)`,
+  init: `claude-profiles init — bootstrap .claude-profiles/ in this project.
+
+Creates .claude-profiles/, optionally seeds a starter profile from an
+existing .claude/ tree, updates .gitignore, and installs the pre-commit
+hook. Refuses to overwrite an already-initialised .claude-profiles/.
+
+Options:
+  --starter=<name>      starter profile name (default: "default")
+  --no-seed             skip seeding from .claude/ even if present
+  --no-hook             skip installing the pre-commit hook
+  --json                emit a structured outcome payload`,
   list: `claude-profiles list — list all profiles with active marker, extends, includes,
 last-materialized timestamp.
 
@@ -77,7 +87,16 @@ Options: --json`,
   sync: `claude-profiles sync — re-materialize the active profile.
 
 Same drift-gate flow as 'use'. Exits 1 if no profile is active.`,
-  hook: `claude-profiles hook install|uninstall — manage the git pre-commit hook (E6, not yet implemented)`,
+  hook: `claude-profiles hook install|uninstall — manage the git pre-commit hook.
+
+The hook script content is fixed and minimal (R25a) and fail-open: a
+missing or broken claude-profiles binary never blocks commits.
+
+install:
+  --force               overwrite an existing pre-commit hook with different content
+uninstall:
+  removes the hook only if its content matches the canonical script
+  (a user-edited or third-party hook is left untouched).`,
 };
 
 export function topLevelHelp(): string {

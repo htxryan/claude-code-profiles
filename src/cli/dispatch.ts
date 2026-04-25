@@ -2,23 +2,21 @@
  * Command dispatcher. Pattern-matches on Command.kind, calls the right
  * handler, and returns an exit code. Errors thrown by handlers propagate so
  * the bin entry's central catch can format them via formatError + exitCodeFor.
- *
- * Init/hook stubs (epic E5 → E6 handoff): we register placeholder handlers
- * that throw CliNotImplementedError. The dispatcher never silently no-ops;
- * the user always gets a clear "not yet implemented (E6)" message.
  */
 
 import type { GateMode } from "../drift/types.js";
 
 import { runDrift } from "./commands/drift.js";
 import { runDiff } from "./commands/diff.js";
+import { runHook } from "./commands/hook.js";
+import { runInit } from "./commands/init.js";
 import { runList } from "./commands/list.js";
 import { runNew } from "./commands/new.js";
 import { runStatus } from "./commands/status.js";
 import { runSync } from "./commands/sync.js";
 import { runUse } from "./commands/use.js";
 import { runValidate } from "./commands/validate.js";
-import { CliNotImplementedError, EXIT_OK } from "./exit.js";
+import { EXIT_OK } from "./exit.js";
 import { topLevelHelp, verbHelp, versionString } from "./help.js";
 import type { OutputChannel } from "./output.js";
 import type { Command, GlobalOptions } from "./types.js";
@@ -119,10 +117,22 @@ export async function dispatch(
       });
 
     case "init":
-      throw new CliNotImplementedError("init", "E6");
+      return runInit({
+        cwd: global.cwd,
+        output: ctx.output,
+        starterName: command.starter,
+        seedFromClaudeDir: command.seed,
+        installHook: command.hook,
+        signalHandlers: ctx.signalHandlers,
+      });
 
     case "hook":
-      throw new CliNotImplementedError(`hook ${command.action}`, "E6");
+      return runHook({
+        cwd: global.cwd,
+        output: ctx.output,
+        action: command.action,
+        force: command.force,
+      });
 
     default: {
       const _exhaustive: never = command;
