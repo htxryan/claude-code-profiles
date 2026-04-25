@@ -68,8 +68,14 @@ export async function reconcilePendingPrior(
     // a per-attempt scratch dir before renaming prior back. Concurrent
     // readers (R43) see EITHER the original `.claude/` OR the restored one,
     // never an empty/missing tree, except for the brief rename window.
+    //
+    // Order matters (Sonnet review #1): the live bytes get moved to scratch,
+    // then prior is renamed back to target, THEN scratch is discarded. If
+    // we cleaned up scratch before the priorDir restore and the restore
+    // throws, the original live bytes would be permanently lost.
+    let scratch: string | null = null;
     if (await pathExists(target)) {
-      const scratch = `${target}.reconcile-${reconcileCounter++}-${Math.random()
+      scratch = `${target}.reconcile-${reconcileCounter++}-${Math.random()
         .toString(36)
         .slice(2, 8)}`;
       try {
@@ -77,14 +83,18 @@ export async function reconcilePendingPrior(
       } catch {
         // Rename failed (filesystem doesn't support move-into-existing-dir,
         // or .claude/ is locked). Fall back to rmrf — wider window but the
-        // recovery still completes.
+        // recovery still completes. No scratch to retain.
         await rmrf(target);
+        scratch = null;
       }
-      // Best-effort cleanup of the scratch path; if cleanup fails the user
-      // sees a `.claude.reconcile-*` dir but recovery already succeeded.
-      await rmrf(scratch).catch(() => undefined);
     }
     await atomicRename(priorDir, target);
+    if (scratch) {
+      // Restore succeeded; safe to discard the held-aside live bytes. If the
+      // cleanup itself fails, the user sees a `.claude.reconcile-*` dir but
+      // the live tree is correct.
+      await rmrf(scratch).catch(() => undefined);
+    }
     if (pendingExists) {
       await rmrf(pendingDir);
     }

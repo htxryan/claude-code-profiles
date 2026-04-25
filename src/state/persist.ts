@@ -132,6 +132,10 @@ export async function persistLiveIntoProfile(
 
   // Touch the profile dir so e.g. `list` shows a recent mtime; not strictly
   // required but matches user expectation that a "persist" updates the
-  // profile's last-modified.
-  await fs.utimes(persist.targetClaudeDir, new Date(), new Date()).catch(() => undefined);
+  // profile's last-modified. Touch profileDir (the parent that `list`
+  // enumerates) rather than the inner `.claude/` (multi-reviewer review,
+  // Gemini #3): mtime on the parent is what "ls -la .claude-profiles/"
+  // reflects.
+  const now = new Date();
+  await fs.utimes(persist.profileDir, now, now).catch(() => undefined);
 }

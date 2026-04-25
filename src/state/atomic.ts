@@ -25,6 +25,22 @@
 
 import { promises as fs, openSync, fsyncSync, closeSync } from "node:fs";
 import * as path from "node:path";
+import * as process from "node:process";
+
+/**
+ * Build a unique tmp staging path inside `tmpDir` for an atomic write of
+ * `dest`. PID + monotonic counter + random suffix prevents concurrent writers
+ * from clobbering each other's staging file even if the lock is bypassed
+ * (defense-in-depth, multi-reviewer P2 Gemini #2). The `dest` basename is
+ * embedded for diagnostics — operators can tell from the staging filename
+ * which final write was in progress at crash time.
+ */
+let atomicTmpCounter = 0;
+export function uniqueAtomicTmpPath(tmpDir: string, dest: string): string {
+  const nonce = `${atomicTmpCounter++}-${Math.random().toString(36).slice(2, 10)}`;
+  const tag = path.basename(dest);
+  return path.join(tmpDir, `${tag}.${process.pid}.${nonce}.tmp`);
+}
 
 /**
  * fsync the directory containing `target`. Best-effort: on Windows, on

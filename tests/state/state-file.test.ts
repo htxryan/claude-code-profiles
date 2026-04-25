@@ -91,13 +91,96 @@ describe("state-file IO", () => {
     expect(r.warning?.code).toBe("SchemaMismatch");
   });
 
-  it("R14a: write does not leave the temp file behind", async () => {
+  it("R42: degrades when fingerprint.files entry is null", async () => {
+    const paths = buildStatePaths(root);
+    await fs.mkdir(paths.profilesDir, { recursive: true });
+    await fs.writeFile(
+      paths.stateFile,
+      JSON.stringify({
+        schemaVersion: STATE_FILE_SCHEMA_VERSION,
+        activeProfile: null,
+        materializedAt: null,
+        resolvedSources: [],
+        fingerprint: {
+          schemaVersion: FINGERPRINT_SCHEMA_VERSION,
+          files: { "a.md": null },
+        },
+        externalTrustNotices: [],
+      }),
+    );
+    const r = await readStateFile(paths);
+    expect(r.warning?.code).toBe("SchemaMismatch");
+    expect(r.state).toEqual(defaultState());
+  });
+
+  it("R42: degrades when fingerprint.files entry has wrong-typed fields", async () => {
+    const paths = buildStatePaths(root);
+    await fs.mkdir(paths.profilesDir, { recursive: true });
+    await fs.writeFile(
+      paths.stateFile,
+      JSON.stringify({
+        schemaVersion: STATE_FILE_SCHEMA_VERSION,
+        activeProfile: null,
+        materializedAt: null,
+        resolvedSources: [],
+        fingerprint: {
+          schemaVersion: FINGERPRINT_SCHEMA_VERSION,
+          files: { "a.md": { size: "bad", mtimeMs: 0, contentHash: "" } },
+        },
+        externalTrustNotices: [],
+      }),
+    );
+    const r = await readStateFile(paths);
+    expect(r.warning?.code).toBe("SchemaMismatch");
+    expect(r.state).toEqual(defaultState());
+  });
+
+  it("R42: degrades when fingerprint.files entry is missing contentHash", async () => {
+    const paths = buildStatePaths(root);
+    await fs.mkdir(paths.profilesDir, { recursive: true });
+    await fs.writeFile(
+      paths.stateFile,
+      JSON.stringify({
+        schemaVersion: STATE_FILE_SCHEMA_VERSION,
+        activeProfile: null,
+        materializedAt: null,
+        resolvedSources: [],
+        fingerprint: {
+          schemaVersion: FINGERPRINT_SCHEMA_VERSION,
+          files: { "a.md": { size: 10, mtimeMs: 0 } },
+        },
+        externalTrustNotices: [],
+      }),
+    );
+    const r = await readStateFile(paths);
+    expect(r.warning?.code).toBe("SchemaMismatch");
+    expect(r.state).toEqual(defaultState());
+  });
+
+  it("R14a: write does not leave temp staging files behind", async () => {
     const paths = buildStatePaths(root);
     await writeStateFile(paths, defaultState());
-    const tmpExists = await fs
-      .access(paths.stateFileTmp)
-      .then(() => true)
-      .catch(() => false);
-    expect(tmpExists).toBe(false);
+    // No `.tmp` files anywhere under .claude-profiles/.
+    const stale = await listAllTmpFiles(paths.profilesDir);
+    expect(stale).toEqual([]);
   });
 });
+
+async function listAllTmpFiles(root: string): Promise<string[]> {
+  const out: string[] = [];
+  async function walk(dir: string): Promise<void> {
+    let entries;
+    try {
+      entries = await fs.readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      const abs = path.join(dir, e.name);
+      if (e.isDirectory()) await walk(abs);
+      else if (e.name.endsWith(".tmp")) out.push(abs);
+    }
+  }
+  await walk(root);
+  return out;
+}

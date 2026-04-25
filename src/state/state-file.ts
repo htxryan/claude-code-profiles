@@ -9,7 +9,7 @@
 
 import { promises as fs } from "node:fs";
 
-import { atomicWriteFile } from "./atomic.js";
+import { atomicWriteFile, uniqueAtomicTmpPath } from "./atomic.js";
 import type { StatePaths } from "./paths.js";
 import {
   STATE_FILE_SCHEMA_VERSION,
@@ -133,6 +133,25 @@ function validateStateShape(value: unknown): Ok | Bad {
   ) {
     return { ok: false, detail: "fingerprint.files must be a JSON object" };
   }
+  // Validate per-file entries (Sonnet review #3): the R42 contract is "never
+  // throws on malformed state". A corrupt entry like `{"a.md": null}` would
+  // pass the previous shallow check and crash E4's compareFingerprint with
+  // a null deref. We require numeric size/mtimeMs and string contentHash.
+  for (const [k, v] of Object.entries(fingerprint["files"] as Record<string, unknown>)) {
+    if (typeof v !== "object" || v === null || Array.isArray(v)) {
+      return { ok: false, detail: `fingerprint.files[${JSON.stringify(k)}] must be an object` };
+    }
+    const e = v as Record<string, unknown>;
+    if (typeof e["size"] !== "number" || !Number.isFinite(e["size"])) {
+      return { ok: false, detail: `fingerprint.files[${JSON.stringify(k)}].size must be a number` };
+    }
+    if (typeof e["mtimeMs"] !== "number" || !Number.isFinite(e["mtimeMs"])) {
+      return { ok: false, detail: `fingerprint.files[${JSON.stringify(k)}].mtimeMs must be a number` };
+    }
+    if (typeof e["contentHash"] !== "string") {
+      return { ok: false, detail: `fingerprint.files[${JSON.stringify(k)}].contentHash must be a string` };
+    }
+  }
   if (!Array.isArray(obj["externalTrustNotices"])) {
     return { ok: false, detail: "externalTrustNotices must be an array" };
   }
@@ -149,6 +168,16 @@ function validateStateShape(value: unknown): Ok | Bad {
  */
 export async function writeStateFile(paths: StatePaths, state: StateFile): Promise<void> {
   await fs.mkdir(paths.profilesDir, { recursive: true });
+  await fs.mkdir(paths.tmpDir, { recursive: true });
   const json = `${JSON.stringify(state, null, 2)}\n`;
-  await atomicWriteFile(paths.stateFile, paths.stateFileTmp, json);
+  // Per-call unique tmp path (multi-reviewer P2 Gemini #2): even though
+  // writes happen under the lock, defense-in-depth prevents two concurrent
+  // writers from clobbering each other's staging file.
+  const tmpPath = uniqueAtomicTmpPath(paths.tmpDir, paths.stateFile);
+  try {
+    await atomicWriteFile(paths.stateFile, tmpPath, json);
+  } catch (err) {
+    await fs.unlink(tmpPath).catch(() => undefined);
+    throw err;
+  }
 }

@@ -20,12 +20,14 @@ export interface StatePaths {
   claudeDir: string;
   /** Absolute path to `.claude-profiles/.state.json`. */
   stateFile: string;
-  /** Absolute path to `.claude-profiles/.state.json.tmp` (atomic write staging). */
-  stateFileTmp: string;
   /** Absolute path to `.claude-profiles/.lock`. */
   lockFile: string;
-  /** Absolute path to `.claude-profiles/.lock.tmp`. */
-  lockFileTmp: string;
+  /**
+   * Directory inside `.claude-profiles/` reserved for atomic-write staging
+   * (`.tmp/`). Per-call unique tmp filenames live here so concurrent writers
+   * never share a staging path and crash debris stays isolated.
+   */
+  tmpDir: string;
   /** Materialize-side staging (R16 step a). */
   pendingDir: string;
   /** Materialize-side prior backup (R16 step b). */
@@ -48,9 +50,8 @@ export function buildStatePaths(projectRoot: string): StatePaths {
     profilesDir,
     claudeDir: path.join(root, ".claude"),
     stateFile: path.join(profilesDir, ".state.json"),
-    stateFileTmp: path.join(profilesDir, ".state.json.tmp"),
     lockFile: path.join(profilesDir, ".lock"),
-    lockFileTmp: path.join(profilesDir, ".lock.tmp"),
+    tmpDir: path.join(profilesDir, ".tmp"),
     pendingDir: path.join(profilesDir, ".pending"),
     priorDir: path.join(profilesDir, ".prior"),
     backupDir: path.join(profilesDir, ".backup"),
@@ -74,16 +75,27 @@ export interface PersistPaths {
   priorDir: string;
 }
 
+// Windows-reserved device names per MS-DOS legacy. Reject these regardless
+// of platform so a profile created on POSIX cannot land on Windows under a
+// reserved name.
+const WIN_RESERVED = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\..*)?$/i;
+
 export function buildPersistPaths(paths: StatePaths, profileName: string): PersistPaths {
-  // Defense-in-depth (multi-reviewer P2, Gemini #5): profile names are
-  // validated by the resolver (`isValidProfileName`) before they reach this
-  // path, but we re-validate here so any caller that bypasses the resolver
-  // can't traverse the profilesDir boundary. `path.basename(x) !== x` flags
-  // anything containing a separator or `..`.
+  // Defense-in-depth (multi-reviewer P2, Gemini #5; Opus #2): profile names
+  // are validated by the resolver (`isValidProfileName`) before they reach
+  // this path, but we re-validate here so any caller that bypasses the
+  // resolver can't traverse the profilesDir boundary. The check uses BOTH
+  // POSIX and Win32 basename so `"a\\b"` is rejected on Linux/macOS — those
+  // bytes would be a separator if the path were ever consumed by a Windows
+  // process via shared state. We also reject NUL bytes and Windows-reserved
+  // device names for cross-platform safety.
   if (
     profileName.length === 0 ||
     profileName.startsWith(".") ||
-    path.basename(profileName) !== profileName
+    profileName.includes("\0") ||
+    path.posix.basename(profileName) !== profileName ||
+    path.win32.basename(profileName) !== profileName ||
+    WIN_RESERVED.test(profileName)
   ) {
     throw new Error(`Invalid profile name for persist target: ${JSON.stringify(profileName)}`);
   }

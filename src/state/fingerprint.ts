@@ -126,8 +126,15 @@ async function walkMetadata(
       await walkMetadata(root, abs, out);
     } else if (e.isFile()) {
       const rel = path.relative(root, abs).split(path.sep).join("/");
-      const stat = await fs.stat(abs);
-      out[rel] = { size: stat.size, mtimeMs: stat.mtimeMs, abs };
+      // Tolerate stat ENOENT (Opus review #4): a file deleted between
+      // readdir and stat (editor atomic-write swap) shouldn't abort drift
+      // detection. Skip the entry — the next pass will reflect actual state.
+      try {
+        const stat = await fs.stat(abs);
+        out[rel] = { size: stat.size, mtimeMs: stat.mtimeMs, abs };
+      } catch (err: unknown) {
+        if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+      }
     }
   }
 }
@@ -151,13 +158,20 @@ async function walk(
       await walk(root, abs, out, mode);
     } else if (e.isFile()) {
       const rel = path.relative(root, abs).split(path.sep).join("/");
-      const stat = await fs.stat(abs);
-      const bytes = await fs.readFile(abs);
-      out[rel] = {
-        size: stat.size,
-        mtimeMs: stat.mtimeMs,
-        contentHash: hashBytes(bytes),
-      };
+      // Tolerate stat/readFile ENOENT (Opus review #4): a file deleted
+      // between readdir and stat/readFile shouldn't abort the walk. Skip
+      // — the next walk picks up reality.
+      try {
+        const stat = await fs.stat(abs);
+        const bytes = await fs.readFile(abs);
+        out[rel] = {
+          size: stat.size,
+          mtimeMs: stat.mtimeMs,
+          contentHash: hashBytes(bytes),
+        };
+      } catch (err: unknown) {
+        if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+      }
     }
     // Symlinks and other non-file entries are skipped — `.claude/` is a copy
     // tree by R39, and any symlinks would be artifacts the user created post-
@@ -215,13 +229,20 @@ export async function compareFingerprint(
         continue;
       }
       // Slow path: hash this single file and compare against the recorded
-      // hash. Avoids hashing the whole tree.
-      const bytes = await fs.readFile(l.abs);
-      const liveHash = hashBytes(bytes);
-      out.push({
-        relPath,
-        kind: liveHash === r.contentHash ? "unchanged" : "modified",
-      });
+      // hash. Avoids hashing the whole tree. Tolerate ENOENT (Opus review
+      // #4): the file may have been deleted between metadata walk and
+      // readFile; treat as deleted.
+      try {
+        const bytes = await fs.readFile(l.abs);
+        const liveHash = hashBytes(bytes);
+        out.push({
+          relPath,
+          kind: liveHash === r.contentHash ? "unchanged" : "modified",
+        });
+      } catch (err: unknown) {
+        if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+        out.push({ relPath, kind: "deleted" });
+      }
     }
   }
   out.sort((a, b) => a.relPath.localeCompare(b.relPath));

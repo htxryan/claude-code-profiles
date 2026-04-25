@@ -14,7 +14,7 @@
 
 import { promises as fs } from "node:fs";
 
-import { atomicWriteFile } from "./atomic.js";
+import { atomicWriteFile, uniqueAtomicTmpPath } from "./atomic.js";
 import type { StatePaths } from "./paths.js";
 
 /**
@@ -29,6 +29,7 @@ export const E3_GITIGNORE_ENTRIES = [
   ".claude-profiles/.pending/",
   ".claude-profiles/.prior/",
   ".claude-profiles/.backup/",
+  ".claude-profiles/.tmp/",
 ] as const;
 
 const SECTION_HEADER = "# Added by claude-profiles";
@@ -81,10 +82,25 @@ export async function ensureGitignoreEntries(paths: StatePaths): Promise<Gitigno
   // Atomic write (multi-reviewer P2, Codex #6): use atomicWriteFile so a
   // crash mid-write doesn't truncate the user's `.gitignore`. Consistent
   // with the rest of E3's write discipline.
+  //
+  // Tmp staging is placed inside `.claude-profiles/.tmp/` rather than next
+  // to `.gitignore` (Sonnet review #4, Gemini #2): a `.gitignore.tmp` at the
+  // project root would be visible in `git status` after a crash, and adding
+  // `.gitignore.tmp` to the gitignore is circular (the file we're writing IS
+  // the gitignore). Cross-filesystem rename is not a concern in practice —
+  // `.claude-profiles/` is a sibling of `.gitignore`, both inside the project.
+  await fs.mkdir(paths.profilesDir, { recursive: true });
+  await fs.mkdir(paths.tmpDir, { recursive: true });
   const trimmed = existing.replace(/\s+$/, "");
   const sep = trimmed.length === 0 ? "" : "\n\n";
   const block = `${sep}${SECTION_HEADER}\n${toAdd.join("\n")}\n`;
   const next = trimmed + block;
-  await atomicWriteFile(paths.gitignoreFile, `${paths.gitignoreFile}.tmp`, next);
+  const tmpPath = uniqueAtomicTmpPath(paths.tmpDir, paths.gitignoreFile);
+  try {
+    await atomicWriteFile(paths.gitignoreFile, tmpPath, next);
+  } catch (err) {
+    await fs.unlink(tmpPath).catch(() => undefined);
+    throw err;
+  }
   return { added: [...toAdd], created };
 }

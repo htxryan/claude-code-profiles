@@ -57,4 +57,20 @@ describe(".gitignore management", () => {
     const content = await fs.readFile(paths.gitignoreFile, "utf8");
     expect(content.startsWith(userContent.trim())).toBe(true);
   });
+
+  // Regression (Sonnet review #4, Gemini #2): the previous staging path was
+  // `<root>/.gitignore.tmp`, which would be visible at the project root if a
+  // crash interrupted the write. Staging now lives inside
+  // `.claude-profiles/.tmp/`, which is itself gitignored.
+  it("does not stage temp files at the project root", async () => {
+    const paths = buildStatePaths(root);
+    await ensureGitignoreEntries(paths);
+    const rootEntries = await fs.readdir(root);
+    const tmpAtRoot = rootEntries.filter((e) => e.endsWith(".tmp"));
+    expect(tmpAtRoot).toEqual([]);
+  });
+
+  it("includes .claude-profiles/.tmp/ so staging directory itself is gitignored", () => {
+    expect(E3_GITIGNORE_ENTRIES).toContain(".claude-profiles/.tmp/");
+  });
 });

@@ -31,8 +31,15 @@ export async function snapshotForDiscard(paths: StatePaths): Promise<string | nu
   if (!(await pathExists(paths.claudeDir))) return null;
 
   await fs.mkdir(paths.backupDir, { recursive: true });
-  const stamp = isoStampSafeForFs();
-  const dest = path.join(paths.backupDir, stamp);
+  // Find an unused snapshot dir name. ISO timestamps are millisecond-precise,
+  // so two snapshots within the same ms collide; copyTree's force:true silent
+  // merge would corrupt the retention accounting (Opus review #5). Append a
+  // counter suffix `.1`, `.2`, ... until a free slot is found.
+  const baseStamp = isoStampSafeForFs();
+  let dest = path.join(paths.backupDir, baseStamp);
+  for (let i = 1; await pathExists(dest); i++) {
+    dest = path.join(paths.backupDir, `${baseStamp}.${i}`);
+  }
 
   await copyTree(paths.claudeDir, dest);
   await pruneOldSnapshots(paths.backupDir, MAX_RETAINED_SNAPSHOTS);

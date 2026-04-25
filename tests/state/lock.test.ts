@@ -84,18 +84,17 @@ describe("lock primitive", () => {
     await expect(fs.access(paths.lockFile)).rejects.toThrow();
   });
 
-  it("uses a unique temp path per attempt (no shared .lock.tmp)", async () => {
+  it("acquires without leaving any tmp/side files behind", async () => {
     const paths = buildStatePaths(root);
     const lock = await acquireLock(paths, { signalHandlers: false });
-    // The shared paths.lockFileTmp must NOT remain — and acquire must NOT
-    // have written to it. Per-attempt unique tmps go into the same dir but
-    // with PID + nonce in the name; we only verify the canonical shared
-    // path stays clean.
-    await expect(fs.access(paths.lockFileTmp)).rejects.toThrow();
-    // No `.tmp` files should linger in the profilesDir.
+    // The lock now uses fs.open(wx) for atomic exclusive create — no tmp
+    // file is involved on the success path. After acquire, only `.lock`
+    // should be present in profilesDir.
     const entries = await fs.readdir(paths.profilesDir);
-    const tmps = entries.filter((e) => e.endsWith(".tmp"));
-    expect(tmps).toEqual([]);
+    const debris = entries.filter(
+      (e) => e.endsWith(".tmp") || e.includes(".stale.") || e.includes(".reconcile-"),
+    );
+    expect(debris).toEqual([]);
     await lock.release();
   });
 
@@ -111,5 +110,30 @@ describe("lock primitive", () => {
       ),
     ).rejects.toThrow("boom");
     await expect(fs.access(paths.lockFile)).rejects.toThrow();
+  });
+
+  // Regression: rename-based claim had a replace-existing TOCTOU where two
+  // concurrent acquirers could both succeed (Codex review #1, Gemini #1).
+  // The exclusive-create primitive should serialize all parallel attempts
+  // through O_EXCL; only one can win, the rest must throw LockHeldError.
+  it("under heavy contention exactly one acquirer wins; others fail-fast", async () => {
+    const paths = buildStatePaths(root);
+    const N = 25;
+    const results = await Promise.allSettled(
+      Array.from({ length: N }, () =>
+        acquireLock(paths, { signalHandlers: false }),
+      ),
+    );
+    const winners = results.filter((r) => r.status === "fulfilled");
+    const losers = results.filter((r) => r.status === "rejected");
+    expect(winners.length).toBe(1);
+    expect(losers.length).toBe(N - 1);
+    for (const l of losers) {
+      const reason = (l as PromiseRejectedResult).reason;
+      expect(reason).toBeInstanceOf(LockHeldError);
+    }
+    const winner = (winners[0] as PromiseFulfilledResult<Awaited<ReturnType<typeof acquireLock>>>)
+      .value;
+    await winner.release();
   });
 });
