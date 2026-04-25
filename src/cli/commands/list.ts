@@ -9,12 +9,18 @@
 import { promises as fs } from "node:fs";
 import * as path from "node:path";
 
-import { listProfiles } from "../../resolver/discover.js";
-import { buildPaths } from "../../resolver/paths.js";
-import type { ProfileManifest } from "../../resolver/types.js";
-import { buildStatePaths } from "../../state/paths.js";
-import { readStateFile } from "../../state/state-file.js";
-import { formatStateWarning, relativeTime, renderTable } from "../format.js";
+import {
+  buildPaths,
+  listProfiles,
+  type ProfileManifest,
+} from "../../resolver/index.js";
+import { buildStatePaths, readStateFile } from "../../state/index.js";
+import {
+  formatStateWarning,
+  meaningfulStateWarning,
+  relativeTime,
+  renderTable,
+} from "../format.js";
 import type { OutputChannel } from "../output.js";
 
 export interface ListEntryPayload {
@@ -60,12 +66,7 @@ export async function runList(opts: ListOptions): Promise<number> {
     });
   }
 
-  // Surface only meaningful warnings — Missing is the fresh-project signal,
-  // matches lesson L942d1c5b's principle: silence the "normal absence" case.
-  const stateWarning =
-    warning && warning.code !== "Missing"
-      ? { code: warning.code, detail: warning.code === "ParseError" ? warning.detail : warning.code === "SchemaMismatch" ? warning.detail : "" }
-      : null;
+  const stateWarning = meaningfulStateWarning(warning);
 
   if (opts.output.jsonMode) {
     const payload: ListPayload = { profiles: entries, stateWarning };

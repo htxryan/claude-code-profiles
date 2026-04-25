@@ -4,13 +4,12 @@
  * "no active profile" case explicitly.
  */
 
-import { buildStatePaths } from "../../state/paths.js";
-import { readStateFile } from "../../state/state-file.js";
+import type { GateMode } from "../../drift/index.js";
+import { buildStatePaths, readStateFile } from "../../state/index.js";
 import { CliUserError, EXIT_USER_ERROR } from "../exit.js";
 import type { OutputChannel } from "../output.js";
 import { readlinePrompt } from "../prompt.js";
 import { runSwap } from "../service/swap.js";
-import type { GateMode } from "../../drift/types.js";
 import type { OnDriftFlag } from "../types.js";
 
 export interface SyncOptions {
@@ -18,8 +17,8 @@ export interface SyncOptions {
   output: OutputChannel;
   mode: GateMode;
   onDriftFlag: OnDriftFlag | null;
-  /** Wired through to the lock for tests; production omits (defaults true). */
-  signalHandlers?: boolean;
+  /** Bin always passes true; tests pass false. Required to avoid accidental skip. */
+  signalHandlers: boolean;
 }
 
 export async function runSync(opts: SyncOptions): Promise<number> {
@@ -38,7 +37,7 @@ export async function runSync(opts: SyncOptions): Promise<number> {
     onDriftFlag: opts.onDriftFlag,
     prompt: readlinePrompt,
     isSync: true,
-    ...(opts.signalHandlers !== undefined ? { signalHandlers: opts.signalHandlers } : {}),
+    signalHandlers: opts.signalHandlers,
   });
 
   if (opts.output.jsonMode) {

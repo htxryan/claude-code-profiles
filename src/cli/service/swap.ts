@@ -27,15 +27,21 @@
  *     applyGate + state-write happen under one acquisition)
  */
 
-import { applyGate, type ApplyGateResult } from "../../drift/apply.js";
-import { detectDrift } from "../../drift/detect.js";
-import { decideGate } from "../../drift/gate.js";
-import type { GateChoice, GateMode } from "../../drift/types.js";
-import { merge } from "../../merge/merge.js";
-import { resolve } from "../../resolver/resolve.js";
-import { withLock } from "../../state/lock.js";
-import type { StatePaths } from "../../state/paths.js";
-import { readStateFile } from "../../state/state-file.js";
+import {
+  applyGate,
+  decideGate,
+  detectDrift,
+  type ApplyGateResult,
+  type GateChoice,
+  type GateMode,
+} from "../../drift/index.js";
+import { merge } from "../../merge/index.js";
+import { resolve } from "../../resolver/index.js";
+import {
+  readStateFile,
+  withLock,
+  type StatePaths,
+} from "../../state/index.js";
 import { CliUserError, EXIT_USER_ERROR } from "../exit.js";
 import type { GatePrompt } from "../prompt.js";
 import type { OnDriftFlag } from "../types.js";
@@ -58,11 +64,12 @@ export interface SwapOptions {
   isSync?: boolean;
   /**
    * Whether the lock module should install per-acquire SIGINT/SIGTERM
-   * handlers that synchronously release the lock. Defaults to true (the bin
-   * entry needs this for the SIGINT-to-lock-release invariant). Tests pass
-   * false because vitest workers reject `process.on('SIGINT', ...)`.
+   * handlers that synchronously release the lock. The bin entry passes true
+   * (production: SIGINT-to-lock-release invariant). Tests pass false because
+   * vitest workers reject `process.on('SIGINT', ...)`. Required (no default)
+   * so callers can't accidentally skip wiring it through.
    */
-  signalHandlers?: boolean;
+  signalHandlers: boolean;
 }
 
 export interface SwapResult {
@@ -177,7 +184,7 @@ export async function runSwap(opts: SwapOptions): Promise<SwapResult> {
       activeProfileName: activeBefore,
     });
     },
-    { signalHandlers: opts.signalHandlers ?? true },
+    { signalHandlers: opts.signalHandlers },
   );
 
   // The materialize() call already wrote the new state; we surface the

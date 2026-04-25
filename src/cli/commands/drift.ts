@@ -6,11 +6,9 @@
  * which is fail-open (always exits 0) and writes a brief warning to stderr.
  */
 
-import { detectDrift } from "../../drift/detect.js";
-import { preCommitWarn } from "../../drift/pre-commit.js";
-import type { DriftReport } from "../../drift/types.js";
-import { buildStatePaths } from "../../state/paths.js";
-import { formatStateWarning } from "../format.js";
+import { detectDrift, preCommitWarn, type DriftReport } from "../../drift/index.js";
+import { buildStatePaths } from "../../state/index.js";
+import { formatStateWarning, meaningfulStateWarning } from "../format.js";
 import type { OutputChannel } from "../output.js";
 
 export interface DriftCommandPayload {
@@ -100,14 +98,6 @@ function reportToPayload(report: DriftReport): DriftCommandPayload {
     scannedFiles: report.scannedFiles,
     fastPathHits: report.fastPathHits,
     slowPathHits: report.slowPathHits,
-    warning: report.warning && report.warning.code !== "Missing"
-      ? {
-          code: report.warning.code,
-          detail:
-            report.warning.code === "ParseError" || report.warning.code === "SchemaMismatch"
-              ? report.warning.detail
-              : "",
-        }
-      : null,
+    warning: meaningfulStateWarning(report.warning),
   };
 }

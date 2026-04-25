@@ -7,9 +7,8 @@
  * are caught per-profile so one bad manifest doesn't mask others.
  */
 
-import { listProfiles } from "../../resolver/discover.js";
-import { resolve } from "../../resolver/resolve.js";
-import { merge } from "../../merge/merge.js";
+import { listProfiles, resolve } from "../../resolver/index.js";
+import { merge } from "../../merge/index.js";
 import { CliUserError, EXIT_CONFLICT } from "../exit.js";
 import { formatResolutionWarnings } from "../format.js";
 import type { OutputChannel } from "../output.js";

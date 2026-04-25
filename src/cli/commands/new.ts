@@ -14,7 +14,7 @@
 import { promises as fs } from "node:fs";
 import * as path from "node:path";
 
-import { isValidProfileName } from "../../resolver/paths.js";
+import { isValidProfileName } from "../../resolver/index.js";
 import { CliUserError, EXIT_USER_ERROR } from "../exit.js";
 import type { OutputChannel } from "../output.js";
 

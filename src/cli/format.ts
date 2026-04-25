@@ -54,6 +54,25 @@ export function renderTable(rows: ReadonlyArray<readonly [string, string]>): str
 }
 
 /**
+ * Reshape a StateReadWarning into the `{code, detail}` payload commands emit
+ * via --json, with `Missing` filtered out (lesson L942d1c5b: Missing is the
+ * "fresh project" signal, not a degradation worth surfacing). Returns null
+ * when the warning is null OR Missing — callers can treat null uniformly.
+ *
+ * `detail` is empty string for variants that have no detail field rather than
+ * undefined so the JSON shape is stable across all rows.
+ */
+export function meaningfulStateWarning(
+  w: StateReadWarning | null,
+): { code: string; detail: string } | null {
+  if (w === null || w.code === "Missing") return null;
+  // ParseError and SchemaMismatch both carry a `detail` field today, and
+  // exhaust the non-Missing variants — the explicit narrowing keeps the
+  // function future-proof if a new variant without `detail` is added.
+  return { code: w.code, detail: w.detail };
+}
+
+/**
  * Format a StateReadWarning for human display. The pre-commit hook already
  * filters Missing (lesson L942d1c5b — Missing is "fresh project", not broken),
  * but the `status` command surfaces all three variants so the user knows

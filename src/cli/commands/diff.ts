@@ -12,10 +12,9 @@
  *   - changed: exists in both, bytes differ
  */
 
-import { merge } from "../../merge/merge.js";
-import { resolve } from "../../resolver/resolve.js";
-import { buildStatePaths } from "../../state/paths.js";
-import { readStateFile } from "../../state/state-file.js";
+import { merge } from "../../merge/index.js";
+import { resolve } from "../../resolver/index.js";
+import { buildStatePaths, readStateFile } from "../../state/index.js";
 import { CliUserError } from "../exit.js";
 import type { OutputChannel } from "../output.js";
 
@@ -76,19 +75,21 @@ export async function runDiff(opts: DiffOptions): Promise<number> {
 
   const all = new Set<string>([...mapA.keys(), ...mapB.keys()]);
   const entries: DiffEntry[] = [];
+  const totals = { added: 0, removed: 0, changed: 0 };
   for (const rel of [...all].sort()) {
     const ba = mapA.get(rel);
     const bb = mapB.get(rel);
-    if (ba && !bb) entries.push({ relPath: rel, status: "added" });
-    else if (!ba && bb) entries.push({ relPath: rel, status: "removed" });
-    else if (ba && bb && !ba.equals(bb)) entries.push({ relPath: rel, status: "changed" });
+    if (ba && !bb) {
+      entries.push({ relPath: rel, status: "added" });
+      totals.added++;
+    } else if (!ba && bb) {
+      entries.push({ relPath: rel, status: "removed" });
+      totals.removed++;
+    } else if (ba && bb && !ba.equals(bb)) {
+      entries.push({ relPath: rel, status: "changed" });
+      totals.changed++;
+    }
   }
-
-  const totals = {
-    added: entries.filter((e) => e.status === "added").length,
-    removed: entries.filter((e) => e.status === "removed").length,
-    changed: entries.filter((e) => e.status === "changed").length,
-  };
 
   if (opts.output.jsonMode) {
     const payload: DiffPayload = { a, b, entries, totals };

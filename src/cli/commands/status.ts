@@ -4,10 +4,13 @@
  * structured fields that round-trip cleanly.
  */
 
-import { detectDrift } from "../../drift/detect.js";
-import { buildStatePaths } from "../../state/paths.js";
-import { readStateFile } from "../../state/state-file.js";
-import { formatStateWarning, timestampWithRelative } from "../format.js";
+import { detectDrift } from "../../drift/index.js";
+import { buildStatePaths, readStateFile } from "../../state/index.js";
+import {
+  formatStateWarning,
+  meaningfulStateWarning,
+  timestampWithRelative,
+} from "../format.js";
 import type { OutputChannel } from "../output.js";
 
 export interface StatusPayload {
@@ -34,14 +37,8 @@ export async function runStatus(opts: StatusOptions): Promise<number> {
   const drift = await detectDrift(paths);
 
   const counts = countByStatus(drift.entries);
-  const warnings: Array<{ code: string; detail: string }> = [];
-  if (warning && warning.code !== "Missing") {
-    const detail =
-      warning.code === "ParseError" || warning.code === "SchemaMismatch"
-        ? warning.detail
-        : "";
-    warnings.push({ code: warning.code, detail });
-  }
+  const stateWarning = meaningfulStateWarning(warning);
+  const warnings = stateWarning ? [stateWarning] : [];
 
   if (opts.output.jsonMode) {
     const payload: StatusPayload = {

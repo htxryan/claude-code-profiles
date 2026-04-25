@@ -90,6 +90,7 @@ describe("runSwap — drift + non-TTY (epic invariant: never blocks)", () => {
         mode: "non-interactive",
         onDriftFlag: null,
         prompt: NEVER_CALLED,
+        signalHandlers: false,
       });
     } catch (err) {
       thrown = err;
@@ -151,6 +152,7 @@ describe("runSwap — drift + non-TTY (epic invariant: never blocks)", () => {
         mode: "non-interactive",
         onDriftFlag: "abort",
         prompt: NEVER_CALLED,
+        signalHandlers: false,
       });
     } catch (err) {
       thrown = err;

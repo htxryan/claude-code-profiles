@@ -3,11 +3,11 @@
  * `runSwap` — all business logic lives in the service layer.
  */
 
-import { buildStatePaths } from "../../state/paths.js";
+import type { GateMode } from "../../drift/index.js";
+import { buildStatePaths } from "../../state/index.js";
 import type { OutputChannel } from "../output.js";
 import { readlinePrompt } from "../prompt.js";
 import { runSwap } from "../service/swap.js";
-import type { GateMode } from "../../drift/types.js";
 import type { OnDriftFlag } from "../types.js";
 
 export interface UseOptions {
@@ -16,8 +16,8 @@ export interface UseOptions {
   profile: string;
   mode: GateMode;
   onDriftFlag: OnDriftFlag | null;
-  /** Wired through to the lock for tests; production omits (defaults true). */
-  signalHandlers?: boolean;
+  /** Bin always passes true; tests pass false. Required to avoid accidental skip. */
+  signalHandlers: boolean;
 }
 
 export async function runUse(opts: UseOptions): Promise<number> {
@@ -27,7 +27,7 @@ export async function runUse(opts: UseOptions): Promise<number> {
     mode: opts.mode,
     onDriftFlag: opts.onDriftFlag,
     prompt: readlinePrompt,
-    ...(opts.signalHandlers !== undefined ? { signalHandlers: opts.signalHandlers } : {}),
+    signalHandlers: opts.signalHandlers,
   });
 
   if (opts.output.jsonMode) {
