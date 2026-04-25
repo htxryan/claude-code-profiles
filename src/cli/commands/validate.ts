@@ -1,0 +1,130 @@
+/**
+ * `validate [<name>]` command (R33). Dry-run resolve + merge against one or
+ * all profiles. Returns exit 0 on full pass, 3 on any failure (R33: pass/fail
+ * report; non-zero exit on failures — S11).
+ *
+ * Composes E1 (resolve) + E2 (merge) without touching disk via E3. Errors
+ * are caught per-profile so one bad manifest doesn't mask others.
+ */
+
+import { listProfiles } from "../../resolver/discover.js";
+import { resolve } from "../../resolver/resolve.js";
+import { merge } from "../../merge/merge.js";
+import { CliUserError, EXIT_CONFLICT } from "../exit.js";
+import { formatResolutionWarnings } from "../format.js";
+import type { OutputChannel } from "../output.js";
+
+export interface ValidateProfileResult {
+  profile: string;
+  ok: boolean;
+  /** Error code from a thrown PipelineError, or null. */
+  errorCode: string | null;
+  errorMessage: string | null;
+  warnings: Array<{ code: string; message: string; source: string | null }>;
+  externalPaths: string[];
+}
+
+export interface ValidatePayload {
+  results: ValidateProfileResult[];
+  pass: boolean;
+}
+
+export interface ValidateOptions {
+  cwd: string;
+  output: OutputChannel;
+  /** Single profile to validate, or null to validate every profile in the project. */
+  profile: string | null;
+}
+
+export async function runValidate(opts: ValidateOptions): Promise<number> {
+  const targets =
+    opts.profile !== null
+      ? [opts.profile]
+      : await listProfiles({ projectRoot: opts.cwd });
+
+  if (targets.length === 0) {
+    if (opts.output.jsonMode) {
+      opts.output.json({ results: [], pass: true } satisfies ValidatePayload);
+    } else {
+      opts.output.print("(no profiles to validate)");
+    }
+    return 0;
+  }
+
+  const results: ValidateProfileResult[] = [];
+  for (const name of targets) {
+    results.push(await validateOne(opts.cwd, name));
+  }
+  const pass = results.every((r) => r.ok);
+
+  if (opts.output.jsonMode) {
+    const payload: ValidatePayload = { results, pass };
+    opts.output.json(payload);
+  } else {
+    for (const r of results) {
+      if (r.ok) {
+        const warnNote = r.warnings.length > 0 ? ` (${r.warnings.length} warning${r.warnings.length === 1 ? "" : "s"})` : "";
+        opts.output.print(`PASS  ${r.profile}${warnNote}`);
+        if (r.warnings.length > 0) {
+          const ws = r.warnings.map((w) => {
+            const base = { code: w.code as never, message: w.message };
+            return w.source !== null ? { ...base, source: w.source } : base;
+          });
+          opts.output.print(formatResolutionWarnings(ws));
+        }
+      } else {
+        opts.output.print(`FAIL  ${r.profile}: [${r.errorCode}] ${r.errorMessage}`);
+      }
+    }
+    const failed = results.filter((r) => !r.ok).length;
+    if (failed === 0) {
+      opts.output.print(`validate: ${results.length} pass`);
+    } else {
+      opts.output.print(`validate: ${results.length - failed} pass, ${failed} fail`);
+    }
+  }
+
+  if (!pass) {
+    // R33 + AC-9: any fail → exit 3 (conflict/cycle/missing class).
+    throw new CliUserError(`validation failed for ${results.filter((r) => !r.ok).length} profile(s)`, EXIT_CONFLICT);
+  }
+  return 0;
+}
+
+async function validateOne(cwd: string, name: string): Promise<ValidateProfileResult> {
+  try {
+    const plan = await resolve(name, { projectRoot: cwd });
+    // Run merge to surface settings.json parse errors / read failures even
+    // though we don't materialize. R33 lists "detect conflicts" — E2 surfaces
+    // the rest.
+    await merge(plan);
+    return {
+      profile: name,
+      ok: true,
+      errorCode: null,
+      errorMessage: null,
+      warnings: plan.warnings.map((w) => ({
+        code: w.code,
+        message: w.message,
+        source: w.source ?? null,
+      })),
+      externalPaths: plan.externalPaths.map((e) => e.resolvedPath),
+    };
+  } catch (err: unknown) {
+    const code =
+      err instanceof Error && "code" in err && typeof (err as { code: unknown }).code === "string"
+        ? (err as { code: string }).code
+        : err instanceof Error
+          ? err.name
+          : "Unknown";
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      profile: name,
+      ok: false,
+      errorCode: code,
+      errorMessage: message,
+      warnings: [],
+      externalPaths: [],
+    };
+  }
+}
