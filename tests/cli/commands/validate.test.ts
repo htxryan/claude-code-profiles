@@ -156,7 +156,16 @@ describe("validate (R33)", () => {
 
     it("active profile + root CLAUDE.md missing → exit 1 with actionable error", async () => {
       fx = await makeFixture({
-        profiles: { a: { manifest: { name: "a" }, files: {} } },
+        profiles: {
+          // P1-A: marker check fires only when the active plan contributes
+          // to projectRoot. Give the profile a peer CLAUDE.md so the gating
+          // is exercised here.
+          a: {
+            manifest: { name: "a" },
+            files: {},
+            rootFiles: { "CLAUDE.md": "ROOT-BODY\n" },
+          },
+        },
       });
       await makeActive(fx);
       // Ensure root CLAUDE.md does NOT exist.
@@ -177,7 +186,13 @@ describe("validate (R33)", () => {
 
     it("active profile + root CLAUDE.md present without markers → exit 1", async () => {
       fx = await makeFixture({
-        profiles: { a: { manifest: { name: "a" }, files: {} } },
+        profiles: {
+          a: {
+            manifest: { name: "a" },
+            files: {},
+            rootFiles: { "CLAUDE.md": "ROOT-BODY\n" },
+          },
+        },
       });
       await makeActive(fx);
       await fs.writeFile(
@@ -192,7 +207,13 @@ describe("validate (R33)", () => {
 
     it("active profile + root CLAUDE.md with valid markers → exit 0", async () => {
       fx = await makeFixture({
-        profiles: { a: { manifest: { name: "a" }, files: {} } },
+        profiles: {
+          a: {
+            manifest: { name: "a" },
+            files: {},
+            rootFiles: { "CLAUDE.md": "ROOT-BODY\n" },
+          },
+        },
       });
       await makeActive(fx);
       await fs.writeFile(
@@ -229,6 +250,58 @@ describe("validate (R33)", () => {
         profile: null,
       });
       expect(code).toBe(0);
+    });
+
+    // P1-A regression: the marker check is CONDITIONAL on the active
+    // profile's plan contributing to the projectRoot destination. An active
+    // profile with NO profile-root CLAUDE.md (silent-majority v1 layout)
+    // must not trip the marker check — even if root CLAUDE.md is missing
+    // markers or absent entirely. See docs/migration/cw6-section-ownership.md
+    // §"Opting out" point 2.
+    it("active profile with NO projectRoot contributor + missing markers → exit 0 (silent-majority AC-10)", async () => {
+      fx = await makeFixture({
+        profiles: {
+          // Profile only has .claude/-destination files; no peer CLAUDE.md.
+          a: { manifest: { name: "a" }, files: { "x.md": "x\n" } },
+        },
+      });
+      await makeActive(fx);
+      // Root CLAUDE.md is absent — would have failed pre-P1-A.
+      const cap = captureOutput(false);
+      const code = await runValidate({
+        cwd: fx.projectRoot,
+        output: cap.channel,
+        profile: null,
+      });
+      expect(code).toBe(0);
+    });
+
+    it("active profile WITH projectRoot contributor + missing markers → exit 1 (gating fires)", async () => {
+      fx = await makeFixture({
+        profiles: {
+          // Profile contributes a peer CLAUDE.md → projectRoot destination.
+          a: {
+            manifest: { name: "a" },
+            files: {},
+            rootFiles: { "CLAUDE.md": "ROOT-BODY\n" },
+          },
+        },
+      });
+      await makeActive(fx);
+      // Root CLAUDE.md is absent → marker check must fail because the active
+      // plan DOES contribute to projectRoot.
+      const cap = captureOutput(false);
+      let thrown: unknown;
+      try {
+        await runValidate({ cwd: fx.projectRoot, output: cap.channel, profile: null });
+      } catch (err) {
+        thrown = err;
+      }
+      expect(thrown).toBeInstanceOf(CliUserError);
+      expect((thrown as CliUserError).exitCode).toBe(EXIT_USER_ERROR);
+      expect((thrown as CliUserError).message).toContain(
+        "project-root CLAUDE.md is missing claude-profiles markers",
+      );
     });
   });
 });

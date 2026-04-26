@@ -235,6 +235,102 @@ describe("materialize: projectRoot section splice (cw6/T4 / R45)", () => {
     });
   });
 
+  // ──────────────────────────────────────────────────────────────────────
+  // P1-B: switching from a root-contributing profile to a non-root-
+  // contributing one must clear the stale section bytes between markers.
+  // Otherwise Claude Code reads the old profile's instructions as active
+  // for the new (silent) profile.
+  // ──────────────────────────────────────────────────────────────────────
+  describe("P1-B: stale section is cleared when new plan has no projectRoot contributor", () => {
+    it("profile A (with profile-root CLAUDE.md) → profile B (no profile-root) clears section between markers", async () => {
+      // Step 1: materialize profile A (has projectRoot contribution).
+      await writeRootClaudeMdWithMarkers({
+        before: "# ABOVE\n",
+        sectionBody: "INITIAL",
+        after: "\n# BELOW\n",
+      });
+      const paths = buildStatePaths(root);
+      const planA = makePlan("A", root);
+      await materialize(paths, planA, [rootFile("PROFILE-A-SECTION-BYTES")]);
+
+      // Sanity: A's section landed.
+      const afterA = await fs.readFile(paths.rootClaudeMdFile, "utf8");
+      expect(afterA).toContain("PROFILE-A-SECTION-BYTES");
+      const stateA = await readStateFile(paths);
+      expect(stateA.state.rootClaudeMdSection).not.toBeNull();
+
+      // Step 2: switch to profile B (no projectRoot contributor).
+      const planB = makePlan("B", root);
+      await materialize(paths, planB, [claudeFile("only-claude.md", "B-CLAUDE")]);
+
+      // The section between markers must be EMPTY — A's bytes are gone.
+      const afterB = await fs.readFile(paths.rootClaudeMdFile, "utf8");
+      expect(afterB).not.toContain("PROFILE-A-SECTION-BYTES");
+      // Bytes outside the markers preserved (the "above"/"below" user content).
+      expect(afterB.startsWith("# ABOVE\n")).toBe(true);
+      expect(afterB.endsWith("\n# BELOW\n")).toBe(true);
+      // Markers still present (the empty splice writes a fresh empty block).
+      expect(afterB).toContain("<!-- claude-profiles:v1:begin");
+      expect(afterB).toContain("<!-- claude-profiles:v1:end");
+      // State now reflects "no contribution" — rootClaudeMdSection is null.
+      const stateB = await readStateFile(paths);
+      expect(stateB.state.rootClaudeMdSection).toBeNull();
+    });
+
+    it("AC-10 regression: project with no prior root section + first activate of a non-root profile → CLAUDE.md untouched", async () => {
+      // User has a hand-authored CLAUDE.md WITHOUT markers (never opted in).
+      // First-ever materialize of a profile that contributes nothing to
+      // projectRoot must NOT trigger the empty-splice path (there was no
+      // prior section, so there is nothing to clear).
+      const original = "# My hand-written project notes.\n\nNo markers here.\n";
+      const filePath = path.join(root, "CLAUDE.md");
+      await fs.writeFile(filePath, original);
+      const originalStat = await fs.stat(filePath);
+
+      const paths = buildStatePaths(root);
+      await materialize(paths, makePlan("leaf", root), [
+        claudeFile("agents/x.md", "X"),
+      ]);
+
+      // Byte-equal: no write happened.
+      expect(await fs.readFile(filePath, "utf8")).toBe(original);
+      const afterStat = await fs.stat(filePath);
+      expect(afterStat.mtimeMs).toBe(originalStat.mtimeMs);
+      // State carries no rootClaudeMdSection (never had one).
+      const state = await readStateFile(paths);
+      expect(state.state.rootClaudeMdSection ?? null).toBeNull();
+    });
+
+    it("opt-out path: prior section + user removes markers + switch to non-root profile → no write (no markers to splice into)", async () => {
+      // Set up a project that previously had a section (so prior state has
+      // rootClaudeMdSection != null), but the user has since removed the
+      // marker block (a documented opt-out per migration docs).
+      await writeRootClaudeMdWithMarkers({
+        before: "TOP\n",
+        sectionBody: "OLD",
+        after: "\nBOTTOM\n",
+      });
+      const paths = buildStatePaths(root);
+      await materialize(paths, makePlan("A", root), [rootFile("WAS-CONTRIB")]);
+      // Prior state now has rootClaudeMdSection != null. Confirm.
+      const priorState = await readStateFile(paths);
+      expect(priorState.state.rootClaudeMdSection).not.toBeNull();
+
+      // Now the user removes the marker block entirely (opt-out per
+      // docs/migration/cw6-section-ownership.md §"Opting out" point 2).
+      const userRewrite = "# Just my own notes now. No markers.\n";
+      await fs.writeFile(paths.rootClaudeMdFile, userRewrite);
+
+      // Switch to a non-root profile. The empty-splice helper sees absent
+      // markers and returns null — no write happens, file is preserved.
+      await materialize(paths, makePlan("B", root), [claudeFile("y.md", "Y")]);
+      expect(await fs.readFile(paths.rootClaudeMdFile, "utf8")).toBe(userRewrite);
+      // State now reflects no contribution.
+      const stateB = await readStateFile(paths);
+      expect(stateB.state.rootClaudeMdSection).toBeNull();
+    });
+  });
+
   describe("AC-6a: missing markers → exit 1 + actionable error, file unchanged", () => {
     it("file absent → throws RootClaudeMdMarkersMissingError", async () => {
       // No CLAUDE.md at root.

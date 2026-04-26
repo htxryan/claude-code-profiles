@@ -122,9 +122,31 @@ export async function materialize(
   // we can splice without re-reading the file (avoids a TOCTOU window where
   // user edits could interleave between the marker check and the splice
   // write — the in-memory slices are the bytes we'll preserve).
+  //
+  // P1-B: we ALSO need to consider the case where the new plan contributes
+  // NO projectRoot file but the PRIOR materialize did — in that case the
+  // live root CLAUDE.md still has the prior profile's section bytes
+  // between the markers, which the new active profile does not own. We
+  // splice an EMPTY section in to clear them. The trigger is "prior state
+  // had a non-null rootClaudeMdSection". If the live file has no markers
+  // (because the user removed them after opting out per the migration
+  // doc), the splice plan is null and we leave the file alone — there's
+  // nothing for us to write.
+  //
+  // Reading prior state up-front (rather than at the post-splice state-
+  // build below) lets us decide whether the empty-splice path applies
+  // before any side-effects happen.
+  const prior = await readStateFile(paths);
   let rootSplicePlan: RootSplicePlan | null = null;
   if (rootMerged.length > 0) {
     rootSplicePlan = await preflightRootSplice(paths, rootMerged);
+  } else if (prior.state.rootClaudeMdSection !== null) {
+    // Prior materialize wrote a section; new plan does not. Try to stage an
+    // empty-section splice. preflightEmptyRootSplice returns null if the
+    // live file is missing or its markers were removed — in either of those
+    // cases there is nothing for us to clear, so we no-op (the user's edit
+    // to remove markers is a documented opt-out path).
+    rootSplicePlan = await preflightEmptyRootSplice(paths);
   }
 
   // Step a: write `.claude/`-destination merged bytes to pending. We rmrf
@@ -201,7 +223,15 @@ export async function materialize(
   // is documented; the test suite covers both crash points.
   let rootSectionFingerprint: SectionFingerprint | null = null;
   if (rootSplicePlan !== null) {
-    rootSectionFingerprint = await applyRootSplice(paths, rootSplicePlan);
+    const fp = await applyRootSplice(paths, rootSplicePlan);
+    // P1-B: when this is the empty-splice path (new plan has no projectRoot
+    // contributor), record `null` rather than the empty-section fingerprint.
+    // The state field tracks "is there a managed section we own" — and the
+    // answer for the new plan is no. The bytes are still cleared on disk
+    // (the splice ran), but state correctly reflects "no contribution".
+    if (rootMerged.length > 0) {
+      rootSectionFingerprint = fp;
+    }
   }
 
   // Step c succeeded. Build the state file BEFORE removing prior so a crash
@@ -219,7 +249,8 @@ export async function materialize(
 
   // Preserve external-trust notices from the prior state and add any new
   // ones for external paths in this plan that haven't been noticed before.
-  const prior = await readStateFile(paths);
+  // (P1-B: `prior` is read above pre-side-effects for the empty-splice
+  // decision; reuse it here.)
   const trustNotices = mergeExternalTrustNotices(
     prior.state.externalTrustNotices,
     plan,
@@ -406,6 +437,55 @@ async function preflightRootSplice(
     before: parsed.before,
     after: parsed.after,
     sectionBytes,
+  };
+}
+
+/**
+ * P1-B: stage an empty-section splice when the new plan contributes nothing
+ * to projectRoot but the prior state had a section. This clears stale
+ * section bytes from a previously-active root-contributing profile so the
+ * new (non-root-contributing) profile's environment doesn't leak the old
+ * profile's instructions.
+ *
+ * Returns null when the splice should be skipped — specifically:
+ *   - root CLAUDE.md is missing (user removed it, or never ran init); or
+ *   - markers are absent/malformed (user opted out per the migration doc by
+ *     deleting the marker block).
+ *
+ * Both of those are documented opt-out paths in
+ * docs/migration/cw6-section-ownership.md §"Opting out". A null return
+ * means no write happens, which is correct: there is nothing for us to
+ * clear.
+ *
+ * Unlike preflightRootSplice we do NOT throw on missing markers here —
+ * the user's prior plan needed them, but the new plan does not, and the
+ * pre-flight error message ("run init") would be misleading for a `use`
+ * that no longer touches projectRoot.
+ */
+async function preflightEmptyRootSplice(
+  paths: StatePaths,
+): Promise<RootSplicePlan | null> {
+  const filePath = paths.rootClaudeMdFile;
+  let content: string;
+  try {
+    content = await fs.readFile(filePath, "utf8");
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      return null;
+    }
+    throw err;
+  }
+  const parsed = parseMarkers(content);
+  if (!parsed.found) {
+    // Markers absent or malformed → opted out / never opted in. No-op.
+    return null;
+  }
+  return {
+    filePath,
+    version: parsed.version,
+    before: parsed.before,
+    after: parsed.after,
+    sectionBytes: "",
   };
 }
 

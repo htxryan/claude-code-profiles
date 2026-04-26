@@ -13,6 +13,7 @@ import * as path from "node:path";
 import { PipelineError, type PipelineErrorCode } from "../../errors/index.js";
 import { parseMarkers } from "../../markers.js";
 import { listProfiles, resolve } from "../../resolver/index.js";
+import type { ResolvedPlan } from "../../resolver/types.js";
 import { merge } from "../../merge/index.js";
 import { buildStatePaths, readStateFile } from "../../state/index.js";
 import { CliUserError, EXIT_CONFLICT, EXIT_USER_ERROR } from "../exit.js";
@@ -50,19 +51,41 @@ export interface ValidateOptions {
 }
 
 export async function runValidate(opts: ValidateOptions): Promise<number> {
-  // cw6 / R44: when a profile is active, verify the project-root CLAUDE.md
+  // cw6 / R44: when a profile is active AND that profile's resolved plan
+  // contributes to the project-root CLAUDE.md, verify the live root file
   // has the managed-block markers. This is a project-wide environment check,
   // not per-profile, so it runs before the per-target loop.
   //
-  // Idle state (NoActive, e.g. user just ran `init` but no `use` yet) skips
-  // the check — pestering users who haven't adopted profiles would be noisy
-  // and the markers don't actually do anything until materialize wires them.
-  // readStateFile degrades to defaultState() (activeProfile: null) on any
-  // error per R42, so a missing/corrupt state.json correctly idles here too.
+  // Per docs/migration/cw6-section-ownership.md the marker check is
+  // CONDITIONAL on a contribution being present. An active profile that
+  // never touches projectRoot (the silent-majority v1 layout) must not trip
+  // this check — otherwise users who haven't opted into section ownership
+  // see a spurious failure. We resolve the active plan and look for any
+  // PlanFile with destination === "projectRoot"; if none, skip.
+  //
+  // Idle state (NoActive, e.g. user just ran `init` but no `use` yet) also
+  // skips the check. readStateFile degrades to defaultState() (activeProfile:
+  // null) on any error per R42, so a missing/corrupt state.json correctly
+  // idles here too. If resolve() throws (broken active profile), we skip the
+  // marker check and let the per-profile validateOne loop surface the real
+  // error rather than masking it behind an unrelated marker complaint.
   const paths = buildStatePaths(opts.cwd);
   const { state } = await readStateFile(paths);
   if (state.activeProfile !== null) {
-    await assertRootClaudeMdMarkers(opts.cwd);
+    let activePlan: ResolvedPlan | null = null;
+    try {
+      activePlan = await resolve(state.activeProfile, { projectRoot: opts.cwd });
+    } catch {
+      // Active profile no longer resolvable — skip the marker check; the
+      // per-profile loop below will surface the resolve error if the user
+      // is validating that profile.
+    }
+    if (
+      activePlan !== null &&
+      activePlan.files.some((f) => f.destination === "projectRoot")
+    ) {
+      await assertRootClaudeMdMarkers(opts.cwd);
+    }
   }
 
   const targets =
