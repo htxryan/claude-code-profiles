@@ -21,6 +21,7 @@ CLI invoked as `node dist/cli/bin.js` against fresh scratch project at `/tmp/cp-
 | 09 | [09-negative-paths.md](09-negative-paths.md) | (errors) | Missing profile (exit 3), missing parent, cycle detection, unknown verb / dead flag, path-traversal-rejected name |
 | 10 | [10-hook.md](10-hook.md) | `hook install/uninstall`, `drift --pre-commit-warn` | Pre-commit hook surfaces drift summary as warning without blocking |
 | 11 | [11-concurrency.md](11-concurrency.md) | (race) | Two simultaneous `use` invocations: lockfile lets exactly one win, the loser exits 3 with PID/timestamp |
+| 12 | [12-components.md](12-components.md) | `includes` + `extends` | Reusable components in `./components/`; `base` includes test-suite, `app` extends base + includes security-baseline. Confirms concat order (ancestors → includes → leaf) and drift provenance listing every contributor per file. |
 
 ## Exit-code map (verified across scenarios)
 
