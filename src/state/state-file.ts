@@ -155,6 +155,24 @@ function validateStateShape(value: unknown): Ok | Bad {
   if (!Array.isArray(obj["externalTrustNotices"])) {
     return { ok: false, detail: "externalTrustNotices must be an array" };
   }
+  // cw6/T4: rootClaudeMdSection is OPTIONAL. Legacy state files (written
+  // before cw6 landed) do not have this key; tolerate its absence by treating
+  // it as null. When present, validate shape so a corrupt entry doesn't
+  // crash the section-drift comparator (mirrors fingerprint.files entry
+  // validation rationale).
+  const rootSec = obj["rootClaudeMdSection"];
+  if (rootSec !== undefined && rootSec !== null) {
+    if (typeof rootSec !== "object" || Array.isArray(rootSec)) {
+      return { ok: false, detail: "rootClaudeMdSection must be an object or null" };
+    }
+    const r = rootSec as Record<string, unknown>;
+    if (typeof r["size"] !== "number" || !Number.isFinite(r["size"])) {
+      return { ok: false, detail: "rootClaudeMdSection.size must be a number" };
+    }
+    if (typeof r["contentHash"] !== "string") {
+      return { ok: false, detail: "rootClaudeMdSection.contentHash must be a string" };
+    }
+  }
   return { ok: true, value: obj as unknown as StateFile };
 }
 

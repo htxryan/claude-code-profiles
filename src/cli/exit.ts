@@ -27,9 +27,10 @@ import { LockHeldError } from "../state/lock.js";
 import {
   ConflictError,
   CycleError,
+  MaterializeError,
+  MergeError,
   MissingIncludeError,
   MissingProfileError,
-  MergeError,
   PipelineError,
   ResolverError,
 } from "../errors/index.js";
@@ -103,6 +104,11 @@ export function exitCodeFor(err: unknown): ExitCode {
     return EXIT_CONFLICT;
   }
   if (err instanceof ResolverError) return EXIT_CONFLICT;
+  // cw6/T4 (R45): missing/malformed managed-block markers in projectRoot
+  // CLAUDE.md is a user error (the user runs `claude-profiles init` to fix
+  // it). Maps to exit 1 per spec §12.4 — not exit 2 (system error) because
+  // the remediation is purely a user action, not an infrastructure fault.
+  if (err instanceof MaterializeError) return EXIT_USER_ERROR;
   if (err instanceof MergeError) return EXIT_SYSTEM_ERROR;
   if (err instanceof PipelineError) return EXIT_SYSTEM_ERROR;
   return EXIT_SYSTEM_ERROR;

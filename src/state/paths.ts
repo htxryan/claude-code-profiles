@@ -10,6 +10,7 @@
  */
 
 import * as path from "node:path";
+import process from "node:process";
 
 export interface StatePaths {
   /** Absolute project root. */
@@ -43,6 +44,17 @@ export interface StatePaths {
   backupDir: string;
   /** Project-root `.gitignore`. */
   gitignoreFile: string;
+  /**
+   * Project-root `CLAUDE.md` (cw6/T4). Peer of `.claude/`. Partially managed:
+   * the bytes between the `<!-- claude-profiles:vN:begin/end -->` markers are
+   * owned by materialize; bytes outside the markers are user-owned (R45/R46).
+   *
+   * Section-splice writes go through a temp file in the same directory (so
+   * the rename is guaranteed same-FS) named with the pattern returned by
+   * {@link rootClaudeMdTmpPath}; reconcile sweeps any leftover tmps with
+   * {@link listRootClaudeMdTmps}.
+   */
+  rootClaudeMdFile: string;
 }
 
 /**
@@ -65,7 +77,38 @@ export function buildStatePaths(projectRoot: string): StatePaths {
     priorDir: path.join(metaDir, "prior"),
     backupDir: path.join(metaDir, "backup"),
     gitignoreFile: path.join(root, ".gitignore"),
+    rootClaudeMdFile: path.join(root, "CLAUDE.md"),
   };
+}
+
+/**
+ * Build a unique tmp staging path for a section-splice write of project-root
+ * CLAUDE.md. Lives in the SAME directory as the final file (not under
+ * `.meta/tmp/`) so the rename is guaranteed same-filesystem (no EXDEV) and so
+ * crash debris is locatable by a stable glob: `<projectRoot>/CLAUDE.md.*.tmp`.
+ *
+ * Pattern: `<basename>.<pid>.<counter>-<random>.tmp` — mirrors the shape of
+ * `uniqueAtomicTmpPath` so the same diagnostics conventions apply (operators
+ * can correlate the pid). The `.tmp` suffix is the recovery sentinel that
+ * `reconcileMaterialize` greps for.
+ */
+let rootMdTmpCounter = 0;
+export function rootClaudeMdTmpPath(paths: StatePaths): string {
+  const nonce = `${rootMdTmpCounter++}-${Math.random().toString(36).slice(2, 10)}`;
+  return `${paths.rootClaudeMdFile}.${process.pid}.${nonce}.tmp`;
+}
+
+/**
+ * Predicate: is `name` a leftover section-splice tmp that reconcile should
+ * sweep? Matches the shape produced by {@link rootClaudeMdTmpPath} keyed on
+ * the CLAUDE.md basename so we never mistakenly sweep an unrelated `.tmp`
+ * file the user created.
+ */
+export function isRootClaudeMdTmpName(name: string): boolean {
+  // basename.pid.counter-random.tmp — accept any digits/alphanumerics in the
+  // pid+nonce slot; require the leading "CLAUDE.md." prefix and the trailing
+  // ".tmp" so we never sweep the user's own `.tmp` files (e.g. backup notes).
+  return /^CLAUDE\.md\.\d+\.\d+-[a-z0-9]+\.tmp$/.test(name);
 }
 
 /**

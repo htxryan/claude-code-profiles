@@ -19,9 +19,10 @@
  */
 
 import { promises as fs } from "node:fs";
+import * as path from "node:path";
 
 import { atomicRename, pathExists, rmrf } from "./atomic.js";
-import { buildPersistPaths, type StatePaths } from "./paths.js";
+import { buildPersistPaths, isRootClaudeMdTmpName, type StatePaths } from "./paths.js";
 
 let reconcileCounter = 0;
 
@@ -115,17 +116,56 @@ export async function reconcilePendingPrior(
  * Reconcile the materialize target (root `.claude/`). Call at the start of
  * any mutating op (use, sync, persist). Cheap on the steady-state path
  * (two stat calls, both ENOENT).
+ *
+ * cw6/T4: also sweeps any leftover `<projectRoot>/CLAUDE.md.*.tmp` files
+ * from a crashed section-splice write (R45 atomic rollback). The live root
+ * CLAUDE.md is untouched — only the staging temp file (which would never
+ * have been visible to the user since the splice failed before the rename).
+ * This is best-effort: if the unlink fails (permissions, etc.) we swallow
+ * because the user's CLAUDE.md is fine; the only cost is a bit of debris.
  */
 export async function reconcileMaterialize(paths: StatePaths): Promise<ReconcileOutcome> {
   // Ensure metaDir exists so reads on pending/prior (now under `.meta/`)
   // don't surface unrelated ENOTDIR/ENOENT confusingly. Cheap.
   await fs.mkdir(paths.metaDir, { recursive: true });
+  // Sweep any leftover projectRoot CLAUDE.md tmps from crashed splices
+  // (cw6/T4 R45). Done before the pending/prior reconcile so a totally-
+  // crashed materialize cleans both targets in one pass.
+  await sweepRootClaudeMdTmps(paths);
   return reconcilePendingPrior(
     paths.claudeDir,
     paths.pendingDir,
     paths.priorDir,
     paths.claudeDir,
   );
+}
+
+/**
+ * Best-effort cleanup of leftover section-splice temp files for project-root
+ * CLAUDE.md (cw6/T4 / R45 crash recovery). Pattern matches the shape of
+ * {@link rootClaudeMdTmpPath} via {@link isRootClaudeMdTmpName} so we never
+ * sweep an unrelated `.tmp` file the user may have created.
+ *
+ * Errors are swallowed: the live CLAUDE.md is untouched, and the worst case
+ * of a failed sweep is a stale tmp on disk — diagnosable by the operator,
+ * not blocking. The reconcile contract is "fix what you can; don't refuse
+ * to start the CLI because of debris from an unrelated process".
+ */
+async function sweepRootClaudeMdTmps(paths: StatePaths): Promise<void> {
+  let entries: string[];
+  try {
+    const dirents = await fs.readdir(paths.projectRoot, { withFileTypes: true });
+    entries = dirents.filter((d) => d.isFile()).map((d) => d.name);
+  } catch {
+    // If projectRoot is unreadable, the rest of the CLI will fail loudly
+    // — no point surfacing the failure here.
+    return;
+  }
+  for (const name of entries) {
+    if (!isRootClaudeMdTmpName(name)) continue;
+    const abs = path.join(paths.projectRoot, name);
+    await fs.unlink(abs).catch(() => undefined);
+  }
 }
 
 /**

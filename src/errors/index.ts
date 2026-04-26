@@ -29,7 +29,10 @@ export type MergeErrorCode =
   | "InvalidSettingsJson" // E2: settings.json failed to parse during deep-merge
   | "MergeReadFailed"; // E2: contributor file read failed
 
-export type PipelineErrorCode = ResolverErrorCode | MergeErrorCode;
+export type MaterializeErrorCode =
+  | "RootClaudeMdMarkersMissing"; // R45 (cw6/T4): projectRoot CLAUDE.md absent or markers missing/malformed
+
+export type PipelineErrorCode = ResolverErrorCode | MergeErrorCode | MaterializeErrorCode;
 
 export class PipelineError extends Error {
   readonly code: PipelineErrorCode;
@@ -57,6 +60,22 @@ export class MergeError extends PipelineError {
   constructor(code: MergeErrorCode, message: string) {
     super(code, message);
     this.name = "MergeError";
+  }
+}
+
+/**
+ * Materialization-phase failure (cw6/T4 / R45). Currently the only subclass
+ * is {@link RootClaudeMdMarkersMissingError} (the projectRoot CLAUDE.md is
+ * absent or its managed-block markers are missing/malformed). Lives here
+ * rather than in `src/state/` so that `src/cli/exit.ts` can map it to exit 1
+ * without forcing `src/state/` to import from `src/cli/` (avoiding a cycle).
+ */
+export class MaterializeError extends PipelineError {
+  declare readonly code: MaterializeErrorCode;
+
+  constructor(code: MaterializeErrorCode, message: string) {
+    super(code, message);
+    this.name = "MaterializeError";
   }
 }
 
@@ -171,6 +190,29 @@ export class InvalidSettingsJsonError extends MergeError {
     this.relPath = relPath;
     this.contributor = contributor;
     this.detail = detail;
+  }
+}
+
+/**
+ * cw6/T4 (R45): the live project-root `CLAUDE.md` is absent or its managed-
+ * block markers are missing or malformed. Materialize aborts with this
+ * error BEFORE writing any bytes to either destination (atomic-across-
+ * destinations); the user's remediation is `claude-profiles init`.
+ *
+ * `filePath` is included so the user can locate the file in their editor.
+ * The exit-code mapper (cli/exit.ts) routes this to EXIT_USER_ERROR (1) per
+ * spec §12.4.
+ */
+export class RootClaudeMdMarkersMissingError extends MaterializeError {
+  readonly filePath: string;
+
+  constructor(filePath: string) {
+    super(
+      "RootClaudeMdMarkersMissing",
+      `project-root CLAUDE.md is missing claude-profiles markers — run \`claude-profiles init\` to repair (file: ${filePath})`,
+    );
+    this.name = "RootClaudeMdMarkersMissingError";
+    this.filePath = filePath;
   }
 }
 

@@ -22,6 +22,7 @@ export type {
   FingerprintEntry,
   LockHandle,
   ResolvedSourceRef,
+  SectionFingerprint,
   StateFile,
 } from "./types.js";
 

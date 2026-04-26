@@ -34,6 +34,33 @@ export interface FingerprintEntry {
   contentHash: string;
 }
 
+/**
+ * Section-only fingerprint for the project-root `CLAUDE.md` (R46, cw6/T4).
+ * Distinct from {@link FingerprintEntry} because it intentionally tracks the
+ * SECTION bytes (between the `:begin`/`:end` markers), NOT the whole-file
+ * metadata. The whole-file mtime/size would change every time the user edits
+ * outside the markers, which the spec explicitly says must NOT register as
+ * drift.
+ *
+ * Why a separate type instead of unifying under FingerprintEntry: drift
+ * detection (E4 / cw6/T5) needs to know which scope to use. Whole-file
+ * fingerprints in `fingerprint.files` continue to compare by size+mtime fast
+ * path; the section fingerprint always re-parses the live file and hashes the
+ * inner bytes (no fast path possible — there's no per-section mtime).
+ *
+ * Schema migration: legacy `.state.json` files (written before cw6) have no
+ * `rootClaudeMdSection` field. Readers tolerate its absence (treat as null);
+ * the first cw6-aware materialize that touches a project-root CLAUDE.md
+ * populates it. No schemaVersion bump because the addition is strictly
+ * additive (R42 graceful-degradation contract preserved).
+ */
+export interface SectionFingerprint {
+  /** Section byte length (the slice between markers, exclusive of marker bytes). */
+  size: number;
+  /** Hex-encoded sha256 of the section bytes. */
+  contentHash: string;
+}
+
 export interface Fingerprint {
   schemaVersion: typeof FINGERPRINT_SCHEMA_VERSION;
   /**
@@ -92,6 +119,16 @@ export interface StateFile {
   fingerprint: Fingerprint;
   /** R37a: external-path notices already shown. */
   externalTrustNotices: ExternalTrustNotice[];
+  /**
+   * cw6/T4 (R46): section-only fingerprint of the bytes between the managed-
+   * block markers in project-root `CLAUDE.md`. Null when the active profile
+   * contributes no project-root CLAUDE.md body — the field is absent from
+   * legacy state files and is also absent when materialize ran for a profile
+   * that has only `.claude/` contributors. The presence of this field is
+   * orthogonal to the rest of `fingerprint.files` (which keeps `.claude/`
+   * whole-file entries).
+   */
+  rootClaudeMdSection?: SectionFingerprint | null;
 }
 
 /**
@@ -107,6 +144,7 @@ export function defaultState(): StateFile {
     resolvedSources: [],
     fingerprint: { schemaVersion: FINGERPRINT_SCHEMA_VERSION, files: {} },
     externalTrustNotices: [],
+    rootClaudeMdSection: null,
   };
 }
 
