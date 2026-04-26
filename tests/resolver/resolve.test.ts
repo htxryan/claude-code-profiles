@@ -472,6 +472,35 @@ describe("resolve()", () => {
       const md = plan.files.filter((f) => f.relPath === "CLAUDE.md");
       expect(md.length).toBe(2);
     });
+
+    it("R11 (cw6/T3): same relPath in two destinations is grouped per-destination, not cross-destination", async () => {
+      // Sanity test for the per-destination R11 keying. In v1 the only
+      // projectRoot file is CLAUDE.md (concat → mergeable, R11-exempt), so
+      // this test is correctness-by-construction rather than an actual
+      // false-positive trap. We assert: an include contributes
+      // .claude/CLAUDE.md, the leaf contributes profile-root CLAUDE.md, and
+      // resolution succeeds with two PlanFile entries (one per destination).
+      // If R11 were keyed by relPath alone, this layout would NOT throw
+      // today (CLAUDE.md is mergeable), but if any future relPath ever
+      // appears at both destinations and is non-mergeable, this is the
+      // shape that would otherwise wrongly throw.
+      fx = await makeFixture({
+        profiles: {
+          leaf: {
+            manifest: { includes: ["a"] },
+            rootFiles: { "CLAUDE.md": "from leaf root" },
+          },
+        },
+        components: {
+          a: { files: { "CLAUDE.md": "from a inside" } },
+        },
+      });
+      const plan = await resolve("leaf", { projectRoot: fx.projectRoot });
+      const all = plan.files.filter((f) => f.relPath === "CLAUDE.md");
+      expect(all).toHaveLength(2);
+      const dests = all.map((f) => f.destination).sort();
+      expect(dests).toEqual([".claude", "projectRoot"]);
+    });
   });
 
   describe("R35/R36 — manifest validation", () => {

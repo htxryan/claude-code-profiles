@@ -60,12 +60,14 @@ function makeMerged(content: string): MergedFile[] {
       bytes: Buffer.from(content),
       contributors: ["leaf"],
       mergePolicy: "concat",
+      destination: ".claude",
     },
     {
       path: "agents/x.md",
       bytes: Buffer.from("AGENT"),
       contributors: ["leaf"],
       mergePolicy: "last-wins",
+      destination: ".claude",
     },
   ];
 }

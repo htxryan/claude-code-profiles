@@ -63,7 +63,7 @@ describe("persist transactional pair (R22b)", () => {
     // Initial materialize of "base"
     const basePlan = await resolve("base", { projectRoot: fx.projectRoot });
     const baseMerged: MergedFile[] = [
-      { path: "CLAUDE.md", bytes: Buffer.from("BASE\n"), contributors: ["base"], mergePolicy: "concat" },
+      { path: "CLAUDE.md", bytes: Buffer.from("BASE\n"), contributors: ["base"], mergePolicy: "concat", destination: ".claude" },
     ];
     await materialize(paths, basePlan, baseMerged);
 
@@ -74,7 +74,7 @@ describe("persist transactional pair (R22b)", () => {
     // Persist + swap to v2.
     const v2Plan = await resolve("v2", { projectRoot: fx.projectRoot });
     const v2Merged: MergedFile[] = [
-      { path: "CLAUDE.md", bytes: Buffer.from("BASE\nV2\n"), contributors: ["base", "v2"], mergePolicy: "concat" },
+      { path: "CLAUDE.md", bytes: Buffer.from("BASE\nV2\n"), contributors: ["base", "v2"], mergePolicy: "concat", destination: ".claude" },
     ];
     const result = await persistAndMaterialize(paths, {
       activeProfileName: "base",

@@ -31,12 +31,14 @@ async function setup() {
       bytes: Buffer.from("BASE\nLEAF\n"),
       contributors: ["base", "leaf"],
       mergePolicy: "concat",
+      destination: ".claude",
     },
     {
       path: "agents/a.md",
       bytes: Buffer.from("AGENT-A"),
       contributors: ["base"],
       mergePolicy: "last-wins",
+      destination: ".claude",
     },
   ];
   return { fx, plan, merged };

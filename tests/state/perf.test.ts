@@ -40,6 +40,7 @@ describe("perf budget (R38)", () => {
         bytes: Buffer.from(`payload ${i} `.repeat(8)),
         contributors: ["leaf"],
         mergePolicy: "last-wins",
+        destination: ".claude",
       });
     }
     const plan: ResolvedPlan = {

@@ -5,6 +5,7 @@
  */
 
 import type { MergePolicy } from "../resolver/merge-policy.js";
+import type { PlanFileDestination } from "../resolver/types.js";
 
 /**
  * Schema version for MergedFile. Bumped only when consumers (E3/E5) must
@@ -16,19 +17,26 @@ export const MERGED_FILE_SCHEMA_VERSION = 1 as const;
  * One merged output, ready for materialization.
  *
  * Invariants (enforced by tests):
- *  - `path` is the relative posix path inside `.claude/` (matches PlanFile.relPath).
+ *  - `path` is the relative posix path inside the destination root (matches
+ *    PlanFile.relPath; for `destination='.claude'` this is relative to the
+ *    project's `.claude/` subtree, for `destination='projectRoot'` it is
+ *    relative to the project root itself — see {@link PlanFileDestination}).
  *  - `bytes` is the exact byte content to write.
  *  - `contributors` lists the contributor ids that actually contributed *bytes*
  *    to the output, in canonical order. For last-wins this is a single id; for
  *    deep-merge and concat it is every contributor whose bytes were merged in.
  *  - `mergePolicy` mirrors the strategy used (cached for downstream telemetry
  *    / drift reporting).
+ *  - `destination` mirrors the `destination` of the contributing PlanFiles.
+ *    The merge engine groups by `(relPath, destination)` so two MergedFile
+ *    entries may share the same `path` if their destinations differ (cw6/T3).
  */
 export interface MergedFile {
   path: string;
   bytes: Buffer;
   contributors: string[];
   mergePolicy: MergePolicy;
+  destination: PlanFileDestination;
 }
 
 /**

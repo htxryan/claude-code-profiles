@@ -37,12 +37,14 @@ async function setupTwoProfiles() {
       bytes: Buffer.from("BASE\nLEAF\n"),
       contributors: ["base", "leaf"],
       mergePolicy: "concat",
+      destination: ".claude",
     },
     {
       path: "agents/a.md",
       bytes: Buffer.from("AGENT-A"),
       contributors: ["base"],
       mergePolicy: "last-wins",
+      destination: ".claude",
     },
   ];
   const otherPlan = await resolve("other", { projectRoot: fx.projectRoot });
@@ -52,12 +54,14 @@ async function setupTwoProfiles() {
       bytes: Buffer.from("OTHER\n"),
       contributors: ["other"],
       mergePolicy: "concat",
+      destination: ".claude",
     },
     {
       path: "agents/b.md",
       bytes: Buffer.from("AGENT-B"),
       contributors: ["other"],
       mergePolicy: "last-wins",
+      destination: ".claude",
     },
   ];
   return { fx, leafPlan, leafMerged, otherPlan, otherMerged };

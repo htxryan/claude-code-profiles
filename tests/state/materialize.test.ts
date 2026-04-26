@@ -29,8 +29,8 @@ async function setup() {
   // For materialize tests we don't actually need to run the merger; we
   // construct simple MergedFiles manually so we can isolate E3 behavior.
   const merged: MergedFile[] = [
-    { path: "CLAUDE.md", bytes: Buffer.from("BASE\nLEAF\n"), contributors: ["base", "leaf"], mergePolicy: "concat" },
-    { path: "agents/a.md", bytes: Buffer.from("AGENT-A"), contributors: ["base"], mergePolicy: "last-wins" },
+    { path: "CLAUDE.md", bytes: Buffer.from("BASE\nLEAF\n"), contributors: ["base", "leaf"], mergePolicy: "concat", destination: ".claude" },
+    { path: "agents/a.md", bytes: Buffer.from("AGENT-A"), contributors: ["base"], mergePolicy: "last-wins", destination: ".claude" },
   ];
   return { fx, plan, merged };
 }

@@ -26,6 +26,7 @@ async function setup() {
       bytes: Buffer.from("BASE\n"),
       contributors: ["base"],
       mergePolicy: "concat",
+      destination: ".claude",
     },
   ];
   return { fx, plan, merged };

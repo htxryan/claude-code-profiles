@@ -35,6 +35,7 @@ describe("fingerprint", () => {
         bytes: Buffer.from("hello"),
         contributors: ["x"],
         mergePolicy: "concat",
+        destination: ".claude",
       },
     ];
     const fp = fingerprintFromMergedFiles(files);
@@ -55,7 +56,7 @@ describe("fingerprint", () => {
 
   it("recordMtimes overlays live stat mtimes onto an existing fingerprint", async () => {
     const files: MergedFile[] = [
-      { path: "f", bytes: Buffer.from("x"), contributors: ["a"], mergePolicy: "last-wins" },
+      { path: "f", bytes: Buffer.from("x"), contributors: ["a"], mergePolicy: "last-wins", destination: ".claude" },
     ];
     const fp = fingerprintFromMergedFiles(files);
     await fs.writeFile(path.join(root, "f"), "x");
@@ -72,7 +73,7 @@ describe("fingerprint", () => {
 
   it("compareFingerprint flags deleted files", async () => {
     const fp = fingerprintFromMergedFiles([
-      { path: "gone.md", bytes: Buffer.from("x"), contributors: ["a"], mergePolicy: "concat" },
+      { path: "gone.md", bytes: Buffer.from("x"), contributors: ["a"], mergePolicy: "concat", destination: ".claude" },
     ]);
     const drift = await compareFingerprint(root, fp);
     expect(drift).toEqual([{ relPath: "gone.md", kind: "deleted" }]);
@@ -80,7 +81,7 @@ describe("fingerprint", () => {
 
   it("compareFingerprint flags modified files via content hash slow-path", async () => {
     let fp = fingerprintFromMergedFiles([
-      { path: "f.md", bytes: Buffer.from("v1"), contributors: ["a"], mergePolicy: "concat" },
+      { path: "f.md", bytes: Buffer.from("v1"), contributors: ["a"], mergePolicy: "concat", destination: ".claude" },
     ]);
     await fs.writeFile(path.join(root, "f.md"), "v1");
     fp = await recordMtimes(root, fp);
@@ -92,7 +93,7 @@ describe("fingerprint", () => {
 
   it("compareFingerprint short-circuits unchanged via mtime+size fast path", async () => {
     let fp = fingerprintFromMergedFiles([
-      { path: "f.md", bytes: Buffer.from("v1"), contributors: ["a"], mergePolicy: "concat" },
+      { path: "f.md", bytes: Buffer.from("v1"), contributors: ["a"], mergePolicy: "concat", destination: ".claude" },
     ]);
     await fs.writeFile(path.join(root, "f.md"), "v1");
     fp = await recordMtimes(root, fp);
@@ -109,6 +110,7 @@ describe("fingerprint", () => {
         bytes: Buffer.from(`v-${i}`),
         contributors: ["a"],
         mergePolicy: "concat",
+        destination: ".claude",
       });
       await fs.writeFile(path.join(root, `f-${i}.md`), `v-${i}`);
     }

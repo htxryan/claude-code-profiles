@@ -122,18 +122,29 @@ export async function resolve(
   // 4. Walk every contributor's .claude/ and collect files.
   const files: PlanFile[] = await collectFiles(contributors);
 
-  // 5. Conflict detection (R11). Group files by relPath.
-  const byPath = new Map<string, PlanFile[]>();
+  // 5. Conflict detection (R11). Group files by the composite key
+  // (relPath, destination). cw6/T3: a file at the same relPath in two
+  // different destinations is, by construction, NOT a conflict — the merge
+  // engine groups by the same composite key and produces two independent
+  // MergedFile entries. R11 must therefore be scoped to a single destination
+  // group as well; otherwise two contributors at e.g. `.claude/agents/x.json`
+  // and `<projectRoot>/agents/x.json` (hypothetical) would falsely conflict.
+  // Today this is benign because the only projectRoot file is CLAUDE.md
+  // (concat policy → exempt from R11), but we encode the correct invariant
+  // rather than relying on that policy coincidence.
+  const byKey = new Map<string, PlanFile[]>();
   for (const f of files) {
-    let arr = byPath.get(f.relPath);
+    const key = `${f.destination}::${f.relPath}`;
+    let arr = byKey.get(key);
     if (!arr) {
       arr = [];
-      byPath.set(f.relPath, arr);
+      byKey.set(key, arr);
     }
     arr.push(f);
   }
-  for (const [relPath, group] of byPath) {
+  for (const group of byKey.values()) {
     if (group.length < 2) continue;
+    const relPath = group[0]!.relPath;
     if (isMergeable(relPath)) continue; // R8/R9/R12 handle these in E2
     detectConflict(relPath, group, contributors);
   }
