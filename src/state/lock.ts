@@ -2,7 +2,7 @@
  * Lockfile primitive (R41 / R41a / R41b / R41c).
  *
  * Contract:
- *  - Acquire creates `.claude-profiles/.lock` via `fs.open(path, 'wx')` —
+ *  - Acquire creates `.claude-profiles/.meta/lock` via `fs.open(path, 'wx')` —
  *    O_CREAT | O_EXCL atomic exclusive create. Only one process can succeed;
  *    losers see EEXIST.
  *  - If `.lock` exists with a live PID (kill -0 succeeds), abort with
@@ -206,7 +206,7 @@ export async function acquireLock(
   paths: StatePaths,
   opts: { signalHandlers?: boolean } = {},
 ): Promise<LockHandle> {
-  await fs.mkdir(paths.profilesDir, { recursive: true });
+  await fs.mkdir(paths.metaDir, { recursive: true });
 
   const pid = process.pid;
   let lastError: Error | undefined;

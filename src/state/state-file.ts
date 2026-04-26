@@ -167,7 +167,10 @@ function validateStateShape(value: unknown): Ok | Bad {
  * accidentally checked in) is readable. Trailing newline for tool friendliness.
  */
 export async function writeStateFile(paths: StatePaths, state: StateFile): Promise<void> {
-  await fs.mkdir(paths.profilesDir, { recursive: true });
+  // tmpDir is `.claude-profiles/.meta/tmp/` — recursive mkdir creates both
+  // `.meta/` and the tmp staging directory in one call. The state file lives
+  // beside tmpDir under `.meta/`, so we don't need a separate stateFile-parent
+  // mkdir.
   await fs.mkdir(paths.tmpDir, { recursive: true });
   const json = `${JSON.stringify(state, null, 2)}\n`;
   // Per-call unique tmp path (multi-reviewer P2 Gemini #2): even though

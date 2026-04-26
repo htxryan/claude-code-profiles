@@ -192,7 +192,7 @@ export async function runSwap(opts: SwapOptions): Promise<SwapResult> {
         appliedChoice = "no-drift-proceed";
       } else if (!reportInside.fingerprintOk) {
         throw new CliUserError(
-          `swap aborted: state file became unreadable between drift detection and lock acquisition; re-run after inspecting .claude-profiles/.state.json`,
+          `swap aborted: state file became unreadable between drift detection and lock acquisition; re-run after inspecting .claude-profiles/.meta/state.json`,
           EXIT_USER_ERROR,
         );
       }

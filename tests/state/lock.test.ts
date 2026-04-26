@@ -33,7 +33,7 @@ describe("lock primitive", () => {
 
   it("R41a: throws LockHeldError when another live PID holds the lock", async () => {
     const paths = buildStatePaths(root);
-    await fs.mkdir(paths.profilesDir, { recursive: true });
+    await fs.mkdir(paths.metaDir, { recursive: true });
     // Use this process's PID — it's by definition alive.
     const ts = new Date().toISOString();
     await fs.writeFile(paths.lockFile, `${process.pid} ${ts}\n`);
@@ -44,7 +44,7 @@ describe("lock primitive", () => {
 
   it("R41b: replaces a stale lock from a dead PID", async () => {
     const paths = buildStatePaths(root);
-    await fs.mkdir(paths.profilesDir, { recursive: true });
+    await fs.mkdir(paths.metaDir, { recursive: true });
     // PID 0 doesn't exist — guaranteed dead. (kill(0,0) raises ESRCH on every OS.)
     // We use 99999999 which is well above any normal PID range.
     await fs.writeFile(paths.lockFile, `99999999 2026-01-01T00:00:00.000Z\n`);
@@ -55,7 +55,7 @@ describe("lock primitive", () => {
 
   it("treats unparseable lock as stale and replaces", async () => {
     const paths = buildStatePaths(root);
-    await fs.mkdir(paths.profilesDir, { recursive: true });
+    await fs.mkdir(paths.metaDir, { recursive: true });
     await fs.writeFile(paths.lockFile, "garbage");
     const lock = await acquireLock(paths, { signalHandlers: false });
     expect(lock.pid).toBe(process.pid);

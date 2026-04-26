@@ -80,10 +80,10 @@ describe("E7 gate state machine matrix — non-interactive cells", () => {
     });
     expect(r.exitCode).toBe(0);
     expect(r.stdout).toContain("Switched to b");
-    // Backup snapshot must be on disk under .claude-profiles/.backup/, and
-    // the snapshot bytes must equal the drifted live tree at the moment of
-    // discard (R23a — pre-swap snapshot, not the post-swap content).
-    const backupDir = path.join(fx.projectRoot, ".claude-profiles", ".backup");
+    // Backup snapshot must be on disk under .claude-profiles/.meta/backup/,
+    // and the snapshot bytes must equal the drifted live tree at the moment
+    // of discard (R23a — pre-swap snapshot, not the post-swap content).
+    const backupDir = path.join(fx.projectRoot, ".claude-profiles", ".meta", "backup");
     // Filter to directories and sort by name (snapshot dirs are timestamped
     // and lexicographically sortable). A stray file in .backup/ must not
     // confuse the lookup; the production prune path applies the same
@@ -129,7 +129,7 @@ describe("E7 gate state machine matrix — non-interactive cells", () => {
     await ensureBuilt();
     fx = await setupDrifted();
     const stateBefore = await fs.readFile(
-      path.join(fx.projectRoot, ".claude-profiles", ".state.json"),
+      path.join(fx.projectRoot, ".claude-profiles", ".meta", "state.json"),
       "utf8",
     );
     const r = await runCli({
@@ -142,7 +142,7 @@ describe("E7 gate state machine matrix — non-interactive cells", () => {
     ).toBe("EDIT\n");
     // .state.json untouched
     const stateAfter = await fs.readFile(
-      path.join(fx.projectRoot, ".claude-profiles", ".state.json"),
+      path.join(fx.projectRoot, ".claude-profiles", ".meta", "state.json"),
       "utf8",
     );
     expect(stateAfter).toBe(stateBefore);

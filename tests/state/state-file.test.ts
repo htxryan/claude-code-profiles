@@ -61,7 +61,7 @@ describe("state-file IO", () => {
 
   it("R42: degrades to defaultState + warning on unparseable JSON", async () => {
     const paths = buildStatePaths(root);
-    await fs.mkdir(paths.profilesDir, { recursive: true });
+    await fs.mkdir(paths.metaDir, { recursive: true });
     await fs.writeFile(paths.stateFile, "{not valid json");
     const r = await readStateFile(paths);
     expect(r.warning?.code).toBe("ParseError");
@@ -70,7 +70,7 @@ describe("state-file IO", () => {
 
   it("R42: degrades on schemaVersion mismatch", async () => {
     const paths = buildStatePaths(root);
-    await fs.mkdir(paths.profilesDir, { recursive: true });
+    await fs.mkdir(paths.metaDir, { recursive: true });
     await fs.writeFile(
       paths.stateFile,
       JSON.stringify({ schemaVersion: 99, activeProfile: null }),
@@ -82,7 +82,7 @@ describe("state-file IO", () => {
 
   it("R42: degrades on missing fields", async () => {
     const paths = buildStatePaths(root);
-    await fs.mkdir(paths.profilesDir, { recursive: true });
+    await fs.mkdir(paths.metaDir, { recursive: true });
     await fs.writeFile(
       paths.stateFile,
       JSON.stringify({ schemaVersion: STATE_FILE_SCHEMA_VERSION, activeProfile: 1 }),
@@ -93,7 +93,7 @@ describe("state-file IO", () => {
 
   it("R42: degrades when fingerprint.files entry is null", async () => {
     const paths = buildStatePaths(root);
-    await fs.mkdir(paths.profilesDir, { recursive: true });
+    await fs.mkdir(paths.metaDir, { recursive: true });
     await fs.writeFile(
       paths.stateFile,
       JSON.stringify({
@@ -115,7 +115,7 @@ describe("state-file IO", () => {
 
   it("R42: degrades when fingerprint.files entry has wrong-typed fields", async () => {
     const paths = buildStatePaths(root);
-    await fs.mkdir(paths.profilesDir, { recursive: true });
+    await fs.mkdir(paths.metaDir, { recursive: true });
     await fs.writeFile(
       paths.stateFile,
       JSON.stringify({
@@ -137,7 +137,7 @@ describe("state-file IO", () => {
 
   it("R42: degrades when fingerprint.files entry is missing contentHash", async () => {
     const paths = buildStatePaths(root);
-    await fs.mkdir(paths.profilesDir, { recursive: true });
+    await fs.mkdir(paths.metaDir, { recursive: true });
     await fs.writeFile(
       paths.stateFile,
       JSON.stringify({

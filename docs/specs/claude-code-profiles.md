@@ -20,11 +20,11 @@ Claude Code's behavior in a project is shaped by a tree of files: `.claude/` (co
 | **Manifest** | `profile.json` — the per-profile config file declaring metadata, `extends`, and `includes`. |
 | **Extends** | Linear, single-parent inheritance: `profile.extends = "<name>"`. Override semantics. |
 | **Includes** | Additive list of component bundles applied on top of the inheritance chain. Conflict-detected. |
-| **Active profile** | The profile currently materialized into `.claude/`. Identified in `.claude-profiles/.state.json`. |
+| **Active profile** | The profile currently materialized into `.claude/`. Identified in `.claude-profiles/.meta/state.json`. |
 | **Materialization** | The deterministic process of resolving the inheritance + includes graph into final files in `.claude/` via copy. |
 | **Drift** | Any divergence between the live `.claude/` tree and the fingerprint stored at the time of last materialization. |
 | **Resolution graph** | The DAG of `extends` chain + `includes` list that produces a final flat file list with provenance. |
-| **State file** | `.claude-profiles/.state.json` — tracks active profile, materialized fingerprint, and resolved sources. |
+| **State file** | `.claude-profiles/.meta/state.json` — tracks active profile, materialized fingerprint, and resolved sources. |
 
 ## 3. System-Level EARS Requirements
 
@@ -46,10 +46,10 @@ Claude Code's behavior in a project is shaped by a tree of files: `.claude/` (co
 
 ### 3.3 Materialization & State
 - **R13 (E)**: When the user runs `claude-profiles use <name>`, the system shall, after passing the drift gate, materialize the resolved file list into `.claude/` by copying.
-- **R14 (E)**: When materialization completes, the system shall write `.claude-profiles/.state.json` containing `{ schemaVersion, activeProfile, materializedAt, resolvedSources[], fingerprint, externalTrustNotices[] }`.
+- **R14 (E)**: When materialization completes, the system shall write `.claude-profiles/.meta/state.json` containing `{ schemaVersion, activeProfile, materializedAt, resolvedSources[], fingerprint, externalTrustNotices[] }`.
 - **R14a (U)**: Writes to `.state.json` shall use a temp-file + atomic rename pattern: write to `.state.json.tmp`, fsync, rename to `.state.json`. Truncated or torn writes shall not be observable by readers.
-- **R15 (U)**: The system shall ensure `.claude/` and `.claude-profiles/.state.json` are listed in the project's `.gitignore` after `claude-profiles init`.
-- **R16 (U)**: The system shall materialize via a three-step rename protocol: (a) write the resolved file tree to `.claude-profiles/.pending/`, (b) atomically rename the existing `.claude/` to `.claude-profiles/.prior/` (if present), (c) atomically rename `.pending/` to `.claude/`. On any failure during (a), the pending directory is removed. On any failure during (b)–(c), the prior directory is renamed back to `.claude/`. On success, `.prior/` is removed in the background.
+- **R15 (U)**: The system shall ensure `.claude/` and `.claude-profiles/.meta/state.json` are listed in the project's `.gitignore` after `claude-profiles init`.
+- **R16 (U)**: The system shall materialize via a three-step rename protocol: (a) write the resolved file tree to `.claude-profiles/.meta/pending/`, (b) atomically rename the existing `.claude/` to `.claude-profiles/.meta/prior/` (if present), (c) atomically rename `.meta/pending/` to `.claude/`. On any failure during (a), the pending directory is removed. On any failure during (b)–(c), the prior directory is renamed back to `.claude/`. On success, `.meta/prior/` is removed in the background.
 - **R16a (UN)**: If `.pending/` or `.prior/` exists at startup (indicating a prior crashed materialization), the system shall reconcile state: prefer `.prior/` if present (restore), otherwise discard `.pending/`. The user is informed.
 - **R17 (U)**: The system shall not modify any path outside the project root, including `~/.claude/`.
 
@@ -62,7 +62,7 @@ Claude Code's behavior in a project is shaped by a tree of files: `.claude/` (co
 - **R22a (U)**: After persist, the active profile's `.claude/` content reflects the live state at the moment of persist. The user may afterward manually propagate changes from the active profile back to a component or parent profile if desired.
 - **R22b (U)**: Persist + materialize is a transactional pair. The system shall perform persist using the same pending/prior pattern as R16: write the new profile contents to `.claude-profiles/<active>/.pending/`, atomically rename `<active>/.claude/` to `<active>/.prior/`, atomically rename `.pending/` to `.claude/`. If the process is killed between persist completion and subsequent materialization, the next CLI invocation reconciles: persist's `.prior/` rolls back if `.state.json` was not yet updated; persist sticks if it was. The user is informed of any reconciliation taken.
 - **R23 (E)**: When the user selects **discard**, the system shall proceed with materialization, overwriting drifted content.
-- **R23a (U)**: Before destroying drifted content via discard, the system shall snapshot the live `.claude/` tree to `.claude-profiles/.backup/<ISO-8601 timestamp>/`. The system shall retain at most 5 backup snapshots, pruning oldest first. Backups are not advertised in the CLI surface beyond a one-line "(snapshot saved to ...)" notice; users can restore manually if needed. The `.backup/` directory shall be gitignored.
+- **R23a (U)**: Before destroying drifted content via discard, the system shall snapshot the live `.claude/` tree to `.claude-profiles/.meta/backup/<ISO-8601 timestamp>/`. The system shall retain at most 5 backup snapshots, pruning oldest first. Backups are not advertised in the CLI surface beyond a one-line "(snapshot saved to ...)" notice; users can restore manually if needed. The `.meta/` directory (and therefore `backup/`) shall be gitignored.
 - **R24 (E)**: When the user selects **abort**, the system shall make no changes.
 - **R25 (O)**: Where the user has installed the git pre-commit hook, the system shall warn (non-blocking) on commit if `.claude/` contains drift relative to the active profile.
 - **R25a (U)**: The pre-commit hook script content is fixed and minimal:
@@ -77,7 +77,7 @@ Claude Code's behavior in a project is shaped by a tree of files: `.claude/` (co
 ### 3.5 Initialization & Migration
 - **R26 (E)**: When the user runs `claude-profiles init` in a project with no `.claude-profiles/` folder, the system shall create the folder and offer to seed a starter profile from the existing `.claude/` (if present).
 - **R27 (E)**: When seeding from existing `.claude/`, the system shall copy the contents into `.claude-profiles/<chosen-name>/.claude/` and write a minimal `profile.json`.
-- **R28 (U)**: After init, the system shall add `.claude/` and `.claude-profiles/.state.json` to `.gitignore` (creating the file if absent), and shall offer to install the pre-commit hook.
+- **R28 (U)**: After init, the system shall add `.claude/` and `.claude-profiles/.meta/` to `.gitignore` (creating the file if absent), and shall offer to install the pre-commit hook.
 
 ### 3.6 CLI Surface (Public Verbs)
 - **R29 (U)**: The system shall expose the following commands: `init`, `list`, `use <name>`, `status`, `drift`, `diff <a> [<b>]`, `new <name>`, `validate [<name>]`, `sync`, `hook install|uninstall`.
@@ -94,7 +94,7 @@ Claude Code's behavior in a project is shaped by a tree of files: `.claude/` (co
 - **R37a (U)**: External component paths (anything outside the project root) are treated as fully user-trusted. The system performs no integrity verification, signature check, or sandboxing of their contents. Users are responsible for vetting what those paths point to. The CLI shall print a one-time "external path trusted" notice the first time a profile that uses such a path is materialized in a project, recorded in `.state.json` so the notice is not repeated.
 
 ### 3.8 Concurrency & State Integrity
-- **R41 (U)**: Before any write operation (`use`, `sync`, persist write-back, init, hook install), the system shall acquire an exclusive lock at `.claude-profiles/.lock`. The lock file contents shall be `<PID> <ISO-8601 timestamp>`.
+- **R41 (U)**: Before any write operation (`use`, `sync`, persist write-back, init, hook install), the system shall acquire an exclusive lock at `.claude-profiles/.meta/lock`. The lock file contents shall be `<PID> <ISO-8601 timestamp>`.
 - **R41a (UN)**: If the lock file exists with a live PID, the system shall abort with a message naming the holding PID and timestamp.
 - **R41b (E)**: If the lock file exists but the recorded PID is not running (stale lock), the system shall remove and re-acquire it. Stale-detection is by `kill -0 <pid>` (or platform equivalent).
 - **R41c (U)**: The lock shall be released on normal exit, on caught termination signals, and via a process-exit handler.

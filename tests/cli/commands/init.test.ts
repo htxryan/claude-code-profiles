@@ -35,8 +35,7 @@ describe("init (R26, R27, R28)", () => {
 
     const gitignore = await fs.readFile(path.join(fx.projectRoot, ".gitignore"), "utf8");
     expect(gitignore).toContain(".claude/");
-    expect(gitignore).toContain(".claude-profiles/.state.json");
-    expect(gitignore).toContain(".claude-profiles/.backup/");
+    expect(gitignore).toContain(".claude-profiles/.meta/");
     expect(cap.stdout()).toContain("Initialised claude-profiles");
   });
 
@@ -196,10 +195,13 @@ describe("init (R26, R27, R28)", () => {
     // Opus review P3: classifyProfilesDir previously skipped `.backup`
     // unconditionally with the comment "empty backup dir from prior tooling
     // is fine", but never verified emptiness — so `.backup/` left behind by
-    // a prior init was being mistaken for a fresh project.
+    // a prior init was being mistaken for a fresh project. Under the .meta/
+    // layout the same hazard applies one level deeper (populated
+    // `.meta/backup/` inside an otherwise-clean `.meta/`) and is guarded by
+    // the inner check in classifyProfilesDir.
     fx = await makeFixture({});
     await fs.mkdir(
-      path.join(fx.projectRoot, ".claude-profiles", ".backup", "stale-snapshot"),
+      path.join(fx.projectRoot, ".claude-profiles", ".meta", "backup", "stale-snapshot"),
       { recursive: true },
     );
     const cap = captureOutput(false);

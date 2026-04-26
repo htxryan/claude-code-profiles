@@ -66,7 +66,7 @@ describe("E7 scenarios S1-S18 (cross-epic CLI gate)", () => {
     // gitignore (R28) was written
     const gi = await fs.readFile(path.join(fx.projectRoot, ".gitignore"), "utf8");
     expect(gi).toContain(".claude/");
-    expect(gi).toContain(".claude-profiles/.state.json");
+    expect(gi).toContain(".claude-profiles/.meta/");
     // Starter profile (R27) seeded with content
     const seeded = await fs.readFile(
       path.join(fx.projectRoot, ".claude-profiles", "default", ".claude", "CLAUDE.md"),
@@ -91,7 +91,7 @@ describe("E7 scenarios S1-S18 (cross-epic CLI gate)", () => {
     ).toBe("B\n");
     const state = JSON.parse(
       await fs.readFile(
-        path.join(fx.projectRoot, ".claude-profiles", ".state.json"),
+        path.join(fx.projectRoot, ".claude-profiles", ".meta", "state.json"),
         "utf8",
       ),
     );
@@ -195,7 +195,7 @@ describe("E7 scenarios S1-S18 (cross-epic CLI gate)", () => {
     fx = await setupActive("a");
     await fs.writeFile(path.join(fx.projectRoot, ".claude", "CLAUDE.md"), "EDIT\n");
     const stateBefore = await fs.readFile(
-      path.join(fx.projectRoot, ".claude-profiles", ".state.json"),
+      path.join(fx.projectRoot, ".claude-profiles", ".meta", "state.json"),
       "utf8",
     );
     const r = await runCli({
@@ -208,7 +208,7 @@ describe("E7 scenarios S1-S18 (cross-epic CLI gate)", () => {
     ).toBe("EDIT\n");
     // State unchanged
     const stateAfter = await fs.readFile(
-      path.join(fx.projectRoot, ".claude-profiles", ".state.json"),
+      path.join(fx.projectRoot, ".claude-profiles", ".meta", "state.json"),
       "utf8",
     );
     expect(stateAfter).toBe(stateBefore);
@@ -382,7 +382,7 @@ describe("E7 scenarios S1-S18 (cross-epic CLI gate)", () => {
     fx = await setupActive("a");
     // Pre-plant a lock file naming a dead PID (well above any normal PID
     // range; kill(0, n) reports ESRCH for unused PIDs).
-    const lockPath = path.join(fx.projectRoot, ".claude-profiles", ".lock");
+    const lockPath = path.join(fx.projectRoot, ".claude-profiles", ".meta", "lock");
     await fs.writeFile(lockPath, "99999998 2026-01-01T00:00:00.000Z\n");
 
     const r = await runCli({
@@ -407,8 +407,9 @@ describe("E7 scenarios S1-S18 (cross-epic CLI gate)", () => {
     fx = await setupActive("a");
     const profilesDir = path.join(fx.projectRoot, ".claude-profiles");
     const claudeDir = path.join(fx.projectRoot, ".claude");
-    const priorDir = path.join(profilesDir, ".prior");
-    const pendingDir = path.join(profilesDir, ".pending");
+    const metaDir = path.join(profilesDir, ".meta");
+    const priorDir = path.join(metaDir, "prior");
+    const pendingDir = path.join(metaDir, "pending");
 
     // Simulate post-step-(b) crash: .claude/ moved to .prior/, .pending/
     // partially staged.
@@ -445,7 +446,7 @@ describe("E7 scenarios S1-S18 (cross-epic CLI gate)", () => {
     await ensureBuilt();
     fx = await setupActive("a");
     await fs.writeFile(
-      path.join(fx.projectRoot, ".claude-profiles", ".state.json"),
+      path.join(fx.projectRoot, ".claude-profiles", ".meta", "state.json"),
       "{not valid json",
     );
     const r = await runCli({
@@ -521,7 +522,7 @@ describe("E7 contracts: ResolvedPlan provenance survives the CLI surface", () =>
 
     const state = JSON.parse(
       await fs.readFile(
-        path.join(fx.projectRoot, ".claude-profiles", ".state.json"),
+        path.join(fx.projectRoot, ".claude-profiles", ".meta", "state.json"),
         "utf8",
       ),
     );

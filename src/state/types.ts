@@ -73,7 +73,7 @@ export interface ExternalTrustNotice {
 }
 
 /**
- * The on-disk state file at `.claude-profiles/.state.json`. R14, R14a, R42.
+ * The on-disk state file at `.claude-profiles/.meta/state.json`. R14, R14a, R42.
  *
  * Always written via temp+rename so partial writes are not observable.
  * `activeProfile === null` means "no active profile" (NoActive state in §4.3),
@@ -111,7 +111,7 @@ export function defaultState(): StateFile {
 }
 
 /**
- * A held lock on `.claude-profiles/.lock`. Returned from `acquireLock`. The
+ * A held lock on `.claude-profiles/.meta/lock`. Returned from `acquireLock`. The
  * caller MUST call `release()` (or use `withLock`) — the destructor pattern
  * is enforced by signal handlers registered when the lock is acquired.
  */

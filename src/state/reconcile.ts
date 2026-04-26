@@ -117,9 +117,9 @@ export async function reconcilePendingPrior(
  * (two stat calls, both ENOENT).
  */
 export async function reconcileMaterialize(paths: StatePaths): Promise<ReconcileOutcome> {
-  // Ensure profilesDir exists so reads on .pending/.prior don't surface
-  // unrelated ENOTDIR/ENOENT confusingly. Cheap.
-  await fs.mkdir(paths.profilesDir, { recursive: true });
+  // Ensure metaDir exists so reads on pending/prior (now under `.meta/`)
+  // don't surface unrelated ENOTDIR/ENOENT confusingly. Cheap.
+  await fs.mkdir(paths.metaDir, { recursive: true });
   return reconcilePendingPrior(
     paths.claudeDir,
     paths.pendingDir,

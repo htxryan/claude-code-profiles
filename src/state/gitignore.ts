@@ -2,10 +2,10 @@
  * `.gitignore` management for E3-owned artifacts (R15, R23a `.backup/`).
  *
  * After `claude-profiles init` the project root's `.gitignore` must list
- * `.claude/`, `.claude-profiles/.state.json`, and `.claude-profiles/.backup/`.
- * The init flow lives in E6 but the WRITER lives here so init and any other
- * caller (e.g. recovery diagnostic that detects missing entries) share a
- * single implementation.
+ * `.claude/` and `.claude-profiles/.meta/` (the umbrella for state, lock,
+ * tmp, pending, prior, backup). The init flow lives in E6 but the WRITER
+ * lives here so init and any other caller (e.g. recovery diagnostic that
+ * detects missing entries) share a single implementation.
  *
  * Idempotent: if the entries already exist (with or without trailing
  * comments, leading whitespace) we don't add duplicates. We append, never
@@ -24,12 +24,7 @@ import type { StatePaths } from "./paths.js";
  */
 export const E3_GITIGNORE_ENTRIES = [
   ".claude/",
-  ".claude-profiles/.state.json",
-  ".claude-profiles/.lock",
-  ".claude-profiles/.pending/",
-  ".claude-profiles/.prior/",
-  ".claude-profiles/.backup/",
-  ".claude-profiles/.tmp/",
+  ".claude-profiles/.meta/",
 ] as const;
 
 const SECTION_HEADER = "# Added by claude-profiles";
@@ -83,13 +78,13 @@ export async function ensureGitignoreEntries(paths: StatePaths): Promise<Gitigno
   // crash mid-write doesn't truncate the user's `.gitignore`. Consistent
   // with the rest of E3's write discipline.
   //
-  // Tmp staging is placed inside `.claude-profiles/.tmp/` rather than next
-  // to `.gitignore` (Sonnet review #4, Gemini #2): a `.gitignore.tmp` at the
-  // project root would be visible in `git status` after a crash, and adding
-  // `.gitignore.tmp` to the gitignore is circular (the file we're writing IS
-  // the gitignore). Cross-filesystem rename is not a concern in practice —
-  // `.claude-profiles/` is a sibling of `.gitignore`, both inside the project.
-  await fs.mkdir(paths.profilesDir, { recursive: true });
+  // Tmp staging is placed inside `.claude-profiles/.meta/tmp/` rather than
+  // next to `.gitignore` (Sonnet review #4, Gemini #2): a `.gitignore.tmp` at
+  // the project root would be visible in `git status` after a crash, and
+  // adding `.gitignore.tmp` to the gitignore is circular (the file we're
+  // writing IS the gitignore). Cross-filesystem rename is not a concern in
+  // practice — `.claude-profiles/` is a sibling of `.gitignore`, both inside
+  // the project.
   await fs.mkdir(paths.tmpDir, { recursive: true });
   const trimmed = existing.replace(/\s+$/, "");
   const sep = trimmed.length === 0 ? "" : "\n\n";

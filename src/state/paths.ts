@@ -16,23 +16,30 @@ export interface StatePaths {
   projectRoot: string;
   /** Absolute path to `.claude-profiles/`. */
   profilesDir: string;
+  /**
+   * Absolute path to `.claude-profiles/.meta/`, the parent of every
+   * bookkeeping artifact owned by this CLI. Profile directories sit beside
+   * it so `ls .claude-profiles/` shows only user-owned profiles plus this
+   * single dotfolder.
+   */
+  metaDir: string;
   /** Absolute path to the live `.claude/` tree. */
   claudeDir: string;
-  /** Absolute path to `.claude-profiles/.state.json`. */
+  /** Absolute path to `.claude-profiles/.meta/state.json`. */
   stateFile: string;
-  /** Absolute path to `.claude-profiles/.lock`. */
+  /** Absolute path to `.claude-profiles/.meta/lock`. */
   lockFile: string;
   /**
-   * Directory inside `.claude-profiles/` reserved for atomic-write staging
-   * (`.tmp/`). Per-call unique tmp filenames live here so concurrent writers
-   * never share a staging path and crash debris stays isolated.
+   * Directory inside `.claude-profiles/.meta/` reserved for atomic-write
+   * staging (`tmp/`). Per-call unique tmp filenames live here so concurrent
+   * writers never share a staging path and crash debris stays isolated.
    */
   tmpDir: string;
   /** Materialize-side staging (R16 step a). */
   pendingDir: string;
   /** Materialize-side prior backup (R16 step b). */
   priorDir: string;
-  /** Discard backup root `.claude-profiles/.backup/`. */
+  /** Discard backup root `.claude-profiles/.meta/backup/`. */
   backupDir: string;
   /** Project-root `.gitignore`. */
   gitignoreFile: string;
@@ -45,16 +52,18 @@ export interface StatePaths {
 export function buildStatePaths(projectRoot: string): StatePaths {
   const root = path.resolve(projectRoot);
   const profilesDir = path.join(root, ".claude-profiles");
+  const metaDir = path.join(profilesDir, ".meta");
   return {
     projectRoot: root,
     profilesDir,
+    metaDir,
     claudeDir: path.join(root, ".claude"),
-    stateFile: path.join(profilesDir, ".state.json"),
-    lockFile: path.join(profilesDir, ".lock"),
-    tmpDir: path.join(profilesDir, ".tmp"),
-    pendingDir: path.join(profilesDir, ".pending"),
-    priorDir: path.join(profilesDir, ".prior"),
-    backupDir: path.join(profilesDir, ".backup"),
+    stateFile: path.join(metaDir, "state.json"),
+    lockFile: path.join(metaDir, "lock"),
+    tmpDir: path.join(metaDir, "tmp"),
+    pendingDir: path.join(metaDir, "pending"),
+    priorDir: path.join(metaDir, "prior"),
+    backupDir: path.join(metaDir, "backup"),
     gitignoreFile: path.join(root, ".gitignore"),
   };
 }

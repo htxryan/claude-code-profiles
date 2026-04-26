@@ -36,10 +36,10 @@ describe(".gitignore management", () => {
     const result = await ensureGitignoreEntries(paths);
     expect(result.created).toBe(false);
     expect(result.added).not.toContain(".claude/");
-    expect(result.added).toContain(".claude-profiles/.state.json");
+    expect(result.added).toContain(".claude-profiles/.meta/");
     const content = await fs.readFile(paths.gitignoreFile, "utf8");
     expect(content).toContain("node_modules/");
-    expect(content).toContain(".claude-profiles/.state.json");
+    expect(content).toContain(".claude-profiles/.meta/");
   });
 
   it("is idempotent on a fully-populated file", async () => {
@@ -61,7 +61,8 @@ describe(".gitignore management", () => {
   // Regression (Sonnet review #4, Gemini #2): the previous staging path was
   // `<root>/.gitignore.tmp`, which would be visible at the project root if a
   // crash interrupted the write. Staging now lives inside
-  // `.claude-profiles/.tmp/`, which is itself gitignored.
+  // `.claude-profiles/.meta/tmp/`, which is itself gitignored via the
+  // `.meta/` umbrella entry.
   it("does not stage temp files at the project root", async () => {
     const paths = buildStatePaths(root);
     await ensureGitignoreEntries(paths);
@@ -70,7 +71,7 @@ describe(".gitignore management", () => {
     expect(tmpAtRoot).toEqual([]);
   });
 
-  it("includes .claude-profiles/.tmp/ so staging directory itself is gitignored", () => {
-    expect(E3_GITIGNORE_ENTRIES).toContain(".claude-profiles/.tmp/");
+  it("includes .claude-profiles/.meta/ so all bookkeeping artifacts are gitignored under one entry", () => {
+    expect(E3_GITIGNORE_ENTRIES).toContain(".claude-profiles/.meta/");
   });
 });

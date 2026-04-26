@@ -79,9 +79,9 @@ describe("formatError — AC-17 (always names file/profile/path)", () => {
 
   it("LockHeldError: contains lock path + holder PID + timestamp", () => {
     const out = formatError(
-      new LockHeldError("/p/.claude-profiles/.lock", 4242, "2026-04-25T12:34:56.789Z"),
+      new LockHeldError("/p/.claude-profiles/.meta/lock", 4242, "2026-04-25T12:34:56.789Z"),
     );
-    expect(out).toContain(".lock");
+    expect(out).toContain(".meta/lock");
     expect(out).toContain("4242");
     expect(out).toContain("2026-04-25T12:34:56.789Z");
   });

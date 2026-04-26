@@ -101,7 +101,7 @@ export async function runInit(opts: InitOptions): Promise<number> {
       // If we ran seed/gitignore first, an exception here would commit a
       // partial init that re-running could not recover from without the
       // user manually deleting `.claude-profiles/`. With this ordering, a
-      // throw releases the lock, leaves only `.lock`/`.tmp/` (which
+      // throw releases the lock, leaves only `.meta/` (which
       // classifyProfilesDir treats as "fresh"), and a retry just works.
       let hook: InstallHookResult | null = null;
       if (opts.installHook) {
@@ -144,20 +144,37 @@ export async function runInit(opts: InitOptions): Promise<number> {
 async function classifyProfilesDir(
   profilesDir: string,
 ): Promise<"fresh" | "already-initialised"> {
-  // Invariant: `withLock` ran `fs.mkdir(profilesDir, { recursive: true })`
-  // before invoking us, so `profilesDir` always exists here. The directory
-  // contains at minimum `.lock` + `.tmp/`. "Already initialised" means: a
-  // profile directory, a `.state.json`, or a non-empty `.backup/` is
-  // present.
+  // Invariant: `withLock` ran `fs.mkdir(metaDir, { recursive: true })` before
+  // invoking us, so `profilesDir` always exists and contains `.meta/` (which
+  // holds the lock, tmp staging, and any pending/prior reconciliation
+  // artifacts). A pristine project therefore has exactly one entry: `.meta`.
+  // Any sibling — a profile directory, stray file — means init has already
+  // run.
   const entries = await fs.readdir(profilesDir);
   for (const e of entries) {
-    if (e === ".lock" || e === ".tmp" || e === ".pending" || e === ".prior") continue;
-    // Anything else (including `.state.json`, `.backup/`, or a profile dir)
-    // means init has already run. We previously skipped `.backup/`
-    // unconditionally with the rationale "empty backup dir from prior
-    // tooling is fine", but we never verified emptiness, so a populated
-    // `.backup/` from a prior init was being mistaken for a fresh project.
+    if (e === ".meta") continue;
     return "already-initialised";
+  }
+  // Look inside .meta/ for prior-use evidence (Opus review P3 — pre-refactor
+  // version of this check guarded against a populated top-level `.backup/`
+  // being mistaken for fresh). The same concern applies one level down: a
+  // populated `state.json` or `backup/` snapshot inside `.meta/` is proof of
+  // prior init even when the user manually deleted their profile dirs. We
+  // ignore lock/tmp/pending/prior because those are run-time artifacts that
+  // a crash + retry can legitimately leave behind on a never-completed init.
+  let metaEntries: string[];
+  try {
+    metaEntries = await fs.readdir(path.join(profilesDir, ".meta"));
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return "fresh";
+    throw err;
+  }
+  for (const e of metaEntries) {
+    if (e === "state.json") return "already-initialised";
+    if (e === "backup") {
+      const backupContents = await fs.readdir(path.join(profilesDir, ".meta", "backup"));
+      if (backupContents.length > 0) return "already-initialised";
+    }
   }
   return "fresh";
 }

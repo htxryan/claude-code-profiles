@@ -131,7 +131,7 @@ describe("E3 fitness function: crash injection across pending/prior", () => {
     await fs.mkdir(paths.claudeDir, { recursive: true });
     await fs.writeFile(path.join(paths.claudeDir, "CLAUDE.md"), "OLD-LIVE");
     // Write a stale state pointing at a different profile.
-    await fs.mkdir(paths.profilesDir, { recursive: true });
+    await fs.mkdir(paths.metaDir, { recursive: true });
     await fs.writeFile(
       paths.stateFile,
       JSON.stringify({

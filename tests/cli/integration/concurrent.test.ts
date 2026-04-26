@@ -142,7 +142,7 @@ describe("E7 S14: concurrent CLI invocations on the same project", () => {
     // Final state matches the most recent successful swap.
     const state = JSON.parse(
       await fs.readFile(
-        path.join(fx.projectRoot, ".claude-profiles", ".state.json"),
+        path.join(fx.projectRoot, ".claude-profiles", ".meta", "state.json"),
         "utf8",
       ),
     );

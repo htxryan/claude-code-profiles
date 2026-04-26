@@ -162,7 +162,7 @@ describe("detectDrift (R18, R19, R20)", () => {
 
   it("R42 / S17: surfaces StateReadWarning when .state.json is corrupted", async () => {
     const paths = buildStatePaths(fx!.projectRoot);
-    await fs.mkdir(paths.profilesDir, { recursive: true });
+    await fs.mkdir(paths.metaDir, { recursive: true });
     await fs.writeFile(paths.stateFile, "{not valid json");
     const report = await detectDrift(paths);
     expect(report.fingerprintOk).toBe(false);
@@ -172,7 +172,7 @@ describe("detectDrift (R18, R19, R20)", () => {
 
   it("returns fingerprintOk:false when fingerprint.schemaVersion mismatches", async () => {
     const paths = buildStatePaths(fx!.projectRoot);
-    await fs.mkdir(paths.profilesDir, { recursive: true });
+    await fs.mkdir(paths.metaDir, { recursive: true });
     // Hand-craft a state file whose top-level schema is current but whose
     // nested fingerprint.schemaVersion is bumped — readStateFile validates
     // the top-level shape; we want to be sure the drift layer doesn't blow

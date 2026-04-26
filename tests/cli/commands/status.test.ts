@@ -97,7 +97,7 @@ describe("status (R31, R40)", () => {
   it("Corrupted state file: warning surfaced (degraded path)", async () => {
     fx = await makeFixture({});
     const paths = buildStatePaths(fx.projectRoot);
-    await fs.mkdir(paths.profilesDir, { recursive: true });
+    await fs.mkdir(paths.metaDir, { recursive: true });
     await fs.writeFile(paths.stateFile, "{not json");
 
     const cap = captureOutput(true);
