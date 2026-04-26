@@ -3,12 +3,21 @@
  *
  *   0 — success
  *   1 — user error: bad argv, drift abort, non-TTY swap with no --on-drift,
- *       validation failure (subset of `validate`'s pass/fail)
+ *       validation failure, missing profile name on the CLI (typo — the user
+ *       can fix it by editing their invocation)
  *   2 — system error: unexpected IO/permission/internal fault, including
  *       not-yet-implemented stubs (init/hook in E5)
- *   3 — conflict / cycle / missing: any ResolverError that signals the
- *       manifest graph itself is broken; LockHeldError also maps here
+ *   3 — conflict / cycle / structural-missing: ResolverError that signals
+ *       the manifest graph itself is broken (cycle, missing profile reached
+ *       via an extends chain, missing include); LockHeldError also maps here
  *       (a peer process holds the project, conceptually a "missing slot")
+ *
+ * The 'missing profile' case is split: when the user types
+ * `claude-profiles use ghst` (typo for `ghost`), the resolver throws
+ * MissingProfileError with referencedBy === undefined — that's a CLI typo
+ * and exits 1. When a manifest declares `extends: "nope"`, the resolver
+ * throws the same error class but with referencedBy set — that's a
+ * structural manifest failure and exits 3.
  *
  * Mapping is centralised so individual command handlers don't reinvent it.
  */
@@ -67,7 +76,9 @@ export class CliNotImplementedError extends Error {
  * Map any error thrown by the command pipeline to a CLI exit code.
  *
  * - CliUserError carries its own code (lets callers force exit 1 vs 3).
- * - ResolverError subclasses → 3 (conflict/cycle/missing).
+ * - MissingProfileError → 1 if it's a CLI typo (referencedBy undefined),
+ *   3 if it's structural (manifest extends chain points at nothing).
+ * - Other ResolverError subclasses → 3 (conflict/cycle/missing-include).
  * - LockHeldError → 3 (the project is occupied; semantically "no slot for us").
  * - MergeError → 2 (runtime drift, not user-input fault).
  * - CliNotImplementedError → 2 (system error class).
@@ -77,11 +88,17 @@ export function exitCodeFor(err: unknown): ExitCode {
   if (err instanceof CliUserError) return err.exitCode;
   if (err instanceof CliNotImplementedError) return EXIT_SYSTEM_ERROR;
   if (err instanceof LockHeldError) return EXIT_CONFLICT;
+  if (err instanceof MissingProfileError) {
+    // Distinguish "user typed a name that doesn't exist" (typo, fixable by
+    // editing argv → exit 1) from "manifest's extends chain points at a
+    // profile that doesn't exist" (structural fault → exit 3). The resolver
+    // sets referencedBy only when the missing name was reached transitively.
+    return err.referencedBy === undefined ? EXIT_USER_ERROR : EXIT_CONFLICT;
+  }
   if (
     err instanceof ConflictError ||
     err instanceof CycleError ||
-    err instanceof MissingIncludeError ||
-    err instanceof MissingProfileError
+    err instanceof MissingIncludeError
   ) {
     return EXIT_CONFLICT;
   }

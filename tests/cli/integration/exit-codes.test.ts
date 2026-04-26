@@ -65,14 +65,29 @@ describe("exit-code matrix (AC-16)", () => {
     expect(r.exitCode).toBe(2);
   });
 
-  it("use missing profile → 3 (MissingProfile)", async () => {
+  it("use missing profile → 1 (CLI typo, fixable by editing argv)", async () => {
     await ensureBuilt();
     fx = await makeFixture({});
     const r = await runCli({
       args: ["--cwd", fx.projectRoot, "use", "nonexistent"],
     });
-    expect(r.exitCode).toBe(3);
+    expect(r.exitCode).toBe(1);
     expect(r.stderr.toLowerCase()).toContain("nonexistent");
+  });
+
+  it("validate manifest with missing extends parent → 3 (structural)", async () => {
+    // Distinct from the CLI-typo case above: here the *manifest* references a
+    // parent that doesn't exist, which is a structural graph fault — exit 3.
+    await ensureBuilt();
+    fx = await makeFixture({
+      profiles: {
+        child: { manifest: { name: "child", extends: "missing-parent" }, files: {} },
+      },
+    });
+    const r = await runCli({
+      args: ["--cwd", fx.projectRoot, "validate", "child"],
+    });
+    expect(r.exitCode).toBe(3);
   });
 
   it("validate failing profile → 3", async () => {

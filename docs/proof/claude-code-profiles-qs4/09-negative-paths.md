@@ -3,8 +3,10 @@
 ## use a non-existent profile
 ```
 claude-profiles: Profile "ghost" does not exist
-[exit 3]
+[exit 1]
 ```
+(CLI typo — fixable by editing the invocation. Distinct from the structural
+"manifest extends a profile that doesn't exist" case below, which is exit 3.)
 
 ## extends a non-existent profile
 ```

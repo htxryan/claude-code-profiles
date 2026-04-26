@@ -36,14 +36,23 @@ describe("exitCodeFor — exit-code matrix", () => {
     );
   });
 
-  it("ResolverError subclasses → exit 3", () => {
+  it("structural ResolverError subclasses → exit 3", () => {
     expect(exitCodeFor(new ConflictError("a/b", ["x", "y"]))).toBe(EXIT_CONFLICT);
     expect(exitCodeFor(new CycleError(["a", "b", "a"]))).toBe(EXIT_CONFLICT);
-    expect(exitCodeFor(new MissingProfileError("z"))).toBe(EXIT_CONFLICT);
     expect(exitCodeFor(new MissingIncludeError("c", "/p/c", "z"))).toBe(EXIT_CONFLICT);
     expect(exitCodeFor(new InvalidManifestError("/p/profile.json", "bad json"))).toBe(
       EXIT_CONFLICT,
     );
+  });
+
+  it("MissingProfileError split: CLI typo → 1, structural extends-miss → 3", () => {
+    // No referencedBy → user typed a name on the CLI that doesn't exist
+    // (e.g. `claude-profiles use ghst` instead of `ghost`). Fixable by
+    // editing the invocation, so exit 1.
+    expect(exitCodeFor(new MissingProfileError("ghst"))).toBe(EXIT_USER_ERROR);
+    // referencedBy set → some manifest's extends chain points at a profile
+    // that doesn't exist. Structural fault; user has to edit a profile.json.
+    expect(exitCodeFor(new MissingProfileError("missing", "child"))).toBe(EXIT_CONFLICT);
   });
 
   it("MergeError subclasses → exit 2 (runtime drift, not user input)", () => {
