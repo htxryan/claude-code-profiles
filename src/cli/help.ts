@@ -74,7 +74,9 @@ const VERBS: Record<string, VerbHelp> = {
     description:
       "Creates .claude-profiles/, optionally seeds a starter profile from an\n" +
       "existing .claude/ tree, updates .gitignore, and installs the pre-commit\n" +
-      "hook. Refuses to overwrite an already-initialised .claude-profiles/.",
+      "hook. Also injects claude-profiles markers into project-root CLAUDE.md\n" +
+      "(preserves existing content) so profiles can manage a section of it.\n" +
+      "Refuses to overwrite an already-initialised .claude-profiles/.",
     options: [
       "--starter=<name>   starter profile name (default: \"default\")",
       "--no-seed          skip seeding from .claude/ even if present",
@@ -182,10 +184,12 @@ const VERBS: Record<string, VerbHelp> = {
     tagline: "switch to profile <name>; runs the drift gate",
     synopsis: "use <name> [options]",
     description:
-      "Materializes <name> into .claude/. If .claude/ has uncommitted edits\n" +
-      "(drift), prompts you to discard / persist / abort. Non-TTY sessions MUST\n" +
-      "pass --on-drift=<choice>; otherwise the command exits 1 immediately so\n" +
-      "CI scripts never block on a hidden prompt.",
+      "Materializes <name> into .claude/. If <name> (or any contributor) has a\n" +
+      "profile-root CLAUDE.md, also splices its content between the markers in\n" +
+      "project-root CLAUDE.md (user content above/below preserved). If .claude/\n" +
+      "has uncommitted edits (drift), prompts you to discard / persist / abort.\n" +
+      "Non-TTY sessions MUST pass --on-drift=<choice>; otherwise the command\n" +
+      "exits 1 immediately so CI scripts never block on a hidden prompt.",
     options: [],
     globals: SWAP_GLOBALS,
     examples: [
@@ -206,7 +210,9 @@ const VERBS: Record<string, VerbHelp> = {
     synopsis: "validate [<name>] [options]",
     description:
       "Walks the resolver and merger without writing anything. With no name,\n" +
-      "validates every profile in the project and reports pass/fail per profile.",
+      "validates every profile in the project and reports pass/fail per profile.\n" +
+      "When a profile is active, also checks that project-root CLAUDE.md has the\n" +
+      "claude-profiles markers (run `init` to add them).",
     options: [],
     globals: COMMON_GLOBALS,
     examples: [

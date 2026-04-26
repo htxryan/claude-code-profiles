@@ -398,6 +398,8 @@ my-project/
 
 A profile may supply both, either, or neither file; the two destinations are independent.
 
+A user-facing walkthrough of these changes — including before/after directory layouts, opt-in steps, opt-out behaviour, and troubleshooting for the marker-missing error — lives in [`docs/migration/cw6-section-ownership.md`](../migration/cw6-section-ownership.md). The contract surface for marker parsing/rendering is `src/markers.ts` (single source of truth: every consumer — `init`, `validate`, `materialize`, `drift detect`, `persist` — imports from there).
+
 ---
 
 *Phase 2 spec complete. Phase 3 will decompose this into epics via the 6-subagent convoy.*

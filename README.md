@@ -102,6 +102,53 @@ project-root/
 Profiles themselves (`.claude-profiles/dev/`, etc.) **are** checked in. The
 `.meta/` subtree (state, lock, backups) is ignored.
 
+## Profile-managed `CLAUDE.md` sections
+
+By default, `claude-profiles` only touches `.claude/`. If you also want a profile
+to manage part of your **project-root** `CLAUDE.md` — Claude Code reads both
+locations — put a `CLAUDE.md` next to the profile's `profile.json`:
+
+```
+.claude-profiles/
+└── dev/
+    ├── profile.json
+    ├── CLAUDE.md          # ← profile-managed root section (NEW, opt-in)
+    └── .claude/
+        └── ...
+```
+
+Then run `claude-profiles init` once to add a marker pair to your project-root
+`CLAUDE.md` (preserving any existing user content above):
+
+```markdown
+# Your existing CLAUDE.md content stays here, untouched.
+
+<!-- claude-profiles:v1:begin -->
+<!-- Managed block. Do not edit between markers — changes are overwritten on next `claude-profiles use`. -->
+
+...active profile's profile-root CLAUDE.md content lands here...
+
+<!-- claude-profiles:v1:end -->
+
+# Anything below the end marker is also preserved verbatim.
+```
+
+On every `claude-profiles use <profile>`:
+
+- Bytes **between** the markers are replaced with the resolved content from
+  the active profile's `CLAUDE.md` (and any extends/includes contributors,
+  concatenated in the same order as `.claude/CLAUDE.md`).
+- Bytes **above and below** the markers are preserved byte-for-byte.
+- Drift detection and `--on-drift=persist` only see the section bytes; edits
+  to the user-owned regions never register as drift.
+
+**Opt out**: don't put `CLAUDE.md` at the profile root. With no contributor
+for the projectRoot destination, the project-root `CLAUDE.md` is never opened
+or written — back-compat is byte-exact.
+
+See [docs/migration/cw6-section-ownership.md](docs/migration/cw6-section-ownership.md)
+for the full migration story.
+
 ## Drift gate
 
 If you've edited `.claude/` since the last materialization (drift), `use` and
