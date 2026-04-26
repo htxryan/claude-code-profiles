@@ -53,7 +53,13 @@ describe("exit-code matrix (AC-16)", () => {
       args: ["--cwd", fx.projectRoot, "init", "--no-seed", "--no-hook"],
     });
     expect(r.exitCode).toBe(0);
-    expect(r.stdout).toContain("Initialised claude-profiles");
+    // Init UX (claude-code-profiles-pnf): the new banner reads
+    // "claude-profiles initialised" + a list of [ok]/[skip] status lines in
+    // non-TTY mode. We assert the banner text and the "Created
+    // .claude-profiles/" line so this test catches both presence and the
+    // semantic outcome (profiles dir was created).
+    expect(r.stdout).toContain("claude-profiles initialised");
+    expect(r.stdout).toContain("Created .claude-profiles/");
   });
 
   it("hook install in a project without .git/ → 2 (ENOENT)", async () => {

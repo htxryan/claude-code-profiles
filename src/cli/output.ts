@@ -89,3 +89,109 @@ function writeSafe(stream: NodeJS.WritableStream, text: string): void {
     // Better to lose the message than crash the CLI on a broken pipe.
   }
 }
+
+/**
+ * Visual style helpers for human-readable CLI output (claude-code-profiles-pnf).
+ *
+ * All decisions about color and unicode are centralised here so individual
+ * commands can ask `style.ok("...")` without each one re-checking TTY-ness.
+ *
+ * Rules:
+ * - `process.env.NO_COLOR` (any value, even empty string per https://no-color.org/)
+ *   disables colour. NO_COLOR also forces ASCII glyphs because the most
+ *   common reason to set it is logging to a system that mangles them.
+ * - Non-TTY stdout disables colour (CI logs, redirection, pipes).
+ * - Windows defaults to ASCII glyphs even with colour on, because Windows
+ *   terminals historically don't render the box-drawing/check glyphs we use.
+ *
+ * No external dependencies: raw ANSI escapes only.
+ */
+
+const ANSI = {
+  reset: "\x1b[0m",
+  bold: "\x1b[1m",
+  dim: "\x1b[2m",
+  green: "\x1b[32m",
+  yellow: "\x1b[33m",
+  red: "\x1b[31m",
+  cyan: "\x1b[36m",
+} as const;
+
+export interface Style {
+  /** True iff colour escapes will be emitted. */
+  readonly color: boolean;
+  /** True iff unicode glyphs (✓, ⊙, ╭, ─) are safe to emit. */
+  readonly unicode: boolean;
+
+  /** Status glyph for a successful step. */
+  ok(text: string): string;
+  /** Status glyph for a skipped/no-op step. */
+  skip(text: string): string;
+  /** Status glyph for a warning step. */
+  warn(text: string): string;
+  /** Render a one-line banner header with the given title. */
+  banner(title: string): string;
+  /** Dim secondary text (e.g. paths, counts). */
+  dim(text: string): string;
+}
+
+export interface StyleOptions {
+  /**
+   * Whether the destination supports colour. Production callers pass
+   * `process.stdout.isTTY`; tests pass an explicit boolean.
+   */
+  isTty: boolean;
+  /**
+   * Platform string (defaults to `process.platform`). Pulled out so tests
+   * can pin a specific OS without monkey-patching globals.
+   */
+  platform?: NodeJS.Platform;
+  /**
+   * NO_COLOR value (defaults to `process.env.NO_COLOR`). Per the spec, any
+   * non-undefined value (including empty string) disables colour.
+   */
+  noColor?: string | undefined;
+}
+
+/**
+ * Build a Style helper. Pure — every decision is derived from the inputs, no
+ * hidden module-level state. That keeps `--json` callers reproducible and
+ * tests deterministic regardless of which terminal vitest happens to launch in.
+ */
+export function createStyle(opts: StyleOptions): Style {
+  const platform = opts.platform ?? process.platform;
+  const noColor = opts.noColor !== undefined;
+  const color = opts.isTty && !noColor;
+  // Windows historically chokes on box-drawing + check glyphs in cmd.exe; we
+  // also gate unicode on NO_COLOR because users frequently set NO_COLOR in
+  // log capture pipelines that strip non-ASCII bytes too.
+  const unicode = color && platform !== "win32";
+
+  function paint(code: string, text: string): string {
+    return color ? `${code}${text}${ANSI.reset}` : text;
+  }
+
+  return {
+    color,
+    unicode,
+    ok(text: string): string {
+      const glyph = unicode ? "✓" : "[ok]";
+      return `${paint(ANSI.green, glyph)} ${text}`;
+    },
+    skip(text: string): string {
+      const glyph = unicode ? "⊙" : "[skip]";
+      return `${paint(ANSI.dim, glyph)} ${paint(ANSI.dim, text)}`;
+    },
+    warn(text: string): string {
+      const glyph = unicode ? "!" : "[warn]";
+      return `${paint(ANSI.yellow, glyph)} ${text}`;
+    },
+    banner(title: string): string {
+      if (!unicode) return `== ${title} ==`;
+      return paint(ANSI.cyan, `╭ ${title} ─`);
+    },
+    dim(text: string): string {
+      return paint(ANSI.dim, text);
+    },
+  };
+}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createOutput } from "../../src/cli/output.js";
+import { createOutput, createStyle } from "../../src/cli/output.js";
 
 class StringSink {
   buf = "";
@@ -101,6 +101,54 @@ describe("OutputChannel — JSON mode (epic invariant)", () => {
   it("jsonMode flag is exposed for command code that needs to branch", () => {
     expect(build(true).ch.jsonMode).toBe(true);
     expect(build(false).ch.jsonMode).toBe(false);
+  });
+});
+
+describe("createStyle (claude-code-profiles-pnf)", () => {
+  it("non-TTY → no colour, ASCII glyphs", () => {
+    const s = createStyle({ isTty: false, platform: "linux" });
+    expect(s.color).toBe(false);
+    expect(s.unicode).toBe(false);
+    expect(s.ok("ready")).toBe("[ok] ready");
+    expect(s.skip("skipped")).toBe("[skip] skipped");
+    expect(s.banner("hi")).toBe("== hi ==");
+    // Dim is a no-op without colour.
+    expect(s.dim("path")).toBe("path");
+  });
+
+  it("TTY + linux → colour + unicode glyphs", () => {
+    const s = createStyle({ isTty: true, platform: "linux" });
+    expect(s.color).toBe(true);
+    expect(s.unicode).toBe(true);
+    expect(s.ok("ok").includes("✓")).toBe(true);
+    expect(s.ok("ok").includes("\x1b[")).toBe(true);
+    expect(s.banner("hi").includes("╭")).toBe(true);
+  });
+
+  it("TTY + win32 → ASCII glyphs (modern Windows terminals may colour, but not box glyphs)", () => {
+    // Modern Windows terminals (Windows Terminal, PowerShell 7, ConEmu)
+    // handle ANSI colour just fine, but historically choke on box-drawing
+    // and check glyphs. We keep colour on for them but never emit unicode.
+    const s = createStyle({ isTty: true, platform: "win32" });
+    expect(s.color).toBe(true);
+    expect(s.unicode).toBe(false);
+    // Glyph is ASCII; colour escapes still wrap the painted text.
+    expect(s.ok("ok").includes("[ok]")).toBe(true);
+    expect(s.ok("ok").includes("\x1b[")).toBe(true);
+  });
+
+  it("NO_COLOR set (even empty string) disables colour and unicode", () => {
+    // Per https://no-color.org/ any non-undefined value disables colour.
+    const s = createStyle({ isTty: true, platform: "linux", noColor: "" });
+    expect(s.color).toBe(false);
+    expect(s.unicode).toBe(false);
+    expect(s.ok("ok")).toBe("[ok] ok");
+  });
+
+  it("warn glyph is yellow ! when colour, [warn] otherwise", () => {
+    expect(createStyle({ isTty: false, platform: "linux" }).warn("x")).toBe("[warn] x");
+    const tty = createStyle({ isTty: true, platform: "linux" }).warn("x");
+    expect(tty.includes("!")).toBe(true);
   });
 });
 

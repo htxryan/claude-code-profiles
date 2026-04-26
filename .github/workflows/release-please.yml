@@ -1,0 +1,29 @@
+name: release-please
+
+# Maintains a perpetual "release PR" against main bundling all unreleased
+# conventional-commit changes. When the release PR is merged, release-please
+# tags the commit + creates a GitHub release; the publish workflow (separate
+# file) then triggers off the new tag and runs `npm publish --provenance`.
+#
+# The npm publish step uses GitHub Actions OIDC trusted publishers — no
+# long-lived NPM_TOKEN secret required. The package must be configured for
+# OIDC publishing on npmjs.com first (one-time human setup).
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          # Single-package repo. release-please reads .release-please-config.json
+          # and .release-please-manifest.json from the repo root.
+          config-file: .release-please-config.json
+          manifest-file: .release-please-manifest.json

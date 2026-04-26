@@ -27,6 +27,7 @@
 
 import { promises as fs } from "node:fs";
 import * as path from "node:path";
+import process from "node:process";
 
 import { isValidProfileName } from "../../resolver/index.js";
 import {
@@ -36,7 +37,7 @@ import {
   type GitignoreUpdate,
 } from "../../state/index.js";
 import { CliUserError, EXIT_USER_ERROR } from "../exit.js";
-import type { OutputChannel } from "../output.js";
+import { createStyle, type OutputChannel } from "../output.js";
 
 import { installHook, type InstallHookResult } from "./hook.js";
 
@@ -256,30 +257,76 @@ function emitOutput(output: OutputChannel, result: InitResult, projectRoot: stri
     return;
   }
 
-  output.print(`Initialised claude-profiles in ${projectRoot}`);
+  // First-run UX (claude-code-profiles-pnf): banner, coloured ✓/⊙ status
+  // glyphs, suggested next-step block. Style is auto-derived from TTY +
+  // NO_COLOR + platform; non-TTY runs degrade to plain ASCII.
+  const style = createStyle({
+    isTty: Boolean(process.stdout.isTTY),
+    platform: process.platform,
+    noColor: process.env["NO_COLOR"],
+  });
+
+  output.print(style.banner(`claude-profiles initialised`));
+  output.print(style.dim(`  ${projectRoot}`));
+  output.print("");
+
+  // Profiles dir
+  output.print(`  ${style.ok(`Created .claude-profiles/`)}`);
+
+  // Starter seed
   if (result.starterProfileSeeded !== null) {
-    output.print(`  Seeded starter profile "${result.starterProfileSeeded}" from .claude/`);
+    output.print(
+      `  ${style.ok(`Seeded starter profile "${result.starterProfileSeeded}" from .claude/`)}`,
+    );
   } else {
-    output.print(`  No .claude/ to seed; create profiles via "claude-profiles new <name>"`);
+    output.print(`  ${style.skip(`No .claude/ to seed (skipped)`)}`);
   }
+
+  // Gitignore
   if (result.gitignore.created) {
-    output.print(`  Created .gitignore with ${result.gitignore.added.length} entries`);
+    output.print(
+      `  ${style.ok(`Wrote .gitignore (${result.gitignore.added.length} entries)`)}`,
+    );
   } else if (result.gitignore.added.length > 0) {
-    output.print(`  Updated .gitignore (added ${result.gitignore.added.length} entries)`);
+    output.print(
+      `  ${style.ok(`Updated .gitignore (${result.gitignore.added.length} new entries)`)}`,
+    );
   } else {
-    output.print(`  .gitignore already up to date`);
+    output.print(`  ${style.skip(`.gitignore already up to date`)}`);
   }
+
+  // Hook
   if (result.hook) {
     if (result.hook.skippedReason === "no-git-dir") {
-      output.print(`  Pre-commit hook NOT installed (not a git project — run "git init" then "claude-profiles hook install")`);
+      output.print(
+        `  ${style.warn(`Pre-commit hook NOT installed`)} ${style.dim(`(not a git project — run "git init" then "claude-profiles hook install")`)}`,
+      );
     } else if (result.hook.installed) {
-      output.print(`  Installed pre-commit hook at ${result.hook.hookPath}`);
+      output.print(
+        `  ${style.ok(`Installed pre-commit hook`)} ${style.dim(`(${result.hook.hookPath})`)}`,
+      );
     } else if (result.hook.preExisting === "ours") {
-      output.print(`  Pre-commit hook already installed at ${result.hook.hookPath}`);
+      output.print(
+        `  ${style.skip(`Pre-commit hook already installed (${result.hook.hookPath})`)}`,
+      );
     } else {
       output.print(
-        `  Pre-commit hook NOT installed (${result.hook.hookPath} contains a different script)`,
+        `  ${style.warn(`Pre-commit hook NOT installed`)} ${style.dim(`(${result.hook.hookPath} contains a different script)`)}`,
       );
     }
   }
+
+  // Next steps footer — small nudge so the user has somewhere to go after a
+  // bare `init`. Suggested verbs cover the 90% first-run path.
+  output.print("");
+  output.print(`Next:`);
+  output.print(
+    `  ${style.dim("claude-profiles new <name>")}     scaffold a profile`,
+  );
+  output.print(
+    `  ${style.dim("claude-profiles list")}           see profiles`,
+  );
+  output.print(
+    `  ${style.dim("claude-profiles use <name>")}     activate a profile`,
+  );
 }

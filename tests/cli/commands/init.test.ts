@@ -36,7 +36,8 @@ describe("init (R26, R27, R28)", () => {
     const gitignore = await fs.readFile(path.join(fx.projectRoot, ".gitignore"), "utf8");
     expect(gitignore).toContain(".claude/");
     expect(gitignore).toContain(".claude-profiles/.meta/");
-    expect(cap.stdout()).toContain("Initialised claude-profiles");
+    expect(cap.stdout()).toContain("claude-profiles initialised");
+    expect(cap.stdout()).toContain("Created .claude-profiles/");
   });
 
   it("R27: seeds a starter profile from existing .claude/", async () => {
