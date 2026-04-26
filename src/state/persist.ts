@@ -11,6 +11,15 @@
  *   (d) materialize the new target (overwrites root `.claude/`)
  *   (e) update `.state.json` with the new active profile
  *
+ * cw6/T5 (R46/AC-8): in addition to the `.claude/` tree persist, when the
+ * live project-root `CLAUDE.md` carries well-formed markers we also write
+ * the section bytes (between markers) to `<active>/CLAUDE.md` (peer of
+ * `profile.json`). This lets the next `use` cycle re-materialize the user's
+ * edits via the normal merge/splice pipeline, completing the round trip.
+ * The destination file holds JUST the section bytes — no markers — because
+ * markers only exist in the materialized live file (they're added by
+ * renderManagedBlock at materialize time, not stored in sources).
+ *
  * Crash recovery: persist's pending/prior is reconciled by `reconcilePersist`
  * keyed on the active profile name. If the process is killed between persist
  * (a-c) completion and step d, the next reconcile sees the materialize-side
@@ -19,11 +28,13 @@
  */
 
 import { promises as fs } from "node:fs";
+import * as path from "node:path";
 
+import { extractSectionBody, parseMarkers } from "../markers.js";
 import type { MergedFile } from "../merge/types.js";
 import type { ResolvedPlan } from "../resolver/types.js";
 
-import { atomicRename, pathExists, rmrf } from "./atomic.js";
+import { atomicRename, atomicWriteFile, pathExists, rmrf, uniqueAtomicTmpPath } from "./atomic.js";
 import { copyTree } from "./copy.js";
 import { materialize, type MaterializeResult } from "./materialize.js";
 import { buildPersistPaths, type StatePaths } from "./paths.js";
@@ -130,6 +141,12 @@ export async function persistLiveIntoProfile(
     await rmrf(persist.priorDir);
   }
 
+  // cw6/T5 (R46/AC-8): write the live project-root CLAUDE.md section bytes
+  // back to <profile>/CLAUDE.md (peer of profile.json). This MUST come
+  // BEFORE the profileDir mtime touch below so the touch reflects the
+  // complete persist (including the section write-back).
+  await persistRootClaudeMdSection(paths, persist.profileDir);
+
   // Touch the profile dir so e.g. `list` shows a recent mtime; not strictly
   // required but matches user expectation that a "persist" updates the
   // profile's last-modified. Touch profileDir (the parent that `list`
@@ -138,4 +155,71 @@ export async function persistLiveIntoProfile(
   // reflects.
   const now = new Date();
   await fs.utimes(persist.profileDir, now, now).catch(() => undefined);
+}
+
+/**
+ * cw6/T5 (R46/AC-8): persist the live project-root CLAUDE.md section back to
+ * the profile's peer `<profileDir>/CLAUDE.md`. Skipped silently when:
+ *   - the live project-root CLAUDE.md doesn't exist (no R10 contributor
+ *     ever ran; nothing to persist)
+ *   - the live file's markers are missing/malformed (drift detection
+ *     surfaces this as `unrecoverable`; persist would have nothing
+ *     meaningful to write because we can't locate the section bytes)
+ *
+ * The destination file holds JUST the section body — no markers, no
+ * surrounding user-owned bytes. Markers only exist in the materialized
+ * live file; sources hold the body to be merged. This matches the cw6/T2
+ * resolver contract: a contributor's `.claude-profiles/<P>/CLAUDE.md` is
+ * the body bytes to splice on next `use`.
+ *
+ * Why we explicitly do NOT touch `.claude-profiles/<active>/.claude/CLAUDE.md`
+ * (AC-8b regression guard): pre-cw6 profiles may have a stale
+ * `.claude/CLAUDE.md` that the user never migrated. The cw6 contract is
+ * "the project-root section lives in `<P>/CLAUDE.md`, the `.claude/` tree
+ * lives under `<P>/.claude/`" — touching the legacy location would
+ * silently shadow the new one and break drift detection's destination
+ * disambiguation.
+ */
+async function persistRootClaudeMdSection(
+  paths: StatePaths,
+  profileDir: string,
+): Promise<void> {
+  let content: string;
+  try {
+    content = await fs.readFile(paths.rootClaudeMdFile, "utf8");
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return;
+    throw err;
+  }
+  const parsed = parseMarkers(content);
+  if (!parsed.found) {
+    // Markers absent or malformed — drift detection's `unrecoverable`
+    // status will surface this to the user; persist itself silently skips
+    // the write-back so we don't mistakenly persist plain-text content as
+    // if it were a section body.
+    return;
+  }
+  // Strip the renderManagedBlock framing (self-doc comment + framing
+  // newlines) so the persisted source file is just the user-meaningful
+  // body. Without this strip, every round-trip would accumulate an extra
+  // self-doc line as renderManagedBlock re-wraps an already-wrapped body.
+  const body = extractSectionBody(parsed.section);
+
+  // Write the section body to <profile>/CLAUDE.md atomically. We use the
+  // same temp+rename pattern as `.state.json` (atomicWriteFile) for
+  // consistency. Tmp lives adjacent to dest to guarantee same-FS rename
+  // (no EXDEV) — mirrors the rationale in materialize's applyRootSplice
+  // (the meta tmpDir could in principle live on a different mount). The
+  // basename includes pid+nonce so a concurrent persist into a sibling
+  // profile can't clobber our staging file (defense-in-depth even though
+  // the lock prevents it).
+  await fs.mkdir(profileDir, { recursive: true });
+  const dest = path.join(profileDir, "CLAUDE.md");
+  const tmpPath = uniqueAtomicTmpPath(profileDir, dest);
+  try {
+    await atomicWriteFile(dest, tmpPath, body);
+  } catch (err) {
+    await fs.unlink(tmpPath).catch(() => undefined);
+    throw err;
+  }
 }

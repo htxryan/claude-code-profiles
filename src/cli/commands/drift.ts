@@ -17,8 +17,20 @@ export interface DriftCommandPayload {
   fingerprintOk: boolean;
   entries: Array<{
     relPath: string;
-    status: "modified" | "added" | "deleted";
+    status: "modified" | "added" | "deleted" | "unrecoverable";
     provenance: Array<{ id: string; kind: "ancestor" | "include" | "profile"; rootPath: string; external: boolean }>;
+    /**
+     * cw6/T5: destination scope. Optional for back-compat with legacy
+     * consumers that key on `relPath` alone — only set explicitly for
+     * the project-root `CLAUDE.md` ('projectRoot').
+     */
+    destination?: ".claude" | "projectRoot";
+    /**
+     * cw6/T5: human-readable remediation when status is `unrecoverable`
+     * (markers missing/malformed). Absent for ordinary modified/added/
+     * deleted entries.
+     */
+    error?: string;
   }>;
   scannedFiles: number;
   fastPathHits: number;
@@ -72,7 +84,14 @@ export async function runDrift(opts: DriftOptions): Promise<number> {
   );
   for (const e of report.entries) {
     const prov = e.provenance.map((p) => p.id).join(", ");
-    opts.output.print(`  ${e.status.padEnd(8)} ${e.relPath}${prov ? `  (from: ${prov})` : ""}`);
+    // padEnd(13) widens for 'unrecoverable' so columns line up; older
+    // statuses (modified/added/deleted) still fit comfortably.
+    opts.output.print(`  ${e.status.padEnd(13)} ${e.relPath}${prov ? `  (from: ${prov})` : ""}`);
+    // cw6/T5: surface the actionable remediation immediately under the
+    // entry so the user doesn't have to hunt for it.
+    if (e.error) {
+      opts.output.print(`                 ${e.error}`);
+    }
   }
   if (report.warning && report.warning.code !== "Missing") {
     opts.output.warn(formatStateWarning(report.warning));
@@ -94,6 +113,8 @@ function reportToPayload(report: DriftReport): DriftCommandPayload {
         rootPath: p.rootPath,
         external: p.external,
       })),
+      ...(e.destination !== undefined ? { destination: e.destination } : {}),
+      ...(e.error !== undefined ? { error: e.error } : {}),
     })),
     scannedFiles: report.scannedFiles,
     fastPathHits: report.fastPathHits,

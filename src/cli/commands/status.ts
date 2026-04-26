@@ -21,6 +21,13 @@ export interface StatusPayload {
     modified: number;
     added: number;
     deleted: number;
+    /**
+     * cw6/T5: count of `unrecoverable` entries — currently only the project-
+     * root CLAUDE.md when the user has deleted/malformed its markers. Carried
+     * as its own field so consumers can treat it as a distinct severity (the
+     * standard discard/persist gate cannot resolve it).
+     */
+    unrecoverable: number;
     total: number;
   };
   warnings: Array<{ code: string; detail: string }>;
@@ -49,6 +56,7 @@ export async function runStatus(opts: StatusOptions): Promise<number> {
         modified: counts.modified,
         added: counts.added,
         deleted: counts.deleted,
+        unrecoverable: counts.unrecoverable,
         total: drift.entries.length,
       },
       warnings,
@@ -67,8 +75,14 @@ export async function runStatus(opts: StatusOptions): Promise<number> {
     } else if (drift.entries.length === 0) {
       opts.output.print("drift: clean");
     } else {
+      // Show unrecoverable in the summary only when non-zero so existing
+      // golden output for the common case (modified/added/deleted only)
+      // stays unchanged.
+      const tail = counts.unrecoverable > 0
+        ? `, ${counts.unrecoverable} unrecoverable`
+        : "";
       opts.output.print(
-        `drift: ${drift.entries.length} (${counts.modified} modified, ${counts.added} added, ${counts.deleted} deleted)`,
+        `drift: ${drift.entries.length} (${counts.modified} modified, ${counts.added} added, ${counts.deleted} deleted${tail})`,
       );
     }
   }
@@ -80,15 +94,17 @@ export async function runStatus(opts: StatusOptions): Promise<number> {
 }
 
 function countByStatus(
-  entries: ReadonlyArray<{ status: "modified" | "added" | "deleted" }>,
-): { modified: number; added: number; deleted: number } {
+  entries: ReadonlyArray<{ status: "modified" | "added" | "deleted" | "unrecoverable" }>,
+): { modified: number; added: number; deleted: number; unrecoverable: number } {
   let modified = 0;
   let added = 0;
   let deleted = 0;
+  let unrecoverable = 0;
   for (const e of entries) {
     if (e.status === "modified") modified++;
     else if (e.status === "added") added++;
     else if (e.status === "deleted") deleted++;
+    else if (e.status === "unrecoverable") unrecoverable++;
   }
-  return { modified, added, deleted };
+  return { modified, added, deleted, unrecoverable };
 }

@@ -145,6 +145,52 @@ export function renderManagedBlock(sectionBytes: string, version = 1): string {
 }
 
 /**
+ * Inverse of {@link renderManagedBlock} (cw6/T5): given the SECTION bytes
+ * that {@link parseMarkers} extracted from a live file, recover the original
+ * `body` parameter that was passed to renderManagedBlock. Used by `persist`
+ * to write JUST the user-meaningful section body to
+ * `.claude-profiles/<active>/CLAUDE.md` (the next `use` re-renders the
+ * managed block from this body).
+ *
+ * Why this matters (round-trip invariant): the on-disk section that
+ * parseMarkers returns is `\n<selfDoc>\n\n<body>\n` for a non-empty body
+ * (renderManagedBlock framing). Persisting that verbatim would carry the
+ * self-doc comment into the source file, and the next materialize would
+ * re-wrap THAT (selfDoc + body) inside a fresh selfDoc + newlines —
+ * accumulating duplicate self-doc lines on every round trip. This helper
+ * undoes exactly the framing renderManagedBlock added.
+ *
+ * Robustness: we tolerate sections that don't have the framing we expect
+ * (e.g. a future renderer variant, or a hand-edited section that lost the
+ * self-doc line). In that case we return the section verbatim — the round
+ * trip will still complete, just with the self-doc absent until the next
+ * full materialize re-renders one.
+ */
+export function extractSectionBody(section: string): string {
+  // Identify the self-doc prefix renderManagedBlock emits. Match it
+  // tolerantly so a future cosmetic edit to the comment text doesn't break
+  // round-trip — we recognize any HTML comment on the line directly after
+  // the leading `\n`. If the section doesn't have a leading `\n<!-- … -->`
+  // followed by `\n`, we return it verbatim (defensive).
+  //
+  // Expected shape for a freshly-rendered non-empty body:
+  //   "\n<!-- Managed block. … -->\n\n<body>\n"
+  // For a freshly-rendered empty body:
+  //   "\n<!-- Managed block. … -->\n\n"
+  // (renderManagedBlock uses `body = "\n"` for empty input, then concats
+  // `${begin}\n${selfDoc}\n${body}${end}\n` so the section between the
+  // markers becomes `\n<selfDoc>\n\n` — no third newline.)
+  const m = section.match(/^\n<!--[^>]*-->\n\n([\s\S]*?)\n?$/);
+  if (m === null) {
+    // No recognizable framing — return as-is. Log nothing: a hand-edited
+    // section is the user's prerogative, and `persist` is supposed to be
+    // a faithful capture of the live state.
+    return section;
+  }
+  return m[1] ?? "";
+}
+
+/**
  * For init: take existing CLAUDE.md content and ensure markers are present.
  *
  *   - If markers already exist (well-formed): return input unchanged (no-op).

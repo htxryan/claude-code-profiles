@@ -178,10 +178,26 @@ describe("materialize: projectRoot section splice (cw6/T4 / R45)", () => {
       const r = await readStateFile(paths);
       expect(r.warning).toBeNull();
       expect(r.state.rootClaudeMdSection).not.toBeNull();
-      expect(r.state.rootClaudeMdSection!.size).toBe(Buffer.from("HELLO").length);
-      // Hash should match the bytes we wrote — not the whole-file hash.
+      // cw6/T5: the recorded size matches the section bytes between
+      // :begin and :end as parseMarkers extracts them — i.e. INCLUDING
+      // the self-doc comment line and the surrounding newlines that
+      // renderManagedBlock emits. This is intentional: drift detection
+      // re-parses the live file with the same parseMarkers call, so the
+      // recorded fingerprint must agree with what drift sees byte-for-
+      // byte. Hashing only the raw merge input ("HELLO") would silently
+      // disagree on every drift call.
+      expect(r.state.rootClaudeMdSection!.size).toBeGreaterThan(
+        Buffer.from("HELLO").length,
+      );
+      // The section is still strictly LESS than the whole file (the
+      // "USER\n" / "\nUSER2\n" bytes outside the markers don't count).
       const fullFile = await fs.readFile(paths.rootClaudeMdFile, "utf8");
       expect(r.state.rootClaudeMdSection!.size).toBeLessThan(fullFile.length);
+      // The body bytes ARE in the recorded section (we encoded "HELLO"
+      // verbatim into the rendered block).
+      expect(r.state.rootClaudeMdSection!.size).toBeGreaterThanOrEqual(
+        Buffer.from("HELLO").length,
+      );
     });
 
     it("AC-9-mirror: concat semantics across two contributors (single MergedFile result)", async () => {

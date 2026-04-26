@@ -101,7 +101,9 @@ function formatWarning(report: DriftReport): string[] {
   return lines;
 }
 
-function statusGlyph(status: "modified" | "added" | "deleted"): string {
+function statusGlyph(
+  status: "modified" | "added" | "deleted" | "unrecoverable",
+): string {
   switch (status) {
     case "modified":
       return "M";
@@ -109,5 +111,10 @@ function statusGlyph(status: "modified" | "added" | "deleted"): string {
       return "A";
     case "deleted":
       return "D";
+    // cw6/T5: 'X' (broken) for unrecoverable — visually distinct from
+    // M/A/D so users immediately see the row needs `init`/`validate`
+    // rather than the standard discard/persist gate.
+    case "unrecoverable":
+      return "X";
   }
 }

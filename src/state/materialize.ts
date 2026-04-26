@@ -466,11 +466,30 @@ async function applyRootSplice(
   }
   fsyncDir(plan.filePath);
 
-  // Section-only fingerprint per R46: hash the bytes between the markers
-  // ONLY. We don't include the markers themselves because user edits to
-  // (e.g.) namespace tail bytes shouldn't read as drift — that's a
-  // structural change init owns, not a section-content change.
-  const sectionBuf = Buffer.from(plan.sectionBytes, "utf8");
+  // Section-only fingerprint per R46: hash the SECTION as parseMarkers
+  // would extract it from the freshly-written file (cw6/T5). This is
+  // load-bearing: drift detection (src/drift/detect.ts) re-parses the live
+  // file with the same `parseMarkers` to get the section bytes to compare
+  // against `contentHash`. Hashing the in-memory `plan.sectionBytes` (the
+  // raw merge input) would silently disagree with what drift extracts,
+  // because renderManagedBlock wraps the body with newlines and the
+  // self-doc comment line — those bytes ARE between :begin and :end on
+  // disk, so they ARE in what parseMarkers returns.
+  //
+  // We re-parse `newContent` (the bytes we just wrote) rather than re-
+  // reading from disk because (a) we just wrote them, so they're the
+  // ground truth, and (b) re-reading would introduce a TOCTOU window where
+  // a concurrent edit could observably change what we record.
+  const reparsed = parseMarkers(newContent);
+  if (!reparsed.found) {
+    // Defensive: renderManagedBlock just produced these markers; if parse
+    // doesn't find them, our renderer is broken (test-only signal). Throw
+    // a typed error so test failures point at the right module.
+    throw new Error(
+      "applyRootSplice: rendered managed block did not round-trip through parseMarkers — investigate renderManagedBlock / MARKER_REGEX",
+    );
+  }
+  const sectionBuf = Buffer.from(reparsed.section, "utf8");
   return {
     size: sectionBuf.length,
     contentHash: hashBytes(sectionBuf),

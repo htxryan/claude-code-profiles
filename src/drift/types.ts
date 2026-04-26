@@ -27,8 +27,22 @@ export const DRIFT_REPORT_SCHEMA_VERSION = 1 as const;
  * Per-file drift status (R19). Mirrors `DriftKind` in E3 but excludes the
  * `unchanged` value — DriftReport.entries only ever contains drift, not
  * intact files (those are summarized via the count metrics).
+ *
+ * cw6/T5 (R45/R46): `unrecoverable` is a terminal state used ONLY for the
+ * project-root `CLAUDE.md` when the user has deleted or malformed the
+ * managed-block markers. The section can no longer be located, so neither
+ * the "modified" (we can't compare bytes) nor the "deleted" (the file may
+ * be present, just structurally broken) labels fit. Surface it as a
+ * distinct status so the CLI can render an actionable remediation pointing
+ * at `claude-profiles init` / `validate` rather than the usual diff. The
+ * accompanying `DriftEntry.error` field carries the human-readable message.
+ *
+ * Hard-block invariant preserved: an `unrecoverable` entry counts toward
+ * the gate's "drift exists" check, so a `use`/`sync` swap will surface the
+ * gate prompt (or auto-abort non-interactively) rather than silently
+ * proceed past a broken file.
  */
-export type DriftStatus = "modified" | "added" | "deleted";
+export type DriftStatus = "modified" | "added" | "deleted" | "unrecoverable";
 
 /**
  * One drifted file in the report. `provenance` is the set of contributors
@@ -42,9 +56,15 @@ export type DriftStatus = "modified" | "added" | "deleted";
  * profile <name> drifted, here are the sources it was built from."
  */
 export interface DriftEntry {
-  /** Path relative to `.claude/`, posix-style — matches MergedFile.path. */
+  /**
+   * Path relative to `.claude/`, posix-style — matches MergedFile.path. For
+   * the project-root `CLAUDE.md` (cw6/T5, destination='projectRoot') the
+   * relPath is the bare basename `"CLAUDE.md"` and is paired with
+   * `destination: 'projectRoot'` so consumers can disambiguate from any
+   * `.claude/CLAUDE.md` entry.
+   */
   relPath: string;
-  /** Modified / Added / Deleted (R19). */
+  /** Modified / Added / Deleted (R19) or Unrecoverable (cw6/T5 markers gone). */
   status: DriftStatus;
   /**
    * The materialization sources from `.state.json` (R20). Empty only when
@@ -52,6 +72,21 @@ export interface DriftEntry {
    * runs, but provenance is not recoverable.
    */
   provenance: ResolvedSourceRef[];
+  /**
+   * cw6/T5: destination scope for the entry. Defaults to `'.claude'` for
+   * back-compat — the field is optional so legacy consumers that key on
+   * `relPath` alone keep working. Only set explicitly when the entry is the
+   * project-root `CLAUDE.md` (`'projectRoot'`).
+   */
+  destination?: ".claude" | "projectRoot";
+  /**
+   * cw6/T5: human-readable remediation. Set ONLY when `status` is
+   * `'unrecoverable'`. The CLI prints this verbatim so the user sees a
+   * single actionable message (e.g. "run `claude-profiles init` to repair").
+   * Null/absent for the normal modified/added/deleted entries — those are
+   * resolvable through the standard discard/persist gate.
+   */
+  error?: string;
 }
 
 /**
