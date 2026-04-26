@@ -92,6 +92,13 @@ describe("--json round-trip (AC-14)", () => {
   it("validate --json: parses pass:true on healthy fixture", async () => {
     await ensureBuilt();
     fx = await setup();
+    // cw6 / R44: validate verifies project-root CLAUDE.md markers when an
+    // active profile is set. setup() materializes profile "a" without
+    // running init, so seed the markers manually for this happy-path test.
+    await fs.writeFile(
+      path.join(fx.projectRoot, "CLAUDE.md"),
+      "<!-- claude-profiles:v1:begin -->\n<!-- Managed block. -->\n\n<!-- claude-profiles:v1:end -->\n",
+    );
     const r = await runCli({
       args: ["--cwd", fx.projectRoot, "--json", "validate"],
     });

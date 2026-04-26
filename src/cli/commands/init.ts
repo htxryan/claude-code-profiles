@@ -29,7 +29,13 @@ import { promises as fs } from "node:fs";
 import * as path from "node:path";
 import process from "node:process";
 
+import {
+  injectMarkersIntoFile,
+  parseMarkers,
+  renderManagedBlock,
+} from "../../markers.js";
 import { isValidProfileName } from "../../resolver/index.js";
+import { atomicWriteFile, uniqueAtomicTmpPath } from "../../state/atomic.js";
 import {
   buildStatePaths,
   ensureGitignoreEntries,
@@ -65,11 +71,27 @@ export interface InitOptions {
   signalHandlers: boolean;
 }
 
+/**
+ * Outcome of the project-root CLAUDE.md marker step (cw6 / spec §12.4):
+ *   - "created"    — file did not exist; we wrote a fresh one with markers.
+ *   - "appended"   — file existed without markers; we appended a fresh block,
+ *                    preserving every prior byte verbatim above.
+ *   - "already"    — file existed with valid markers; no-op.
+ *
+ * `path` is the absolute project-root CLAUDE.md path so --json consumers can
+ * report a stable artifact identifier.
+ */
+export interface RootClaudeMdMarkerResult {
+  outcome: "created" | "appended" | "already";
+  path: string;
+}
+
 export interface InitResult {
   profilesDirCreated: boolean;
   starterProfileSeeded: string | null;
   gitignore: GitignoreUpdate;
   hook: InstallHookResult | null;
+  rootClaudeMd: RootClaudeMdMarkerResult;
 }
 
 export async function runInit(opts: InitOptions): Promise<number> {
@@ -128,11 +150,17 @@ export async function runInit(opts: InitOptions): Promise<number> {
       // writer already covers `.claude/`, `.state.json`, `.backup/`, etc.
       const gitignore = await ensureGitignoreEntries(paths);
 
+      // cw6 / spec §12.4 (init): ensure project-root CLAUDE.md exists with a
+      // well-formed managed-block marker pair. Run inside the lock so a
+      // concurrent `use` cannot race against our (atomic) write.
+      const rootClaudeMd = await ensureRootClaudeMdMarkers(opts.cwd, paths.tmpDir);
+
       return {
         profilesDirCreated: profilesDirCreated === "fresh",
         starterProfileSeeded,
         gitignore,
         hook,
+        rootClaudeMd,
       } satisfies InitResult;
     },
     { signalHandlers: opts.signalHandlers },
@@ -237,6 +265,76 @@ async function maybeSeedStarter(
   return true;
 }
 
+/**
+ * cw6 / spec §12.4: guarantee project-root CLAUDE.md exists and contains the
+ * managed-block markers. Three branches:
+ *
+ *   - File absent → create from scratch with the canonical empty managed
+ *     block. The `renderManagedBlock("")` output is what the spec example
+ *     §12.2 shows.
+ *   - File present without markers → append the marker block at end of file,
+ *     preserving every prior byte byte-for-byte (handled inside
+ *     `injectMarkersIntoFile`). The result still parses cleanly via
+ *     parseMarkers, so the next `validate` / `use` invocation is happy.
+ *   - File present with valid markers → no-op. Init is idempotent.
+ *
+ * All writes go through atomicWriteFile (temp + fsync + rename) so a crash
+ * mid-init never leaves a half-written CLAUDE.md on disk. We share the
+ * `.claude-profiles/.meta/tmp/` staging dir with the rest of E3 because it's
+ * already on the same filesystem as the project root and gitignored.
+ */
+async function ensureRootClaudeMdMarkers(
+  projectRoot: string,
+  tmpDir: string,
+): Promise<RootClaudeMdMarkerResult> {
+  const claudeMdPath = path.join(projectRoot, "CLAUDE.md");
+
+  let existing: string | null;
+  try {
+    existing = await fs.readFile(claudeMdPath, "utf8");
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      existing = null;
+    } else {
+      throw err;
+    }
+  }
+
+  if (existing === null) {
+    // Fresh file: emit the canonical marker block as the entire file body.
+    // No leading content because there is no user content to preserve.
+    const fresh = renderManagedBlock("");
+    await fs.mkdir(tmpDir, { recursive: true });
+    const tmpPath = uniqueAtomicTmpPath(tmpDir, claudeMdPath);
+    try {
+      await atomicWriteFile(claudeMdPath, tmpPath, fresh);
+    } catch (err) {
+      await fs.unlink(tmpPath).catch(() => undefined);
+      throw err;
+    }
+    return { outcome: "created", path: claudeMdPath };
+  }
+
+  const parsed = parseMarkers(existing);
+  if (parsed.found) {
+    // Idempotent: well-formed markers already present.
+    return { outcome: "already", path: claudeMdPath };
+  }
+
+  // File exists, no markers (or malformed — injectMarkersIntoFile handles
+  // both by appending). Preserve all prior bytes; append marker block.
+  const updated = injectMarkersIntoFile(existing);
+  await fs.mkdir(tmpDir, { recursive: true });
+  const tmpPath = uniqueAtomicTmpPath(tmpDir, claudeMdPath);
+  try {
+    await atomicWriteFile(claudeMdPath, tmpPath, updated);
+  } catch (err) {
+    await fs.unlink(tmpPath).catch(() => undefined);
+    throw err;
+  }
+  return { outcome: "appended", path: claudeMdPath };
+}
+
 function emitOutput(output: OutputChannel, result: InitResult, projectRoot: string): void {
   if (output.jsonMode) {
     output.json({
@@ -253,6 +351,10 @@ function emitOutput(output: OutputChannel, result: InitResult, projectRoot: stri
             skippedReason: result.hook.skippedReason,
           }
         : null,
+      rootClaudeMd: {
+        outcome: result.rootClaudeMd.outcome,
+        path: result.rootClaudeMd.path,
+      },
     });
     return;
   }
@@ -293,6 +395,19 @@ function emitOutput(output: OutputChannel, result: InitResult, projectRoot: stri
     );
   } else {
     output.print(`  ${style.skip(`.gitignore already up to date`)}`);
+  }
+
+  // Project-root CLAUDE.md marker outcome (cw6 / spec §12.4). Wording matches
+  // T6 AC: the "appended" path uses the exact phrase the test asserts so
+  // downstream tooling (and our own scenario fixtures) have a stable hook.
+  if (result.rootClaudeMd.outcome === "created") {
+    output.print(`  ${style.ok(`Created CLAUDE.md with claude-profiles markers`)}`);
+  } else if (result.rootClaudeMd.outcome === "appended") {
+    output.print(
+      `  ${style.ok(`added claude-profiles markers to existing CLAUDE.md (your content preserved)`)}`,
+    );
+  } else {
+    output.print(`  ${style.skip(`project-root CLAUDE.md markers already present`)}`);
   }
 
   // Hook

@@ -238,4 +238,87 @@ describe("init (R26, R27, R28)", () => {
     expect(gi).toContain("node_modules/");
     expect(gi).toContain(".claude/");
   });
+
+  // cw6 / T6 / AC-1: init guarantees project-root CLAUDE.md has marker pair.
+  describe("project-root CLAUDE.md marker injection (cw6 §12.4)", () => {
+    it("creates a fresh CLAUDE.md with the canonical marker block when absent", async () => {
+      fx = await makeFixture({});
+      const cap = captureOutput(false);
+      await runInit({
+        cwd: fx.projectRoot,
+        output: cap.channel,
+        starterName: "default",
+        seedFromClaudeDir: false,
+        installHook: false,
+        signalHandlers: false,
+      });
+      const claudeMd = await fs.readFile(
+        path.join(fx.projectRoot, "CLAUDE.md"),
+        "utf8",
+      );
+      expect(claudeMd).toContain("<!-- claude-profiles:v1:begin -->");
+      expect(claudeMd).toContain("<!-- claude-profiles:v1:end -->");
+      expect(claudeMd).toContain("Managed block");
+    });
+
+    it("appends markers to existing CLAUDE.md preserving prior content byte-for-byte", async () => {
+      fx = await makeFixture({});
+      const original = "# My Project\n\nSome user-authored content.\n";
+      await fs.writeFile(path.join(fx.projectRoot, "CLAUDE.md"), original);
+
+      const cap = captureOutput(false);
+      await runInit({
+        cwd: fx.projectRoot,
+        output: cap.channel,
+        starterName: "default",
+        seedFromClaudeDir: false,
+        installHook: false,
+        signalHandlers: false,
+      });
+      const claudeMd = await fs.readFile(
+        path.join(fx.projectRoot, "CLAUDE.md"),
+        "utf8",
+      );
+      // Byte-for-byte preservation of original prefix.
+      expect(claudeMd.startsWith(original)).toBe(true);
+      expect(claudeMd).toContain("<!-- claude-profiles:v1:begin -->");
+      expect(claudeMd).toContain("<!-- claude-profiles:v1:end -->");
+      expect(cap.stdout()).toContain(
+        "added claude-profiles markers to existing CLAUDE.md (your content preserved)",
+      );
+    });
+
+    it("is a no-op when markers already present (idempotent)", async () => {
+      fx = await makeFixture({});
+      const original = [
+        "# My Project",
+        "",
+        "<!-- claude-profiles:v1:begin -->",
+        "<!-- Managed block. -->",
+        "",
+        "<!-- claude-profiles:v1:end -->",
+        "",
+      ].join("\n");
+      await fs.writeFile(path.join(fx.projectRoot, "CLAUDE.md"), original);
+
+      const cap = captureOutput(false);
+      await runInit({
+        cwd: fx.projectRoot,
+        output: cap.channel,
+        starterName: "default",
+        seedFromClaudeDir: false,
+        installHook: false,
+        signalHandlers: false,
+      });
+      const claudeMd = await fs.readFile(
+        path.join(fx.projectRoot, "CLAUDE.md"),
+        "utf8",
+      );
+      // File is byte-identical to input (no-op).
+      expect(claudeMd).toBe(original);
+      expect(cap.stdout()).toContain(
+        "project-root CLAUDE.md markers already present",
+      );
+    });
+  });
 });

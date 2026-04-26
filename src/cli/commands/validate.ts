@@ -7,10 +7,15 @@
  * are caught per-profile so one bad manifest doesn't mask others.
  */
 
+import { promises as fs } from "node:fs";
+import * as path from "node:path";
+
 import { PipelineError, type PipelineErrorCode } from "../../errors/index.js";
+import { parseMarkers } from "../../markers.js";
 import { listProfiles, resolve } from "../../resolver/index.js";
 import { merge } from "../../merge/index.js";
-import { CliUserError, EXIT_CONFLICT } from "../exit.js";
+import { buildStatePaths, readStateFile } from "../../state/index.js";
+import { CliUserError, EXIT_CONFLICT, EXIT_USER_ERROR } from "../exit.js";
 import { formatResolutionWarnings } from "../format.js";
 import type { OutputChannel } from "../output.js";
 
@@ -45,6 +50,21 @@ export interface ValidateOptions {
 }
 
 export async function runValidate(opts: ValidateOptions): Promise<number> {
+  // cw6 / R44: when a profile is active, verify the project-root CLAUDE.md
+  // has the managed-block markers. This is a project-wide environment check,
+  // not per-profile, so it runs before the per-target loop.
+  //
+  // Idle state (NoActive, e.g. user just ran `init` but no `use` yet) skips
+  // the check — pestering users who haven't adopted profiles would be noisy
+  // and the markers don't actually do anything until materialize wires them.
+  // readStateFile degrades to defaultState() (activeProfile: null) on any
+  // error per R42, so a missing/corrupt state.json correctly idles here too.
+  const paths = buildStatePaths(opts.cwd);
+  const { state } = await readStateFile(paths);
+  if (state.activeProfile !== null) {
+    await assertRootClaudeMdMarkers(opts.cwd);
+  }
+
   const targets =
     opts.profile !== null
       ? [opts.profile]
@@ -97,6 +117,41 @@ export async function runValidate(opts: ValidateOptions): Promise<number> {
     throw new CliUserError(`validation failed for ${results.filter((r) => !r.ok).length} profile(s)`, EXIT_CONFLICT);
   }
   return 0;
+}
+
+/**
+ * cw6 / R44: when a profile is active, project-root CLAUDE.md must exist and
+ * contain a well-formed managed-block marker pair. Throws CliUserError(exit
+ * 1) with the spec-mandated remediation message if either condition fails.
+ *
+ * Three failure modes, all surfaced with the same actionable message because
+ * the user's remediation is identical for every one (`claude-profiles init`):
+ *   - File missing entirely.
+ *   - File present but no markers (parseMarkers → reason: "absent").
+ *   - File present with markers in a partial / multi-block / version-mismatch
+ *     state (parseMarkers → reason: "malformed").
+ */
+async function assertRootClaudeMdMarkers(projectRoot: string): Promise<void> {
+  const claudeMdPath = path.join(projectRoot, "CLAUDE.md");
+  let content: string;
+  try {
+    content = await fs.readFile(claudeMdPath, "utf8");
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      throw new CliUserError(
+        "project-root CLAUDE.md is missing claude-profiles markers — run `claude-profiles init` to add them",
+        EXIT_USER_ERROR,
+      );
+    }
+    throw err;
+  }
+  const parsed = parseMarkers(content);
+  if (!parsed.found) {
+    throw new CliUserError(
+      "project-root CLAUDE.md is missing claude-profiles markers — run `claude-profiles init` to add them",
+      EXIT_USER_ERROR,
+    );
+  }
 }
 
 async function validateOne(cwd: string, name: string): Promise<ValidateProfileResult> {

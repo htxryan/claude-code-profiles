@@ -1,7 +1,13 @@
+import { promises as fs } from "node:fs";
+import * as path from "node:path";
+
 import { afterEach, describe, expect, it } from "vitest";
 
 import { runValidate, type ValidatePayload } from "../../../src/cli/commands/validate.js";
-import { CliUserError, EXIT_CONFLICT } from "../../../src/cli/exit.js";
+import { CliUserError, EXIT_CONFLICT, EXIT_USER_ERROR } from "../../../src/cli/exit.js";
+import { buildStatePaths } from "../../../src/state/paths.js";
+import { writeStateFile } from "../../../src/state/state-file.js";
+import { defaultState } from "../../../src/state/types.js";
 import { makeFixture, type Fixture } from "../../helpers/fixture.js";
 import { captureOutput } from "../helpers/output-sink.js";
 
@@ -129,5 +135,100 @@ describe("validate (R33)", () => {
     });
     expect(code).toBe(0);
     expect(cap.stdout()).toContain("no profiles");
+  });
+
+  // cw6 / T6 / AC-2: validate flags missing root CLAUDE.md markers when a
+  // profile is active. The marker check is skipped in the idle (NoActive)
+  // state to avoid pestering users who have not adopted profiles yet.
+  describe("project-root CLAUDE.md marker presence (cw6 R44)", () => {
+    async function makeActive(fx: Fixture): Promise<void> {
+      // Mark the fixture as having an active profile by writing a minimal
+      // state.json with `activeProfile` set. We don't actually materialize —
+      // this is a unit-level integration test for the marker check only.
+      const paths = buildStatePaths(fx.projectRoot);
+      await fs.mkdir(paths.metaDir, { recursive: true });
+      await writeStateFile(paths, {
+        ...defaultState(),
+        activeProfile: "a",
+        materializedAt: "2026-04-26T12:00:00.000Z",
+      });
+    }
+
+    it("active profile + root CLAUDE.md missing → exit 1 with actionable error", async () => {
+      fx = await makeFixture({
+        profiles: { a: { manifest: { name: "a" }, files: {} } },
+      });
+      await makeActive(fx);
+      // Ensure root CLAUDE.md does NOT exist.
+      const cap = captureOutput(false);
+      let thrown: unknown;
+      try {
+        await runValidate({ cwd: fx.projectRoot, output: cap.channel, profile: null });
+      } catch (err) {
+        thrown = err;
+      }
+      expect(thrown).toBeInstanceOf(CliUserError);
+      expect((thrown as CliUserError).exitCode).toBe(EXIT_USER_ERROR);
+      expect((thrown as CliUserError).message).toContain(
+        "project-root CLAUDE.md is missing claude-profiles markers",
+      );
+      expect((thrown as CliUserError).message).toContain("claude-profiles init");
+    });
+
+    it("active profile + root CLAUDE.md present without markers → exit 1", async () => {
+      fx = await makeFixture({
+        profiles: { a: { manifest: { name: "a" }, files: {} } },
+      });
+      await makeActive(fx);
+      await fs.writeFile(
+        path.join(fx.projectRoot, "CLAUDE.md"),
+        "# Project\n\nuser content, no markers here.\n",
+      );
+      const cap = captureOutput(false);
+      await expect(
+        runValidate({ cwd: fx.projectRoot, output: cap.channel, profile: null }),
+      ).rejects.toMatchObject({ exitCode: EXIT_USER_ERROR });
+    });
+
+    it("active profile + root CLAUDE.md with valid markers → exit 0", async () => {
+      fx = await makeFixture({
+        profiles: { a: { manifest: { name: "a" }, files: {} } },
+      });
+      await makeActive(fx);
+      await fs.writeFile(
+        path.join(fx.projectRoot, "CLAUDE.md"),
+        [
+          "# Project",
+          "",
+          "<!-- claude-profiles:v1:begin -->",
+          "<!-- Managed block. -->",
+          "",
+          "<!-- claude-profiles:v1:end -->",
+          "",
+        ].join("\n"),
+      );
+      const cap = captureOutput(false);
+      const code = await runValidate({
+        cwd: fx.projectRoot,
+        output: cap.channel,
+        profile: null,
+      });
+      expect(code).toBe(0);
+    });
+
+    it("idle state (no active profile) → marker check is skipped", async () => {
+      fx = await makeFixture({
+        profiles: { a: { manifest: { name: "a" }, files: {} } },
+      });
+      // No state.json written (or written with activeProfile=null) → idle.
+      // Root CLAUDE.md absent. Should still pass.
+      const cap = captureOutput(false);
+      const code = await runValidate({
+        cwd: fx.projectRoot,
+        output: cap.channel,
+        profile: null,
+      });
+      expect(code).toBe(0);
+    });
   });
 });

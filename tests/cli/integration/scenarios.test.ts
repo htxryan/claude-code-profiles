@@ -311,6 +311,14 @@ describe("E7 scenarios S1-S18 (cross-epic CLI gate)", () => {
   it("S11: validate — pass:true on healthy fixture; non-zero on broken fixture", async () => {
     await ensureBuilt();
     fx = await setupActive("a");
+    // cw6 / R44: when an active profile is set, validate verifies project-
+    // root CLAUDE.md has markers. setupActive activates a profile but does
+    // not run init, so we seed the markers manually here. (S1 covers the
+    // init-managed case explicitly.)
+    await fs.writeFile(
+      path.join(fx.projectRoot, "CLAUDE.md"),
+      "<!-- claude-profiles:v1:begin -->\n<!-- Managed block. -->\n\n<!-- claude-profiles:v1:end -->\n",
+    );
     let r = await runCli({
       args: ["--cwd", fx.projectRoot, "validate"],
     });
