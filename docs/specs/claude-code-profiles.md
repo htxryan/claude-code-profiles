@@ -106,6 +106,13 @@ Claude Code's behavior in a project is shaped by a tree of files: `.claude/` (co
 - **R39 (U)**: The system shall support Node.js LTS (≥ 20) on macOS, Linux, and Windows. On Windows, only the copy strategy is supported (no symlink modes are exposed).
 - **R40 (U)**: The system shall produce human-readable output by default and machine-readable output (`--json`) for the `list`, `status`, `drift`, and `diff` commands.
 
+### 3.10 Section Ownership in Project-Root `CLAUDE.md`
+See §12 for the full design (marker syntax, parser regex, lifecycle, multi-profile composition, migration). The EARS requirements below pin the contractual surface that materialize, validate, and drift must honor.
+
+- **R44 (E)**: When the user runs `claude-profiles validate` against a project with an active profile, the system shall verify that project-root `CLAUDE.md` exists and contains both a well-formed `<!-- claude-profiles:vN:begin -->` opening marker and a matching `<!-- claude-profiles:vN:end -->` closing marker (same version `N`, same optional namespace tail). The system shall fail validation with a non-zero exit code and an actionable error message naming `claude-profiles init` as the remediation if the file is absent or either marker is missing or malformed.
+- **R45 (UN)**: If, during materialization of a profile that contributes a project-root `CLAUDE.md` body, the live project-root `CLAUDE.md` is absent or its markers are missing or malformed, the system shall abort the operation with a non-zero exit code, name the file and the missing/malformed marker, and shall not write any bytes to project-root `CLAUDE.md`. Materialization of files destined for `.claude/` shall also be aborted (the operation is atomic across destinations).
+- **R46 (U)**: For files whose destination is project-root `CLAUDE.md`, the drift fingerprint scope is **section-only**: the system shall fingerprint only the bytes strictly between the `:begin` and `:end` markers (the managed slice). Bytes above the `:begin` marker and below the `:end` marker are user-owned and shall not contribute to the fingerprint, shall not appear in any drift report, and shall not influence the discard/persist/abort gate. For files whose destination is `.claude/`, R18–R19 (whole-file fingerprinting) continue to apply unchanged.
+
 ## 4. Architecture
 
 ### 4.1 C4 Context
@@ -220,9 +227,9 @@ stateDiagram-v2
 - Mutation of `~/.claude/` (plugins, MCP, settings) — explicitly deferred. Profiles describe project-level config only.
 - Pre/post lifecycle hooks on swap.
 - Symlink materialization (Windows compatibility cost not justified for v1).
-- Section-marker-based merging within markdown files (concat is sufficient).
+- Section-marker-based merging *within already-managed files* — i.e. the merge engine does not parse `<!-- ... -->` markers inside contributor files in order to splice their bodies together. Markdown contributors are concatenated whole-file via R9. Note: this exclusion applies to the **merge engine**. Project-root `CLAUDE.md` *does* use HTML-comment markers as **ownership boundaries** (not merge boundaries) — see §12 "Section ownership in project-root CLAUDE.md". The two uses are unrelated: ownership markers delimit which bytes the tool owns within a coexistence file, while merge markers (excluded here) would have delimited splice points within contributor files.
 - npm-published or git-URL components (in-repo and filesystem paths only).
-- B2-style derived root `CLAUDE.md` (root file is left untouched; profile additions go in `.claude/CLAUDE.md`).
+- ~~B2-style derived root `CLAUDE.md`~~ — **revised**: project-root `CLAUDE.md` is now partially managed under section-ownership semantics. See §12 "Section ownership in project-root `CLAUDE.md`" for the marker syntax, lifecycle, and migration story.
 - Per-worktree profile state — profiles work per-project root; multiple worktrees of the same repo share `.claude-profiles/` via git but have independent `.claude/` and `.state.json` (acceptable; not actively designed for).
 
 ## 6.5 Alternatives Considered
@@ -278,7 +285,7 @@ The 6-subagent decomposition convoy may rebalance these (e.g., split orchestrati
 
 ## 10. Key Assumptions
 
-- Claude Code's runtime concatenation of `<root>/CLAUDE.md` + `<project>/.claude/CLAUDE.md` continues. If this changes upstream, the B1 model needs revisiting.
+- Claude Code's runtime concatenation of `<root>/CLAUDE.md` + `<project>/.claude/CLAUDE.md` continues. Both files remain read by Claude Code; the assumption that *both* paths are honored is still load-bearing because profiles may emit contributors to either destination. The earlier B1-only caveat ("root file is left untouched") is obsolete: §12 introduces section-ownership of project-root `CLAUDE.md`, so profiles now manage a marker-bounded slice of the root file in addition to whole-file ownership of `.claude/CLAUDE.md`.
 - Project filesystem supports atomic file rename (true on all supported OSes).
 - Users edit `.claude/` rarely *during* a profile session, often *between* profile sessions; the drift gate is for the latter.
 - Profiles are typically O(10–100) files; performance budget assumes ≤ 1000.
@@ -291,6 +298,105 @@ Re-open the architectural decomposition if any of:
 - Drift gate UX requires bypass logic that crosses ≥ 3 epics.
 - Home-level (`~/.claude/`) management is added in v2 — likely needs new epic and new bounded context.
 - Symlink materialization is added — affects materialization, drift, and state contexts simultaneously.
+
+## 12. Section ownership in project-root `CLAUDE.md`
+
+This section authorizes and specifies *partial* profile ownership of the project-root `CLAUDE.md` file. It supersedes the original B1 stance ("root file is left untouched") that appeared in Out of Scope. Whole-file ownership of `.claude/CLAUDE.md` continues unchanged; the new behavior described here is additive.
+
+### 12.1 Motivation
+
+Claude Code reads instructions from both `<project>/CLAUDE.md` and `<project>/.claude/CLAUDE.md` and concatenates them at runtime. The convention in the wider ecosystem places the canonical project-level `CLAUDE.md` at the project root. v1 deliberately avoided touching the root file to preserve user-authored content. Section ownership lifts that restriction safely: the tool owns a marker-bounded slice of the file, and user content above and below the markers is preserved verbatim.
+
+### 12.2 Marker syntax
+
+A managed block is delimited by a versioned, namespaced pair of HTML comments. The recommended form, emitted by `claude-profiles init`, is:
+
+```markdown
+<!-- claude-profiles:v1:begin -->
+<!-- Managed block. Do not edit between markers — changes are overwritten on next `claude-profiles use`. -->
+
+...managed content (resolved CLAUDE.md body, concatenated from contributors)...
+
+<!-- claude-profiles:v1:end -->
+```
+
+Properties:
+- HTML comments are invisible in GitHub, VS Code, pandoc, and other common markdown renderers.
+- The version tag (`v1`) enables forward migration; the parser refuses to read or write blocks whose version it does not recognize.
+- The `claude-profiles:` namespace prevents collision with other tools that may also want to own a section.
+- The self-documenting second line tells the next human what the block is and how to regenerate it.
+- No content hash is embedded in the markers. Drift detection lives in `.state.json` (R46), not in the marker line, to keep the markers stable across formatting-only changes the user might make to surrounding content.
+
+### 12.3 Parser regex
+
+The canonical parser regex used to locate the managed block is:
+
+```
+<!-- claude-profiles:v(\d+):begin([^>]*)-->([\s\S]*?)<!-- claude-profiles:v\1:end\2-->
+```
+
+Capture groups:
+1. Version number (must match between `:begin` and `:end`).
+2. Optional namespace tail (text between the version and `-->`; empty in the canonical form, reserved for future namespacing).
+3. The managed body — the bytes the tool owns. `[\s\S]*?` is non-greedy so multiple managed blocks within a single file (a future possibility) do not collapse into one.
+
+A well-formed file contains exactly one match. Zero matches means the markers are missing (handled per R44/R45). More than one match is reserved and currently rejected; v1 implementations may treat it as malformed.
+
+### 12.4 Lifecycle
+
+| Phase | Behavior |
+|---|---|
+| `init` | Ensures project-root `CLAUDE.md` exists. If present without markers, appends the `:begin`/`:end` pair at end-of-file (preserving all prior content above). If absent, creates a new file containing only the marker pair (and the self-documenting comment). User content elsewhere in the file is never modified. |
+| `validate` | Per R44: when a profile is active, errors if root `CLAUDE.md` is missing, or if either marker is missing/malformed. Error message points at `claude-profiles init` as remediation. |
+| `use` (materialize) | Per R45: splices the resolved managed body between the markers via the same temp-file + atomic-rename pattern used elsewhere (R14a, R16). Bytes outside the markers are preserved byte-for-byte. Aborts with a clear error if the markers are absent or malformed; in that case no bytes are written to either project-root `CLAUDE.md` or `.claude/`. |
+| `drift detect` | Per R46: fingerprints only the bytes between the markers. User edits above/below the markers do not register as drift and do not surface in `claude-profiles drift` output. |
+| `persist` | When the user selects **persist** at the drift gate (R22) and drift exists in the section, the system writes the live section bytes back to `.claude-profiles/<active>/CLAUDE.md` (peer of `profile.json`, not under `.claude/`). The pre-existing `.claude/CLAUDE.md` write-back path is unaffected. |
+
+### 12.5 Multi-profile composition
+
+When multiple contributors (extends ancestors and includes) supply a profile-root `CLAUDE.md`, the resolver concatenates them in the same order R9 already prescribes for `.claude/CLAUDE.md`: oldest ancestor first, descendants down the extends chain, includes in declaration order, then the profile itself. A single newline separates contributor bodies. The concatenated result is what gets spliced between the markers.
+
+This is intentionally identical to the existing `.claude/CLAUDE.md` concat policy. No new merge semantics are introduced. The merge engine groups files by `(relPath, destination)` so a contributor's `CLAUDE.md` peer-of-profile.json (destination `projectRoot`) and a contributor's `.claude/CLAUDE.md` (destination `.claude`) produce two distinct merged outputs and never collide.
+
+### 12.6 Migration
+
+Backward compatibility is preserved:
+
+- Profiles that contain only `.claude/CLAUDE.md` (the v1 layout) continue to materialize unchanged. Project-root `CLAUDE.md` is touched **only** if at least one contributor in the resolution graph supplies a profile-root `CLAUDE.md` source.
+- Existing `.state.json` files without entries for `projectRoot`-destination files remain valid. The first `use` operation that materializes a profile-root `CLAUDE.md` adds the appropriate entries.
+- `claude-profiles init` is idempotent with respect to markers: running it on a project whose root `CLAUDE.md` already contains a well-formed marker pair is a no-op for that file.
+
+#### Directory layout — before
+
+```
+my-project/
+├── CLAUDE.md                        # user-authored, untouched by v1
+├── .claude/
+│   └── CLAUDE.md                    # materialized by claude-profiles
+└── .claude-profiles/
+    └── dev/
+        ├── profile.json
+        └── .claude/
+            └── CLAUDE.md            # profile contribution to .claude/CLAUDE.md
+```
+
+#### Directory layout — after
+
+```
+my-project/
+├── CLAUDE.md                        # partially managed: marker-bounded section
+│                                    # (user content above/below markers preserved)
+├── .claude/
+│   └── CLAUDE.md                    # materialized as before (whole-file)
+└── .claude-profiles/
+    └── dev/
+        ├── profile.json
+        ├── CLAUDE.md                # NEW: contributes to project-root CLAUDE.md section
+        └── .claude/
+            └── CLAUDE.md            # unchanged: contributes to .claude/CLAUDE.md
+```
+
+A profile may supply both, either, or neither file; the two destinations are independent.
 
 ---
 
