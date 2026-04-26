@@ -817,6 +817,148 @@ describe("resolve()", () => {
     });
   });
 
+  describe("destination tagging (cw6/T2)", () => {
+    // AC-3 from claude-code-profiles-cw6: PlanFile carries a `destination`
+    // discriminator. Existing .claude/-rooted files are 'destination=.claude';
+    // newly discovered profile-root CLAUDE.md (peer of profile.json) is
+    // 'destination=projectRoot'. The two are independent — a profile may
+    // supply either, both, or neither.
+
+    it("defaults destination='.claude' for all existing .claude/-rooted files", async () => {
+      fx = await makeFixture({
+        profiles: {
+          p: {
+            manifest: {},
+            files: {
+              "settings.json": "{}",
+              "CLAUDE.md": "claude-dir md",
+              "agents/foo.json": "{}",
+            },
+          },
+        },
+      });
+      const plan = await resolve("p", { projectRoot: fx.projectRoot });
+      // Every file walked from .claude/ keeps destination='.claude'.
+      for (const f of plan.files) {
+        expect(f.destination).toBe(".claude");
+      }
+    });
+
+    it("emits destination='projectRoot' PlanFile for peer-of-profile.json CLAUDE.md (AC-3a)", async () => {
+      fx = await makeFixture({
+        profiles: {
+          p: {
+            manifest: {},
+            rootFiles: { "CLAUDE.md": "ROOT" },
+            // No .claude/ files.
+          },
+        },
+      });
+      const plan = await resolve("p", { projectRoot: fx.projectRoot });
+      const rootClaude = plan.files.filter(
+        (f) => f.relPath === "CLAUDE.md" && f.destination === "projectRoot",
+      );
+      expect(rootClaude).toHaveLength(1);
+      // No spurious .claude-destination CLAUDE.md.
+      const claudeDir = plan.files.filter(
+        (f) => f.relPath === "CLAUDE.md" && f.destination === ".claude",
+      );
+      expect(claudeDir).toHaveLength(0);
+      // mergePolicy stays 'concat' (destination-agnostic per spec §12).
+      expect(rootClaude[0]!.mergePolicy).toBe("concat");
+    });
+
+    it("emits destination='.claude' PlanFile for .claude/CLAUDE.md only (AC-3b)", async () => {
+      fx = await makeFixture({
+        profiles: {
+          p: {
+            manifest: {},
+            files: { "CLAUDE.md": "INSIDE" },
+          },
+        },
+      });
+      const plan = await resolve("p", { projectRoot: fx.projectRoot });
+      const all = plan.files.filter((f) => f.relPath === "CLAUDE.md");
+      expect(all).toHaveLength(1);
+      expect(all[0]!.destination).toBe(".claude");
+    });
+
+    it("emits TWO PlanFiles when profile supplies both .claude/CLAUDE.md AND profile-root CLAUDE.md", async () => {
+      fx = await makeFixture({
+        profiles: {
+          p: {
+            manifest: {},
+            files: { "CLAUDE.md": "INSIDE" },
+            rootFiles: { "CLAUDE.md": "ROOT" },
+          },
+        },
+      });
+      const plan = await resolve("p", { projectRoot: fx.projectRoot });
+      const all = plan.files.filter((f) => f.relPath === "CLAUDE.md");
+      expect(all).toHaveLength(2);
+      const dests = new Set(all.map((f) => f.destination));
+      expect(dests).toEqual(new Set([".claude", "projectRoot"]));
+      // Both still policy='concat'.
+      for (const f of all) {
+        expect(f.mergePolicy).toBe("concat");
+      }
+    });
+
+    it("emits no CLAUDE.md PlanFiles when profile supplies neither", async () => {
+      fx = await makeFixture({
+        profiles: {
+          p: { manifest: {}, files: { "settings.json": "{}" } },
+        },
+      });
+      const plan = await resolve("p", { projectRoot: fx.projectRoot });
+      const md = plan.files.filter((f) => f.relPath === "CLAUDE.md");
+      expect(md).toHaveLength(0);
+    });
+
+    it("propagates destination through extends + includes contributors", async () => {
+      // base supplies a profile-root CLAUDE.md; an include supplies a .claude/CLAUDE.md;
+      // leaf supplies both. Plan should contain three projectRoot entries (base + leaf)
+      // and two .claude entries (compA + leaf), each tagged correctly.
+      fx = await makeFixture({
+        profiles: {
+          base: {
+            manifest: {},
+            rootFiles: { "CLAUDE.md": "BASE-ROOT" },
+          },
+          leaf: {
+            manifest: { extends: "base", includes: ["compA"] },
+            files: { "CLAUDE.md": "LEAF-INSIDE" },
+            rootFiles: { "CLAUDE.md": "LEAF-ROOT" },
+          },
+        },
+        components: {
+          compA: { files: { "CLAUDE.md": "COMPA-INSIDE" } },
+        },
+      });
+      const plan = await resolve("leaf", { projectRoot: fx.projectRoot });
+      const projectRootEntries = plan.files.filter(
+        (f) => f.relPath === "CLAUDE.md" && f.destination === "projectRoot",
+      );
+      const claudeEntries = plan.files.filter(
+        (f) => f.relPath === "CLAUDE.md" && f.destination === ".claude",
+      );
+      expect(projectRootEntries).toHaveLength(2);
+      expect(claudeEntries).toHaveLength(2);
+
+      // projectRoot entries originate from base + leaf (in resolve order).
+      const projectRootIds = projectRootEntries
+        .sort((a, b) => a.contributorIndex - b.contributorIndex)
+        .map((f) => plan.contributors[f.contributorIndex]!.id);
+      expect(projectRootIds).toEqual(["base", "leaf"]);
+
+      // .claude entries originate from compA + leaf.
+      const claudeIds = claudeEntries
+        .sort((a, b) => a.contributorIndex - b.contributorIndex)
+        .map((f) => plan.contributors[f.contributorIndex]!.id);
+      expect(claudeIds).toEqual(["compA", "leaf"]);
+    });
+  });
+
   describe("empty edge cases", () => {
     it("works for a profile with no manifest fields and no files", async () => {
       fx = await makeFixture({ profiles: { p: { manifest: {} } } });

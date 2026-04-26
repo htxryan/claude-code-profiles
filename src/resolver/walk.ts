@@ -71,3 +71,32 @@ export async function isDirectory(p: string): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Discover files at the *profile root* (peer of `profile.json`, sibling of
+ * `.claude/`) that materialize to the project root rather than under
+ * `.claude/`. Per cw6/§12 / R44–R46 the only such file in v1 is `CLAUDE.md`.
+ *
+ * Returns `[{ relPath: 'CLAUDE.md', absPath }]` when `<profileDir>/CLAUDE.md`
+ * exists and is a regular file (or a symlink to one). Returns `[]` otherwise
+ * (missing dir, missing file, or a directory named `CLAUDE.md`).
+ *
+ * The caller (resolve.ts) is responsible for tagging the result with
+ * `destination: 'projectRoot'`. Keeping that out of the walker keeps this
+ * helper a pure existence check, symmetric with `walkClaudeDir`.
+ */
+export async function walkProfileRoot(
+  profileDir: string,
+): Promise<Array<{ relPath: string; absPath: string }>> {
+  const candidate = path.join(profileDir, "CLAUDE.md");
+  let stat: Awaited<ReturnType<typeof fs.stat>>;
+  try {
+    stat = await fs.stat(candidate);
+  } catch (err) {
+    const e = err as NodeJS.ErrnoException;
+    if (e.code === "ENOENT") return [];
+    throw err;
+  }
+  if (!stat.isFile()) return [];
+  return [{ relPath: "CLAUDE.md", absPath: candidate }];
+}

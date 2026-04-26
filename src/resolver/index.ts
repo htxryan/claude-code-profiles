@@ -30,6 +30,7 @@ export type {
   IncludeRef,
   IncludeSourceKind,
   PlanFile,
+  PlanFileDestination,
   ProfileManifest,
   ResolutionWarning,
   ResolvedPlan,

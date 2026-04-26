@@ -26,7 +26,7 @@ import type {
   ResolvedPlan,
 } from "./types.js";
 import { RESOLVED_PLAN_SCHEMA_VERSION } from "./types.js";
-import { isDirectory, walkClaudeDir } from "./walk.js";
+import { isDirectory, walkClaudeDir, walkProfileRoot } from "./walk.js";
 
 export interface ResolveOptions {
   /** Project root containing `.claude-profiles/`. */
@@ -138,12 +138,17 @@ export async function resolve(
     detectConflict(relPath, group, contributors);
   }
 
-  // 6. Sort files: lex by relPath, then contributorIndex (preserves canonical
-  // last-wins ordering when downstream consumers iterate).
+  // 6. Sort files: lex by relPath, then contributorIndex, then destination
+  // (preserves canonical last-wins ordering when downstream consumers iterate;
+  // destination tiebreak makes ordering deterministic when a single contributor
+  // emits the same relPath to both destinations — cw6/T2).
   files.sort((a, b) => {
     if (a.relPath < b.relPath) return -1;
     if (a.relPath > b.relPath) return 1;
-    return a.contributorIndex - b.contributorIndex;
+    if (a.contributorIndex !== b.contributorIndex)
+      return a.contributorIndex - b.contributorIndex;
+    if (a.destination === b.destination) return 0;
+    return a.destination < b.destination ? -1 : 1;
   });
 
   // Aggregate manifest warnings.
@@ -315,13 +320,30 @@ async function collectFiles(contributors: Contributor[]): Promise<PlanFile[]> {
   const out: PlanFile[] = [];
   for (let i = 0; i < contributors.length; i++) {
     const c = contributors[i]!;
-    const entries = await walkClaudeDir(c.claudeDir);
-    for (const e of entries) {
+
+    // 1. The historical .claude/ subtree → destination='.claude'.
+    const claudeEntries = await walkClaudeDir(c.claudeDir);
+    for (const e of claudeEntries) {
       out.push({
         relPath: e.relPath,
         absPath: e.absPath,
         contributorIndex: i,
         mergePolicy: policyFor(e.relPath),
+        destination: ".claude",
+      });
+    }
+
+    // 2. cw6/T2: profile-root files (CLAUDE.md peer-of-profile.json) →
+    // destination='projectRoot'. Per spec §12 the merge policy is the same
+    // (CLAUDE.md → 'concat'); only the destination grouping differs.
+    const rootEntries = await walkProfileRoot(c.rootPath);
+    for (const e of rootEntries) {
+      out.push({
+        relPath: e.relPath,
+        absPath: e.absPath,
+        contributorIndex: i,
+        mergePolicy: policyFor(e.relPath),
+        destination: "projectRoot",
       });
     }
   }

@@ -11,10 +11,21 @@ export interface ProfileSpec {
   manifest?: Record<string, unknown> | string | null;
   /** Files under `.claude/`, keyed by relative posix path → content string. */
   files?: Record<string, string>;
+  /**
+   * Files at the profile root (peer of profile.json, sibling of .claude/),
+   * keyed by relative posix path → content string. Used for cw6 to set up
+   * `.claude-profiles/<P>/CLAUDE.md` (the destination='projectRoot' source).
+   */
+  rootFiles?: Record<string, string>;
 }
 
 export interface ComponentSpec {
   files?: Record<string, string>;
+  /**
+   * Files at the component root (sibling of .claude/). For cw6 testing of
+   * include contributors that supply a profile-root CLAUDE.md.
+   */
+  rootFiles?: Record<string, string>;
 }
 
 export interface FixtureSpec {
@@ -53,6 +64,11 @@ export async function makeFixture(spec: FixtureSpec): Promise<Fixture> {
       await fs.mkdir(path.dirname(fp), { recursive: true });
       await fs.writeFile(fp, content);
     }
+    for (const [rel, content] of Object.entries(p.rootFiles ?? {})) {
+      const fp = path.join(dir, rel);
+      await fs.mkdir(path.dirname(fp), { recursive: true });
+      await fs.writeFile(fp, content);
+    }
   }
 
   for (const [name, c] of Object.entries(spec.components ?? {})) {
@@ -60,6 +76,11 @@ export async function makeFixture(spec: FixtureSpec): Promise<Fixture> {
     await fs.mkdir(dir, { recursive: true });
     for (const [rel, content] of Object.entries(c.files ?? {})) {
       const fp = path.join(dir, ".claude", rel);
+      await fs.mkdir(path.dirname(fp), { recursive: true });
+      await fs.writeFile(fp, content);
+    }
+    for (const [rel, content] of Object.entries(c.rootFiles ?? {})) {
+      const fp = path.join(dir, rel);
       await fs.mkdir(path.dirname(fp), { recursive: true });
       await fs.writeFile(fp, content);
     }

@@ -28,3 +28,16 @@ describe("isMergeable()", () => {
     expect(isMergeable("agents/foo.json")).toBe(false);
   });
 });
+
+describe("policyFor() — destination-agnostic for CLAUDE.md (cw6/T2)", () => {
+  // Per docs/specs/claude-code-profiles.md §12, the merge policy for CLAUDE.md
+  // is identical regardless of destination ('.claude' vs 'projectRoot'):
+  // both use 'concat'. The destination only changes how merge GROUPS files,
+  // not how it CLASSIFIES them. policyFor() takes a relPath and returns the
+  // same policy for both destinations.
+  it("returns concat for CLAUDE.md regardless of destination", () => {
+    // Both destinations carry the same relPath 'CLAUDE.md' from the walker's
+    // perspective; the policy depends only on that relPath.
+    expect(policyFor("CLAUDE.md")).toBe("concat");
+  });
+});

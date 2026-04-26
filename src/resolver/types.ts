@@ -82,13 +82,30 @@ export interface Contributor {
 }
 
 /**
+ * Where a PlanFile materializes in the project tree.
+ *
+ *  - `'.claude'`     — file lives under the project's `.claude/` subtree
+ *                      (the historical default; still applies to all files
+ *                      walked from a contributor's `.claude/` directory).
+ *  - `'projectRoot'` — file lives at the project root (currently used only
+ *                      for `CLAUDE.md` discovered as a peer of the
+ *                      contributor's `profile.json`, per cw6/§12).
+ *
+ * `relPath` is interpreted relative to whichever destination root applies.
+ * The merge engine groups files by `(relPath, destination)` so the two
+ * destinations never collide even when relPath is the same string.
+ */
+export type PlanFileDestination = ".claude" | "projectRoot";
+
+/**
  * A single file from a single contributor, identified by its path *relative
- * to that contributor's `.claude/` directory*. Multiple PlanFile entries may
- * share a relPath — that is the resolution input the merge engine (E2) and
+ * to that contributor's destination root* (see {@link PlanFileDestination}).
+ * Multiple PlanFile entries may share a relPath when they target different
+ * destinations — that is the resolution input the merge engine (E2) and
  * conflict detector (R11) operate on.
  */
 export interface PlanFile {
-  /** Path relative to the contributor's `.claude/` directory, posix-style. */
+  /** Path relative to the destination root, posix-style. */
   relPath: string;
   /** Absolute path to the file on disk. */
   absPath: string;
@@ -97,9 +114,17 @@ export interface PlanFile {
   /**
    * Pre-classified merge policy for this relPath. Cached on the plan so E2
    * can dispatch without re-importing the classifier. Stable function of
-   * `relPath` only.
+   * `relPath` only (destination-agnostic — see spec §12: identical concat
+   * policy for both `.claude/CLAUDE.md` and project-root `CLAUDE.md`).
    */
   mergePolicy: "deep-merge" | "concat" | "last-wins";
+  /**
+   * Materialization destination for this file (cw6/T2). Defaults to
+   * `'.claude'` for everything walked from a contributor's `.claude/`
+   * subtree. Only the profile-root `CLAUDE.md` (peer of `profile.json`,
+   * sibling of `.claude/`) is tagged `'projectRoot'`.
+   */
+  destination: PlanFileDestination;
 }
 
 /**
