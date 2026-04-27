@@ -46,10 +46,20 @@ describe("parseArgs — verbs (R29)", () => {
     expect(run(["list"]).command).toEqual({ kind: "list" });
     expect(run(["use", "minimal"]).command).toEqual({ kind: "use", profile: "minimal" });
     expect(run(["status"]).command).toEqual({ kind: "status" });
-    expect(run(["drift"]).command).toEqual({ kind: "drift", preCommitWarn: false });
+    expect(run(["drift"]).command).toEqual({
+      kind: "drift",
+      preCommitWarn: false,
+      verbose: false,
+    });
     expect(run(["drift", "--pre-commit-warn"]).command).toEqual({
       kind: "drift",
       preCommitWarn: true,
+      verbose: false,
+    });
+    expect(run(["drift", "--verbose"]).command).toEqual({
+      kind: "drift",
+      preCommitWarn: false,
+      verbose: true,
     });
     expect(run(["diff", "a"]).command).toEqual({ kind: "diff", a: "a", b: null });
     expect(run(["diff", "a", "b"]).command).toEqual({ kind: "diff", a: "a", b: "b" });

@@ -217,14 +217,16 @@ export function parseArgs(argv: ReadonlyArray<string>, defaultCwd: string): Pars
 
     case "drift": {
       let preCommitWarn = false;
+      let verbose = false;
       const positional: string[] = [];
       for (const t of rest) {
         if (t === "--pre-commit-warn") preCommitWarn = true;
+        else if (t === "--verbose") verbose = true;
         else if (t.startsWith("--")) return parseError(`drift: unknown flag "${t}"`);
         else positional.push(t);
       }
       if (positional.length > 0) return parseError(`drift takes no positional arguments; got "${positional.join(" ")}"`);
-      return ok({ command: { kind: "drift", preCommitWarn }, global });
+      return ok({ command: { kind: "drift", preCommitWarn, verbose }, global });
     }
 
     case "diff": {

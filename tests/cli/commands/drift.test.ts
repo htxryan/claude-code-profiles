@@ -40,6 +40,7 @@ describe("drift (R20, R40)", () => {
       cwd: fx.projectRoot,
       output: cap.channel,
       preCommitWarn: false,
+      verbose: false,
     });
     expect(code).toBe(0);
     expect(cap.stdout()).toContain("active: a");
@@ -52,7 +53,7 @@ describe("drift (R20, R40)", () => {
     await fs.writeFile(path.join(paths.claudeDir, "CLAUDE.md"), "EDITED\n");
 
     const cap = captureOutput(false);
-    await runDrift({ cwd: fx.projectRoot, output: cap.channel, preCommitWarn: false });
+    await runDrift({ cwd: fx.projectRoot, output: cap.channel, preCommitWarn: false, verbose: false });
     const out = cap.stdout();
     expect(out).toContain("modified");
     expect(out).toContain("CLAUDE.md");
@@ -66,7 +67,7 @@ describe("drift (R20, R40)", () => {
     await fs.writeFile(path.join(paths.claudeDir, "extra.md"), "X\n");
 
     const cap = captureOutput(true);
-    await runDrift({ cwd: fx.projectRoot, output: cap.channel, preCommitWarn: false });
+    await runDrift({ cwd: fx.projectRoot, output: cap.channel, preCommitWarn: false, verbose: false });
     const payload = cap.jsonLines()[0] as DriftCommandPayload;
     expect(payload.schemaVersion).toBe(1);
     expect(payload.active).toBe("a");
@@ -88,6 +89,7 @@ describe("drift (R20, R40)", () => {
       cwd: fx.projectRoot,
       output: cap.channel,
       preCommitWarn: false,
+      verbose: false,
     });
     expect(code).toBe(0);
     expect(cap.stdout()).toContain("no active profile");
@@ -103,7 +105,39 @@ describe("drift (R20, R40)", () => {
       cwd: fx.projectRoot,
       output: cap.channel,
       preCommitWarn: true,
+      verbose: false,
     });
     expect(code).toBe(0);
+  });
+
+  it("--verbose: human summary includes scan stats", async () => {
+    fx = await setupActive();
+    const paths = buildStatePaths(fx.projectRoot);
+    await fs.writeFile(path.join(paths.claudeDir, "CLAUDE.md"), "EDITED\n");
+
+    const cap = captureOutput(false);
+    await runDrift({
+      cwd: fx.projectRoot,
+      output: cap.channel,
+      preCommitWarn: false,
+      verbose: true,
+    });
+    expect(cap.stdout()).toMatch(/scanned \d+, fast=\d+, slow=\d+/);
+  });
+
+  it("default (non-verbose): human summary omits scan stats", async () => {
+    fx = await setupActive();
+    const paths = buildStatePaths(fx.projectRoot);
+    await fs.writeFile(path.join(paths.claudeDir, "CLAUDE.md"), "EDITED\n");
+
+    const cap = captureOutput(false);
+    await runDrift({
+      cwd: fx.projectRoot,
+      output: cap.channel,
+      preCommitWarn: false,
+      verbose: false,
+    });
+    expect(cap.stdout()).not.toMatch(/scanned/);
+    expect(cap.stdout()).not.toMatch(/fast=/);
   });
 });

@@ -44,13 +44,50 @@ export function timestampWithRelative(iso: string | null, now: number = Date.now
 }
 
 /**
- * Render a simple two-column table: pads the first column to the longest
- * width across all rows. Used for `list` and similar.
+ * Render an N-column text table. Pads each column to the longest cell width
+ * in that column except the LAST column, so the trailing-edge of every line
+ * is the natural end of the data — no ragged trailing whitespace.
+ *
+ * - rows: each row is an array of cells; missing trailing cells are treated
+ *   as empty strings so callers can omit columns per row when they have
+ *   nothing to show.
+ * - options.header: optional header row drawn above the data (its widths
+ *   participate in column width calculation).
+ *
+ * Visible column widths are computed including the header so headers and
+ * data align even when the longest cell is in the header.
  */
-export function renderTable(rows: ReadonlyArray<readonly [string, string]>): string {
-  if (rows.length === 0) return "";
-  const widest = Math.max(...rows.map(([k]) => k.length));
-  return rows.map(([k, v]) => `${k.padEnd(widest)}  ${v}`).join("\n");
+export function renderTable(
+  rows: ReadonlyArray<ReadonlyArray<string>>,
+  options?: { header?: ReadonlyArray<string> },
+): string {
+  if (rows.length === 0 && !options?.header) return "";
+  const allRows = options?.header ? [options.header, ...rows] : [...rows];
+  const numCols = Math.max(...allRows.map((r) => r.length));
+  const widths: number[] = [];
+  for (let c = 0; c < numCols; c++) {
+    let w = 0;
+    for (const r of allRows) {
+      const cell = r[c] ?? "";
+      if (cell.length > w) w = cell.length;
+    }
+    widths.push(w);
+  }
+  const lines = allRows.map((r) => {
+    const cells: string[] = [];
+    for (let c = 0; c < numCols; c++) {
+      const cell = r[c] ?? "";
+      // Last column: emit raw (no padEnd) so trailing whitespace never leaks.
+      // Earlier columns: pad to the column width so the next column starts
+      // at a stable visual offset.
+      if (c === numCols - 1) cells.push(cell);
+      else cells.push(cell.padEnd(widths[c]!));
+    }
+    // Two-space gap is the standard column separator across the codebase
+    // (matches the prior renderTable output for the existing two-column case).
+    return cells.join("  ").trimEnd();
+  });
+  return lines.join("\n");
 }
 
 /**

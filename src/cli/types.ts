@@ -73,7 +73,7 @@ export type Command =
   | { kind: "list" }
   | { kind: "use"; profile: string }
   | { kind: "status" }
-  | { kind: "drift"; preCommitWarn: boolean }
+  | { kind: "drift"; preCommitWarn: boolean; verbose: boolean }
   | { kind: "diff"; a: string; b: string | null }
   | { kind: "new"; profile: string; description: string | null }
   | { kind: "validate"; profile: string | null }

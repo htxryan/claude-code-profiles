@@ -83,7 +83,7 @@ describe("dispatch — every command kind dispatches without throwing on baselin
     const cases: Command[] = [
       { kind: "list" },
       { kind: "status" },
-      { kind: "drift", preCommitWarn: false },
+      { kind: "drift", preCommitWarn: false, verbose: false },
       { kind: "diff", a: "a", b: "b" },
       { kind: "validate", profile: null },
       { kind: "new", profile: "scratch", description: "test" },

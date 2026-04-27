@@ -8,6 +8,7 @@
 
 import { promises as fs } from "node:fs";
 import * as path from "node:path";
+import process from "node:process";
 
 import {
   buildPaths,
@@ -21,7 +22,7 @@ import {
   relativeTime,
   renderTable,
 } from "../format.js";
-import type { OutputChannel } from "../output.js";
+import { createStyle, type OutputChannel } from "../output.js";
 
 export interface ListEntryPayload {
   name: string;
@@ -77,15 +78,35 @@ export async function runList(opts: ListOptions): Promise<number> {
   if (entries.length === 0) {
     opts.output.print("(no profiles — run `claude-profiles new <name>` to create one)");
   } else {
-    const rows: Array<readonly [string, string]> = entries.map((e) => {
+    const style = createStyle({
+      isTty: Boolean(process.stdout.isTTY),
+      platform: process.platform,
+      noColor: process.env["NO_COLOR"],
+    });
+    // Decide which optional columns to render. A column is visible if any
+    // row has content for it — keeps the layout tight in the common case
+    // (no descriptions, no tags) while expanding gracefully when used.
+    const showDescription = entries.some((e) => e.description !== null && e.description !== "");
+    const showTags = entries.some((e) => e.tags.length > 0);
+
+    const rows: string[][] = entries.map((e) => {
+      // Active marker: glyph + bold styling per spec — both for redundancy
+      // (some terminals strip ANSI; the `*` survives).
       const marker = e.active ? "*" : " ";
-      const ext = e.extends ? ` extends=${e.extends}` : "";
-      const inc = e.includes.length > 0 ? ` includes=[${e.includes.join(",")}]` : "";
-      const lm =
-        e.lastMaterialized !== null
-          ? `  (materialized ${relativeTime(e.lastMaterialized)})`
-          : "";
-      return [`${marker} ${e.name}`, `${ext}${inc}${lm}`.trim()];
+      const nameCell = e.active ? `${marker} ${style.bold(e.name)}` : `${marker} ${e.name}`;
+      const cells: string[] = [nameCell];
+      if (showDescription) cells.push(e.description ?? "");
+      if (showTags) cells.push(e.tags.length > 0 ? `[${e.tags.join(", ")}]` : "");
+      // Trailing meta column: extends/includes/last-materialized. Joined
+      // with a single space so each piece reads as one continuous flag.
+      const metaParts: string[] = [];
+      if (e.extends) metaParts.push(`extends=${e.extends}`);
+      if (e.includes.length > 0) metaParts.push(`includes=[${e.includes.join(",")}]`);
+      if (e.lastMaterialized !== null) {
+        metaParts.push(`(materialized ${relativeTime(e.lastMaterialized)})`);
+      }
+      cells.push(metaParts.join(" "));
+      return cells;
     });
     opts.output.print(renderTable(rows));
   }

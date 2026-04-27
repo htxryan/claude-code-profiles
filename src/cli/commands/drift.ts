@@ -42,6 +42,13 @@ export interface DriftOptions {
   cwd: string;
   output: OutputChannel;
   preCommitWarn: boolean;
+  /**
+   * When true, the human summary line includes the scan-stats suffix
+   * `(scanned N, fast=X, slow=Y)`. Off by default (skimmability — those
+   * counts are diagnostic, not user-facing). The JSON payload always
+   * exposes the same fields regardless of this flag.
+   */
+  verbose: boolean;
 }
 
 export async function runDrift(opts: DriftOptions): Promise<number> {
@@ -79,9 +86,10 @@ export async function runDrift(opts: DriftOptions): Promise<number> {
   }
 
   opts.output.print(`active: ${report.active}`);
-  opts.output.print(
-    `drift: ${report.entries.length} file(s) (scanned ${report.scannedFiles}, fast=${report.fastPathHits}, slow=${report.slowPathHits})`,
-  );
+  const scanSuffix = opts.verbose
+    ? ` (scanned ${report.scannedFiles}, fast=${report.fastPathHits}, slow=${report.slowPathHits})`
+    : "";
+  opts.output.print(`drift: ${report.entries.length} file(s)${scanSuffix}`);
   for (const e of report.entries) {
     const prov = e.provenance.map((p) => p.id).join(", ");
     // padEnd(13) widens for 'unrecoverable' so columns line up; older

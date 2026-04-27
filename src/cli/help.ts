@@ -131,6 +131,7 @@ const VERBS: Record<string, VerbHelp> = {
       "Read-only — does not change anything on disk.",
     options: [
       "--pre-commit-warn  fail-open hook entry point (always exits 0)",
+      "--verbose          include scan stats (scanned N, fast=X, slow=Y) in the summary",
     ],
     globals: COMMON_GLOBALS,
     examples: [

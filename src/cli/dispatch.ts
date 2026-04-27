@@ -72,6 +72,7 @@ export async function dispatch(
         cwd: global.cwd,
         output: ctx.output,
         preCommitWarn: command.preCommitWarn,
+        verbose: command.verbose,
       });
 
     case "diff":

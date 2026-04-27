@@ -4,14 +4,23 @@
  * structured fields that round-trip cleanly.
  */
 
+import { promises as fs } from "node:fs";
+import * as path from "node:path";
+import process from "node:process";
+
 import { detectDrift } from "../../drift/index.js";
+import {
+  buildPaths,
+  listProfiles,
+  type ProfileManifest,
+} from "../../resolver/index.js";
 import { buildStatePaths, readStateFile } from "../../state/index.js";
 import {
   formatStateWarning,
   meaningfulStateWarning,
   timestampWithRelative,
 } from "../format.js";
-import type { OutputChannel } from "../output.js";
+import { createStyle, type OutputChannel } from "../output.js";
 
 export interface StatusPayload {
   activeProfile: string | null;
@@ -65,15 +74,36 @@ export async function runStatus(opts: StatusOptions): Promise<number> {
     return 0;
   }
 
+  const style = createStyle({
+    isTty: Boolean(process.stdout.isTTY),
+    platform: process.platform,
+    noColor: process.env["NO_COLOR"],
+  });
+
   if (state.activeProfile === null) {
-    opts.output.print("(no active profile — run `claude-profiles use <name>` to activate)");
+    // Differentiate "no profiles at all" from "profiles exist but none
+    // active" — the next-step the user needs to take is different.
+    const names = await listProfiles({ projectRoot: opts.cwd });
+    if (names.length === 0) {
+      opts.output.print("(no active profile — run `claude-profiles new <name>` first)");
+    } else {
+      opts.output.print("(no active profile — run `claude-profiles use <name>` to activate)");
+    }
   } else {
     opts.output.print(`active: ${state.activeProfile}`);
+    // Surface the active profile's manifest description on a dim line so
+    // status answers "what is this profile for?" at a glance. Best-effort
+    // (a malformed profile.json should not crash status).
+    const description = await tryLoadActiveDescription(opts.cwd, state.activeProfile);
+    if (description !== null && description !== "") {
+      opts.output.print(style.dim(`  ${description}`));
+    }
     opts.output.print(`materialized: ${timestampWithRelative(state.materializedAt)}`);
     if (!drift.fingerprintOk) {
       opts.output.print("drift: (state file degraded — drift not assessable)");
     } else if (drift.entries.length === 0) {
-      opts.output.print("drift: clean");
+      // Visual style consistency with init: clean state earns a green ok glyph.
+      opts.output.print(style.ok("drift: clean"));
     } else {
       // Show unrecoverable in the summary only when non-zero so existing
       // golden output for the common case (modified/added/deleted only)
@@ -91,6 +121,32 @@ export async function runStatus(opts: StatusOptions): Promise<number> {
     opts.output.warn(formatStateWarning(warning));
   }
   return 0;
+}
+
+/**
+ * Best-effort manifest read for the active profile's description. We don't
+ * want a malformed profile.json to blow up `status` — degrade to "no
+ * description shown". `validate` will surface the details.
+ */
+async function tryLoadActiveDescription(
+  projectRoot: string,
+  profileName: string,
+): Promise<string | null> {
+  try {
+    const paths = buildPaths(projectRoot);
+    const raw = await fs.readFile(
+      path.join(paths.profilesDir, profileName, "profile.json"),
+      "utf8",
+    );
+    const parsed = JSON.parse(raw) as ProfileManifest | unknown;
+    if (typeof parsed === "object" && parsed !== null) {
+      const desc = (parsed as ProfileManifest).description;
+      return typeof desc === "string" ? desc : null;
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 function countByStatus(

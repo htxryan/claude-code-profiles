@@ -133,6 +133,8 @@ export interface Style {
   banner(title: string): string;
   /** Dim secondary text (e.g. paths, counts). */
   dim(text: string): string;
+  /** Bold text (no glyph; for inline emphasis like the active profile name). */
+  bold(text: string): string;
 }
 
 export interface StyleOptions {
@@ -192,6 +194,9 @@ export function createStyle(opts: StyleOptions): Style {
     },
     dim(text: string): string {
       return paint(ANSI.dim, text);
+    },
+    bold(text: string): string {
+      return paint(ANSI.bold, text);
     },
   };
 }
