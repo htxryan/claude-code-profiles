@@ -74,6 +74,22 @@ describe("renderUnifiedDiff", () => {
     const out = renderUnifiedDiff(text, bin);
     expect(out).toMatch(/binary file — \d+ bytes/);
   });
+
+  it("trailing-newline-only difference: emits an explicit note (azp review)", () => {
+    // splitLines drops the trailing empty element on both sides, so a naive
+    // diffLines call returns no +/- ops. Without the guard, the preview
+    // would be silent — confusing, since the file IS different.
+    const a = Buffer.from("hello\n");
+    const b = Buffer.from("hello");
+    const out = renderUnifiedDiff(a, b);
+    expect(out).toBe("(files differ only in trailing whitespace / newline)");
+  });
+
+  it("identical inputs do NOT trigger the trailing-newline note", () => {
+    const buf = Buffer.from("a\nb\n");
+    const out = renderUnifiedDiff(buf, buf);
+    expect(out).not.toContain("trailing whitespace");
+  });
 });
 
 describe("renderHeadPreview", () => {

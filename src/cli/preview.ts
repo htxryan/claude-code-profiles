@@ -71,6 +71,17 @@ export function renderUnifiedDiff(
   const bLines = splitLines(b.toString("utf8"));
 
   const ops = diffLines(aLines, bLines);
+  // Edge case (azp external review): when files differ ONLY in their
+  // trailing newline, splitLines() drops the trailing empty element on
+  // both sides (intentional — see the helper's docstring), so `ops` has
+  // no `+`/`-` lines and the preview body would be silent. The caller
+  // already knows the files differ (they wouldn't have made it here
+  // otherwise), but a silent preview is confusing. Substitute an explicit
+  // note so the user sees a body that explains "why is this preview empty".
+  const hasChange = ops.some((op) => op.startsWith("+") || op.startsWith("-"));
+  if (!hasChange && !a.equals(b)) {
+    return "(files differ only in trailing whitespace / newline)";
+  }
   const rendered: string[] = [];
   let i = 0;
   for (; i < ops.length; i++) {

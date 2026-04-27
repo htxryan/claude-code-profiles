@@ -173,6 +173,16 @@ export async function runDiff(opts: DiffOptions): Promise<number> {
     // azp: --preview attaches a unified-diff body for `changed` entries
     // (added/removed entries have no opposing buffer to diff against; the
     // byte count in the entry is sufficient signal there).
+    //
+    // Convention: argument order is `(old, new)` so the renderer's first
+    // input lines render as `-` and the second as `+`. The codebase's
+    // existing file-level sigil convention (see this file's status sigils
+    // above) is "+ = in a (first user arg), - = in b (second user arg)" —
+    // i.e., `b` is the baseline and `a` is the focus. To make the preview's
+    // `+`/`-` lines match that mental model, we pass `(b, a)`: b-side bytes
+    // become `-` and a-side bytes become `+`. A user reading
+    // "diff dev ci --preview" then sees: `+ dev-only-line` and `- ci-only-
+    // line`, consistent with `+ dev-only.md` / `- ci-only.md` above.
     if (opts.preview && e.status === "changed") {
       const buf = buffers.get(e.relPath);
       if (buf?.a !== undefined && buf?.b !== undefined) {
