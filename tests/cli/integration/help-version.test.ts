@@ -54,6 +54,18 @@ describe("--help / --version (AC-20)", () => {
     }
   });
 
+  // cw6.4 followup: validate's exit-codes block must document the R44
+  // marker-failure case so users grepping --help know why validate may
+  // exit 1 instead of 0/3.
+  it("validate --help documents the R44 marker-missing exit-1 case", async () => {
+    await ensureBuilt();
+    const r = await runCli({ args: ["validate", "--help"] });
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("EXIT CODES");
+    expect(r.stdout).toMatch(/missing claude-profiles markers/i);
+    expect(r.stdout).toContain("claude-profiles init");
+  });
+
   it("top-level --help defines the spec terms it uses", async () => {
     await ensureBuilt();
     const r = await runCli({ args: ["--help"] });

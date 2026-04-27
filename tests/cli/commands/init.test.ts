@@ -4,7 +4,7 @@ import * as path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { runInit } from "../../../src/cli/commands/init.js";
-import { CliUserError } from "../../../src/cli/exit.js";
+import { CliUserError, EXIT_USER_ERROR } from "../../../src/cli/exit.js";
 import { listProfiles } from "../../../src/resolver/discover.js";
 import { makeFixture, type Fixture } from "../../helpers/fixture.js";
 import { captureOutput } from "../helpers/output-sink.js";
@@ -286,6 +286,82 @@ describe("init (R26, R27, R28)", () => {
       expect(cap.stdout()).toContain(
         "added claude-profiles markers to existing CLAUDE.md (your content preserved)",
       );
+    });
+
+    // cw6.3 followup: a malformed marker block (lone :begin/:end, version
+    // mismatch, multi-block) must NOT be silently appended-to. init refuses
+    // with an actionable error so the user knows to repair manually.
+    it("fails closed (exit 1) on a CLAUDE.md with a lone :begin marker", async () => {
+      fx = await makeFixture({});
+      const malformed =
+        "# My Project\n\n<!-- claude-profiles:v1:begin -->\noops, no end\n";
+      await fs.writeFile(path.join(fx.projectRoot, "CLAUDE.md"), malformed);
+
+      const cap = captureOutput(false);
+      let thrown: unknown;
+      try {
+        await runInit({
+          cwd: fx.projectRoot,
+          output: cap.channel,
+          starterName: "default",
+          seedFromClaudeDir: false,
+          installHook: false,
+          signalHandlers: false,
+        });
+      } catch (err) {
+        thrown = err;
+      }
+      expect(thrown).toBeInstanceOf(CliUserError);
+      expect((thrown as CliUserError).exitCode).toBe(EXIT_USER_ERROR);
+      expect((thrown as CliUserError).message).toContain(
+        "malformed claude-profiles marker block",
+      );
+      // Error names the file path for grep-ability.
+      expect((thrown as CliUserError).message).toContain(
+        `(file: ${path.join(fx.projectRoot, "CLAUDE.md")})`,
+      );
+
+      // CLAUDE.md is left untouched — no second block appended on top of
+      // the broken one.
+      const onDisk = await fs.readFile(
+        path.join(fx.projectRoot, "CLAUDE.md"),
+        "utf8",
+      );
+      expect(onDisk).toBe(malformed);
+    });
+
+    it("fails closed on a CLAUDE.md with multiple managed blocks", async () => {
+      fx = await makeFixture({});
+      const multiBlock = [
+        "<!-- claude-profiles:v1:begin -->",
+        "first",
+        "<!-- claude-profiles:v1:end -->",
+        "",
+        "<!-- claude-profiles:v1:begin -->",
+        "second",
+        "<!-- claude-profiles:v1:end -->",
+        "",
+      ].join("\n");
+      await fs.writeFile(path.join(fx.projectRoot, "CLAUDE.md"), multiBlock);
+
+      const cap = captureOutput(false);
+      await expect(
+        runInit({
+          cwd: fx.projectRoot,
+          output: cap.channel,
+          starterName: "default",
+          seedFromClaudeDir: false,
+          installHook: false,
+          signalHandlers: false,
+        }),
+      ).rejects.toMatchObject({ exitCode: EXIT_USER_ERROR });
+
+      // File is unchanged.
+      const onDisk = await fs.readFile(
+        path.join(fx.projectRoot, "CLAUDE.md"),
+        "utf8",
+      );
+      expect(onDisk).toBe(multiBlock);
     });
 
     it("is a no-op when markers already present (idempotent)", async () => {

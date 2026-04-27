@@ -115,6 +115,27 @@ into project-root `CLAUDE.md`, and vice versa.
   back to `.claude-profiles/<active>/CLAUDE.md`, preserving your edits in
   the source profile.
 
+### Persist + extends: snapshot semantics
+
+When you run `claude-profiles use <child> --on-drift=persist` and `<child>`
+extends `<parent>` (the active profile), the persisted edits land in
+`<parent>` but the `<child>` you just materialized is built from the
+PRE-persist source of `<parent>`. In other words: the swap target was
+resolved when you typed the command, and that snapshot is what gets
+materialized — `--on-drift=persist` is purely a transactional write-back
+to the previous profile so your edits aren't lost.
+
+To pick up the just-persisted edits in `<child>`, run `claude-profiles use
+<child>` again after the persist completes. That second resolve sees the
+freshly-persisted bytes in `<parent>` and merges them through the extends
+chain.
+
+Why this design: re-resolving after persist would make the materialized
+output depend on whether drift was persisted vs discarded vs absent — the
+same `use <child>` command would produce different bytes on disk based on
+state you can't see. Snapshot semantics keep "what I named is what I get"
+intact and is faster (one resolve instead of two on the swap path).
+
 ## Opting out
 
 You don't have to. Either:
@@ -127,6 +148,36 @@ You don't have to. Either:
    marker block from `CLAUDE.md`. As long as no active profile has a
    profile-root `CLAUDE.md`, the missing markers will not trip `validate`
    (the marker check is conditional on a contribution being present).
+
+## Back-compat invariants (AC-10)
+
+The following invariants are pinned by the regression suite
+(`tests/cli/integration/back-compat-section-ownership.test.ts`) and form the
+contract between the v1 layout and section ownership. They are documented
+here so users can rely on them without reading the test source.
+
+- **BC-1** — A profile that contains *only* `.claude/CLAUDE.md` (no
+  profile-root `CLAUDE.md`) leaves project-root `CLAUDE.md` byte-identical
+  through `claude-profiles use`. The file is not opened, written, or even
+  stat'd. This holds whether the user has run `init` or not.
+- **BC-2** — A profile that contains *only* a profile-root `CLAUDE.md` (no
+  `.claude/CLAUDE.md`) does not write a `CLAUDE.md` into `.claude/`. The two
+  destinations are independent: contributing to one never implicitly
+  contributes to the other.
+- **BC-3** — A profile that supplies *both* `.claude/CLAUDE.md` and a profile-
+  root `CLAUDE.md` writes both files independently. Bytes from the profile-
+  root contribution do not appear in `.claude/CLAUDE.md`, and vice versa. No
+  cross-destination content leak.
+- **BC-4** — On a legacy project (no profile-root `CLAUDE.md` anywhere),
+  running `claude-profiles init` injects markers into the existing project-
+  root `CLAUDE.md` (preserving every prior byte). A subsequent `use` of a
+  profile that has no profile-root contribution leaves the file at exactly
+  what `init` produced — the section between the markers stays empty
+  (equivalent to `init`'s default block).
+
+In short: the projectRoot destination is *opt-in*. If no contributor in the
+resolution graph supplies a profile-root `CLAUDE.md`, the splice path is
+never entered and the user's existing project-root file is untouched.
 
 ## Troubleshooting
 

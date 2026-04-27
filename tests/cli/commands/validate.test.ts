@@ -186,6 +186,11 @@ describe("validate (R33)", () => {
         "project-root CLAUDE.md is missing claude-profiles markers",
       );
       expect((thrown as CliUserError).message).toContain("claude-profiles init");
+      // cw6.2 followup: error must name the file path so grep/log scraping is
+      // consistent with the materialize-time and drift-detect error messages.
+      expect((thrown as CliUserError).message).toContain(
+        `(file: ${path.join(fx.projectRoot, "CLAUDE.md")}`,
+      );
     });
 
     it("active profile + root CLAUDE.md present without markers → exit 1", async () => {

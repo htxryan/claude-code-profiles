@@ -177,19 +177,27 @@ async function compareRootClaudeMdSection(
     };
   }
 
-  // Section is locatable: hash the bytes between markers and compare. Note
-  // we hash the section as utf8 bytes, matching the materialize-side hash
-  // (the splice writer encodes via Buffer.from(sectionBytes, "utf8") before
-  // hashing — see applyRootSplice in src/state/materialize.ts).
+  // Section is locatable: compare bytes between markers against the recorded
+  // fingerprint. Hash the section as utf8 bytes, matching the materialize-
+  // side hash (the splice writer encodes via Buffer.from(sectionBytes,
+  // "utf8") before hashing — see applyRootSplice in src/state/materialize.ts).
+  //
+  // cw6.1 followup: a size mismatch is a sufficient drift signal on its own
+  // (sha256 collisions across different byte lengths are not the threat
+  // model — content with a different size is by definition different
+  // content). Returning early on size mismatch saves the hash on a guaranteed
+  // drift, and short-circuits content equality on size match without hashing
+  // when sizes differ. We still hash on size-match because two different
+  // sections of equal length must hash to the same value to be equal, and
+  // the recorded `contentHash` is the source of truth for byte-equality.
   const sectionBuf = Buffer.from(parsed.section, "utf8");
-  if (sectionBuf.length === recorded.size) {
-    // Quick size-check first to skip hashing in the common no-drift case.
-    // Whole-file mtime is unreliable here (user may have edited bytes
-    // outside the section), so size is our only fast-path; if it matches we
-    // still hash to be sure (consistent with the slow-path comparator's
-    // semantics). For mismatches we know there's drift without hashing,
-    // but we hash anyway for consistency and so the entry's status comes
-    // from the same code path.
+  if (sectionBuf.length !== recorded.size) {
+    return {
+      relPath: "CLAUDE.md",
+      status: "modified",
+      provenance,
+      destination: "projectRoot",
+    };
   }
   const liveHash = hashBytes(sectionBuf);
   if (liveHash === recorded.contentHash) {

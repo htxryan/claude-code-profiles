@@ -25,6 +25,35 @@
  * (a-c) completion and step d, the next reconcile sees the materialize-side
  * pending/prior empty and the state file still pointing at the old profile —
  * the user can re-issue the swap and it'll find the persist already in place.
+ *
+ * Resolution ordering — j44 followup (intentional / snapshot semantics):
+ *
+ *   `persistAndMaterialize` is given a `newPlan` + `newMerged` that the
+ *   *caller* (E5 swap orchestration) resolved BEFORE the persist ran. We do
+ *   NOT re-resolve after the persist write-back lands. So even if the new
+ *   profile extends the active one (e.g. `use prod --on-drift=persist`
+ *   where `prod extends dev`), the materialized prod is built from the
+ *   pre-persist source state of `dev/` and will NOT inherit the just-
+ *   persisted edits via the extends chain.
+ *
+ *   This is the deliberate semantics ("persist preserves my work, swap is
+ *   decoupled from inheritance"): the swap target the user named was
+ *   resolved at command-issue time and is what gets materialized;
+ *   `--on-drift=persist` is purely a transactional write-back to the
+ *   PREVIOUS profile so the user's edits are not lost. To pick up persisted
+ *   edits in an extending profile, the user re-runs `use <child>` after
+ *   persist completes — that resolve sees the freshly-persisted parent
+ *   bytes and merges them in.
+ *
+ *   The alternative (re-resolve post-persist) would auto-include the just-
+ *   persisted edits, which sounds friendlier but: (1) doubles the resolve
+ *   cost in the common case, (2) makes the materialized output depend on
+ *   *whether* drift was persisted vs discarded vs absent, breaking the
+ *   "what I named is what I get" mental model, and (3) opens a weird
+ *   feedback loop where persist's write-back can transitively change the
+ *   `.claude/` tree the swap is producing. Snapshot semantics is simpler
+ *   and pinned by `tests/cli/commands/use-sync.test.ts` /
+ *   `tests/state/persist.test.ts`.
  */
 
 import { promises as fs } from "node:fs";

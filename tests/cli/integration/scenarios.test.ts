@@ -404,13 +404,13 @@ describe("E7 scenarios S1-S18 (cross-epic CLI gate)", () => {
 
   // ──────────────────────────────────────────────────────────────────────
   // S16: Crash mid-materialization (R16, R16a) — next CLI invocation
-  //      reaches a recoverable state via --on-drift=discard. The current
-  //      orchestrator's drift detection runs before reconcile, so a bare
-  //      `use` aborts with exit-1; the user (or hooks) can recover with
-  //      an explicit drift choice. Tracked as a separate behavior gap in
-  //      claude-code-profiles-ch5.
+  //      reconciles via the .prior/ rename-back protocol BEFORE drift
+  //      detection runs, so a bare `use` recovers cleanly without
+  //      requiring --on-drift= (claude-code-profiles-ch5 fix). The
+  //      reconcile clears both staging artifacts and proceeds with the
+  //      requested swap.
   // ──────────────────────────────────────────────────────────────────────
-  it("S16: stale .prior/.pending from a crashed materialize → discard-recovery succeeds", async () => {
+  it("S16: stale .prior/.pending from a crashed materialize → bare `use` recovers cleanly (ch5)", async () => {
     await ensureBuilt();
     fx = await setupActive("a");
     const profilesDir = path.join(fx.projectRoot, ".claude-profiles");
@@ -425,18 +425,13 @@ describe("E7 scenarios S1-S18 (cross-epic CLI gate)", () => {
     await fs.mkdir(pendingDir, { recursive: true });
     await fs.writeFile(path.join(pendingDir, "STALE.md"), "STALE");
 
-    // Bare `use` in non-interactive mode hits the drift gate (exit 1).
-    const naive = await runCli({
-      args: ["--cwd", fx.projectRoot, "use", "b"],
-    });
-    expect(naive.exitCode).toBe(1);
-    expect(naive.stderr).toContain("--on-drift=");
-
-    // With --on-drift=discard the orchestrator proceeds, materialize's
-    // internal reconcile sweeps the stale .prior/ and .pending/, and the
-    // user lands on a coherent live tree matching the new target.
+    // ch5 followup: a bare non-interactive `use` MUST recover without
+    // requiring an explicit --on-drift= flag. The swap orchestrator's
+    // entrypoint reconcile renames .prior/ back to .claude/ before the
+    // outside-lock drift detect runs, so the gate sees the live tree
+    // intact (no false-positive drift) and the swap proceeds.
     const r = await runCli({
-      args: ["--cwd", fx.projectRoot, "--on-drift=discard", "use", "b"],
+      args: ["--cwd", fx.projectRoot, "use", "b"],
     });
     expect(r.exitCode).toBe(0);
     expect(

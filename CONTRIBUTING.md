@@ -15,6 +15,7 @@ src/
 │   ├── commands/    # one file per verb (init, use, list, status, ...)
 │   └── service/     # orchestration shared by use + sync (the swap pipeline)
 ├── errors/          # typed error classes consumed by exit-code mapping
+├── markers.ts       # source of truth for project-root CLAUDE.md managed-block markers (cw6 / spec §12)
 └── index.ts         # public package entry
 tests/               # mirrors src/; integration suites under tests/cli/integration/
 ```

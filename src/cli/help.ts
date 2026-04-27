@@ -227,7 +227,7 @@ const VERBS: Record<string, VerbHelp> = {
     ],
     exitCodes: [
       "0  all profiles validated cleanly",
-      "1  unparseable profile.json (invalid manifest)",
+      "1  unparseable profile.json (invalid manifest); project-root CLAUDE.md is missing claude-profiles markers (run `claude-profiles init`)",
       "3  any profile failed (cycle, missing include, missing extends parent, conflict)",
     ],
   },

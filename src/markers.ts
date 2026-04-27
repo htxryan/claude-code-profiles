@@ -10,8 +10,10 @@
  *
  * Capture groups:
  *   1. Version number (must match between :begin and :end via backref).
- *   2. Optional namespace tail (text between version and `-->`, e.g. " " in
- *      the canonical form; reserved for future namespacing).
+ *   2. Optional namespace tail (text between version and `-->`; whitespace-
+ *      only in the canonical form — a single space, since the canonical
+ *      marker is `<!-- claude-profiles:v1:begin -->`; reserved for future
+ *      namespacing).
  *   3. The managed body — bytes the tool owns. Non-greedy so multiple managed
  *      blocks in a single file (a future possibility) do not collapse into
  *      one match.
@@ -27,6 +29,13 @@
  * consumers (init writes one shape, validate looks for another). The literal
  * here is verbatim from the spec; if the spec changes, this constant changes,
  * and every consumer benefits automatically.
+ *
+ * @internal — exported only so test introspection (`tests/markers.test.ts`)
+ * can pin the regex shape without re-importing it from production code.
+ * Production consumers MUST go through {@link parseMarkers} /
+ * {@link renderManagedBlock} for the source-of-truth contract; treating the
+ * raw regex as public API would re-create the very source-of-truth split this
+ * module exists to prevent.
  */
 export const MARKER_REGEX =
   /<!-- claude-profiles:v(\d+):begin([^>]*)-->([\s\S]*?)<!-- claude-profiles:v\1:end\2-->/;
@@ -74,6 +83,24 @@ export type ParseResult = ParseFound | ParseFailed;
  *   - version mismatch (begin v1 / end v2) — handled implicitly via the `\1`
  *     backref in the regex; the lone-marker check below catches the leftover.
  *   - more than one well-formed block.
+ *
+ * Line-ending policy (cw6.5 followup): parseMarkers is CRLF-tolerant. The
+ * canonical regex's `[^>]*` (capture group 2) and `[\s\S]*?` (capture group
+ * 3) both naturally match `\r`, so a CLAUDE.md saved with CRLF terminators
+ * — Windows editors, default `git config core.autocrlf=true` checkouts —
+ * parses identically to the LF form. The `before`/`section`/`after` slices
+ * are returned with their on-disk bytes intact (CRLF preserved as CRLF, LF
+ * as LF). The lone-marker malformed-check below also works on CRLF because
+ * its regex anchors only on `<!-- claude-profiles:v\d+:(begin|end)`.
+ *
+ * Round-trip caveat: {@link renderManagedBlock} emits LF only. A user whose
+ * pre-existing CLAUDE.md is CRLF will end up with LF *inside* the managed
+ * block after the next materialize while LF/CRLF *outside* the markers is
+ * preserved byte-for-byte (because before/after are copied verbatim). We
+ * accept this asymmetry: the managed block is tool-owned, and forcing the
+ * managed bytes to match the user's surrounding line endings would require
+ * sniffing + re-encoding, which adds complexity for a vanishingly small
+ * win on a tool that runs in a developer environment.
  */
 export function parseMarkers(content: string): ParseResult {
   // Single-match check: the canonical regex (no `g`) returns null if no
@@ -191,6 +218,26 @@ export function extractSectionBody(section: string): string {
 }
 
 /**
+ * Thrown by {@link injectMarkersIntoFile} when the input file already
+ * contains a malformed claude-profiles block (lone `:begin`, lone `:end`,
+ * version mismatch, or multiple blocks). Init refuses to append a second
+ * fresh block on top of the broken bytes — that would leave the file
+ * STILL malformed (now with two block fragments) and trip subsequent
+ * `validate` / `use` calls in a confusing way. cw6.3 followup: fail closed
+ * so the user knows to manually repair the file before re-running init.
+ *
+ * The error message is actionable: it names the exact remediation (delete
+ * the partial markers and re-run init).
+ */
+export class MalformedMarkersError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "MalformedMarkersError";
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
  * For init: take existing CLAUDE.md content and ensure markers are present.
  *
  *   - If markers already exist (well-formed): return input unchanged (no-op).
@@ -200,17 +247,25 @@ export function extractSectionBody(section: string): string {
  *     in a newline, so we never silently mutate the user's trailing-newline
  *     convention.
  *
- * Malformed input is treated like absent: the safest action for init is to
- * leave the broken bytes alone above and append a new block — but this case
- * really shouldn't happen in practice because validate (R44) catches
- * malformed before init can do anything wrong. Init's job here is "guarantee
- * markers exist", not "clean up after a broken upstream tool".
+ * Malformed input — `parseMarkers` returns `reason: "malformed"` (lone
+ * `:begin` or `:end`, version mismatch, or multi-block) — fails closed by
+ * throwing {@link MalformedMarkersError} (cw6.3 followup). Appending a
+ * second fresh block on top of broken bytes would leave the file still
+ * malformed, just with two block fragments instead of one, and the user
+ * would discover this only at the next `validate` / `use`. Failing here
+ * shifts the discovery to init time and points the user at the repair
+ * (delete the partial markers manually, re-run init).
  */
 export function injectMarkersIntoFile(content: string): string {
   const parsed = parseMarkers(content);
   if (parsed.found) {
     // Idempotent: well-formed markers already present → no-op.
     return content;
+  }
+  if (parsed.reason === "malformed") {
+    throw new MalformedMarkersError(
+      "CLAUDE.md contains a malformed claude-profiles marker block (lone `:begin`, lone `:end`, version mismatch, or multiple blocks). Refusing to append a second block on top of broken markers — please delete the partial marker text manually and re-run `claude-profiles init`.",
+    );
   }
   // Append a fresh empty managed block. Preserve the exact trailing-newline
   // state of `content`: if it ends in `\n` we don't double up; if it doesn't,

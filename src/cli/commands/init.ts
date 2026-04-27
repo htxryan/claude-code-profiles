@@ -31,6 +31,7 @@ import process from "node:process";
 
 import {
   injectMarkersIntoFile,
+  MalformedMarkersError,
   parseMarkers,
   renderManagedBlock,
 } from "../../markers.js";
@@ -326,9 +327,23 @@ async function ensureRootClaudeMdMarkers(
     return { outcome: "already", path: claudeMdPath };
   }
 
-  // File exists, no markers (or malformed — injectMarkersIntoFile handles
-  // both by appending). Preserve all prior bytes; append marker block.
-  const updated = injectMarkersIntoFile(existing);
+  // File exists, no markers OR malformed markers. injectMarkersIntoFile
+  // handles "absent" by appending; it throws MalformedMarkersError on
+  // "malformed" (cw6.3 followup) so we don't silently produce a file with
+  // two broken block fragments. Translate that into a CliUserError so the
+  // dispatcher's exit-code mapper surfaces exit 1 with the path included.
+  let updated: string;
+  try {
+    updated = injectMarkersIntoFile(existing);
+  } catch (err: unknown) {
+    if (err instanceof MalformedMarkersError) {
+      throw new CliUserError(
+        `${err.message} (file: ${claudeMdPath})`,
+        EXIT_USER_ERROR,
+      );
+    }
+    throw err;
+  }
   await fs.mkdir(tmpDir, { recursive: true });
   const tmpPath = uniqueAtomicTmpPath(tmpDir, claudeMdPath);
   try {

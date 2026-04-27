@@ -206,3 +206,76 @@ describe("runSwap — interactive prompt path", () => {
     expect(result.choice).toBe("discard");
   });
 });
+
+// ch5 followup: a previous materialize killed mid-step (.claude/ rolled
+// aside to .prior/, .pending/ partially staged) must be reconciled by
+// runSwap BEFORE the outside-lock drift detect runs. Without the entrypoint
+// reconcile, the drift gate reads a missing/half-written .claude/ tree and
+// reports false drift — auto-aborting the swap in non-interactive mode and
+// stranding the user in an inconsistent state.
+describe("runSwap — entrypoint reconcile (ch5 followup, R16/R16a)", () => {
+  it("simulates a crashed materialize (.prior/ exists, .claude/ missing) and recovers", async () => {
+    fx = await setupTwoProfiles();
+    const paths = buildStatePaths(fx.projectRoot);
+    // Capture the live tree (the last successful state for profile "a").
+    const live = path.join(paths.claudeDir);
+    expect(await fs.stat(live)).toBeDefined();
+    // Simulate the crash window between rename-b and rename-c: rename
+    // .claude/ aside to .prior/. There is no .pending/ at this point.
+    await fs.rename(live, paths.priorDir);
+    // Sanity check: .claude/ is gone, .prior/ holds the bytes.
+    await expect(fs.stat(live)).rejects.toThrow();
+    expect(await fs.stat(paths.priorDir)).toBeDefined();
+
+    // A non-interactive swap with NO --on-drift flag MUST succeed (not
+    // auto-abort with exit 1) because the half-written state is recoverable
+    // via the entrypoint reconcile and there is no real drift.
+    const result = await runSwap({
+      paths,
+      targetProfile: "b",
+      mode: "non-interactive",
+      onDriftFlag: null,
+      prompt: NEVER_CALLED,
+      signalHandlers: false,
+    });
+    expect(result.action).toBe("materialized");
+    expect(result.activeAfter).toBe("b");
+    // The .prior/ leftover is gone: reconcile renamed it back to .claude/,
+    // then the swap materialized "b" on top of it.
+    await expect(fs.stat(paths.priorDir)).rejects.toThrow();
+    // Live tree now reflects "b".
+    const live2 = await fs.readFile(path.join(paths.claudeDir, "CLAUDE.md"), "utf8");
+    expect(live2).toBe("B\n");
+  });
+
+  it("simulates a leftover .pending/ (step-a crash) and recovers without false drift", async () => {
+    fx = await setupTwoProfiles();
+    const paths = buildStatePaths(fx.projectRoot);
+    // Simulate a crash during step a: stale .pending/ left behind, .claude/
+    // intact. Without reconcile, this isn't a drift signal anyway, but the
+    // entrypoint reconcile must clean it up so the in-lock materialize
+    // doesn't see a stale staging dir.
+    await fs.mkdir(paths.pendingDir, { recursive: true });
+    await fs.writeFile(path.join(paths.pendingDir, "stale.txt"), "junk");
+
+    const result = await runSwap({
+      paths,
+      targetProfile: "b",
+      mode: "non-interactive",
+      onDriftFlag: null,
+      prompt: NEVER_CALLED,
+      signalHandlers: false,
+    });
+    expect(result.action).toBe("materialized");
+    // .pending/ is no longer holding stale bytes (either gone or contains
+    // only the next operation's transient files — but not "stale.txt").
+    const pendingExists = await fs
+      .stat(paths.pendingDir)
+      .then(() => true)
+      .catch(() => false);
+    if (pendingExists) {
+      const entries = await fs.readdir(paths.pendingDir);
+      expect(entries).not.toContain("stale.txt");
+    }
+  });
+});

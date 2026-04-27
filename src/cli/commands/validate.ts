@@ -184,8 +184,11 @@ async function assertRootClaudeMdMarkers(projectRoot: string): Promise<void> {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") {
       throw new CliUserError(
         // Marker pair appended for ppo/AC: a user who accidentally deleted
-        // the markers needs to know exactly what bytes to put back.
-        "project-root CLAUDE.md is missing claude-profiles markers — run `claude-profiles init` to add them (expected: <!-- claude-profiles:v1:begin --> ... <!-- claude-profiles:v1:end -->)",
+        // the markers needs to know exactly what bytes to put back. The
+        // `(file: <path>)` suffix matches the materialize-time and drift
+        // detect error messages so grep/log scraping is consistent across
+        // the three sites that emit this remediation (cw6.2 followup).
+        `project-root CLAUDE.md is missing claude-profiles markers — run \`claude-profiles init\` to add them (file: ${claudeMdPath}; expected: <!-- claude-profiles:v1:begin --> ... <!-- claude-profiles:v1:end -->)`,
         EXIT_USER_ERROR,
       );
     }

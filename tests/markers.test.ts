@@ -12,6 +12,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   MARKER_REGEX,
+  MalformedMarkersError,
   injectMarkersIntoFile,
   parseMarkers,
   renderManagedBlock,
@@ -144,6 +145,64 @@ describe("parseMarkers", () => {
     expect(r.before).toBe("before\n");
     expect(r.after).toBe("\nafter");
   });
+
+  // cw6.5 followup: parseMarkers must tolerate CRLF line endings (Windows
+  // editors / default `git config core.autocrlf=true` checkouts). Both the
+  // happy and malformed paths are pinned so a future regex tightening that
+  // breaks Windows users surfaces in CI rather than after a bug report.
+  describe("CRLF tolerance (cw6.5)", () => {
+    it("parses a well-formed CRLF file (happy path)", () => {
+      const text = [
+        "user header",
+        "<!-- claude-profiles:v1:begin -->",
+        "<!-- Managed block. -->",
+        "",
+        "managed body line",
+        "<!-- claude-profiles:v1:end -->",
+        "user footer",
+        "",
+      ].join("\r\n");
+      const r = parseMarkers(text);
+      expect(r.found).toBe(true);
+      if (!r.found) return;
+      expect(r.version).toBe(1);
+      // CRLF bytes are preserved verbatim in before/after slices.
+      expect(r.before).toBe("user header\r\n");
+      expect(r.after).toBe("\r\nuser footer\r\n");
+      expect(r.section).toContain("managed body line");
+    });
+
+    it("flags a CRLF file with only :begin as malformed (not absent)", () => {
+      const text = [
+        "<!-- claude-profiles:v1:begin -->",
+        "no end",
+        "",
+      ].join("\r\n");
+      const r = parseMarkers(text);
+      expect(r.found).toBe(false);
+      if (r.found) return;
+      expect(r.reason).toBe("malformed");
+    });
+
+    it("flags a CRLF file with only :end as malformed (not absent)", () => {
+      const text = [
+        "no begin",
+        "<!-- claude-profiles:v1:end -->",
+        "",
+      ].join("\r\n");
+      const r = parseMarkers(text);
+      expect(r.found).toBe(false);
+      if (r.found) return;
+      expect(r.reason).toBe("malformed");
+    });
+
+    it("a CRLF file with no markers reports absent (not malformed)", () => {
+      const r = parseMarkers("user content\r\nmore content\r\n");
+      expect(r.found).toBe(false);
+      if (r.found) return;
+      expect(r.reason).toBe("absent");
+    });
+  });
 });
 
 describe("renderManagedBlock", () => {
@@ -216,6 +275,42 @@ describe("injectMarkersIntoFile", () => {
     const original = "no trailing newline";
     const out = injectMarkersIntoFile(original);
     expect(out.startsWith(original)).toBe(true);
+  });
+
+  // cw6.3 followup: malformed input must fail closed rather than silently
+  // appending a second fresh block on top of partial markers.
+  it("throws MalformedMarkersError when input has a lone :begin (not appended-to)", () => {
+    const original = "<!-- claude-profiles:v1:begin -->\nno end\n";
+    expect(() => injectMarkersIntoFile(original)).toThrow(MalformedMarkersError);
+  });
+
+  it("throws MalformedMarkersError when input has a lone :end", () => {
+    const original = "no begin\n<!-- claude-profiles:v1:end -->\n";
+    expect(() => injectMarkersIntoFile(original)).toThrow(MalformedMarkersError);
+  });
+
+  it("throws MalformedMarkersError when input has version-mismatched markers", () => {
+    const original = [
+      "<!-- claude-profiles:v1:begin -->",
+      "body",
+      "<!-- claude-profiles:v2:end -->",
+      "",
+    ].join("\n");
+    expect(() => injectMarkersIntoFile(original)).toThrow(MalformedMarkersError);
+  });
+
+  it("throws MalformedMarkersError when input has multiple well-formed blocks", () => {
+    const original = [
+      "<!-- claude-profiles:v1:begin -->",
+      "first",
+      "<!-- claude-profiles:v1:end -->",
+      "",
+      "<!-- claude-profiles:v1:begin -->",
+      "second",
+      "<!-- claude-profiles:v1:end -->",
+      "",
+    ].join("\n");
+    expect(() => injectMarkersIntoFile(original)).toThrow(MalformedMarkersError);
   });
 
   it("preserves multiline user content with embedded HTML byte-for-byte", () => {

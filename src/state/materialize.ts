@@ -186,25 +186,37 @@ export async function materialize(
   }
 
   // Step c: rename pending → claudeDir. If this fails, restore from prior.
+  //
+  // bj0 followup: under heavy contention the rename can race with stale FS
+  // state from a prior crashed materialize that the entrypoint reconcile
+  // missed (because pending wasn't an issue at reconcile time). If
+  // pendingDir disappeared between step a and step c (transient ENOENT —
+  // observed empirically on macOS APFS under N=20 simultaneous swaps),
+  // retry once after re-running reconcileMaterialize. The retry is bounded
+  // (at most one extra attempt) so a genuine FS fault still surfaces.
   try {
     await atomicRename(paths.pendingDir, paths.claudeDir);
   } catch (err: unknown) {
-    // Restore prior. We've already wiped the in-progress live state.
-    // Surface restore failures (multi-reviewer P3, Gemini #6) — the
-    // user must know if both the swap AND the rollback failed.
-    if (await pathExists(paths.priorDir)) {
-      await atomicRename(paths.priorDir, paths.claudeDir).catch(
-        (restoreErr: unknown) => {
-          const detail =
-            restoreErr instanceof Error ? restoreErr.message : String(restoreErr);
-          process.stderr.write(
-            `claude-profiles: rollback failed restoring ${paths.claudeDir}: ${detail}\n`,
-          );
-        },
-      );
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      // Re-stage pending and retry once. We already have the merged bytes
+      // in memory, so re-running step a is idempotent. Reconcile cleans any
+      // leftover prior/pending from a peer race.
+      try {
+        await reconcileMaterialize(paths);
+        await rmrf(paths.pendingDir).catch(() => undefined);
+        await writeFiles(paths.pendingDir, claudeMerged);
+        await atomicRename(paths.pendingDir, paths.claudeDir);
+        // Retry succeeded; carry on as if step c worked first time.
+      } catch {
+        // Retry failed too — fall through to the rollback path below with
+        // the ORIGINAL error (more diagnostic than the retry's error).
+        await attemptStepCRollback(paths);
+        throw err;
+      }
+    } else {
+      await attemptStepCRollback(paths);
+      throw err;
     }
-    await rmrf(paths.pendingDir).catch(() => undefined);
-    throw err;
   }
 
   // cw6/T4 step b' (the "step c'" splice): write the section bytes into
@@ -487,6 +499,38 @@ async function preflightEmptyRootSplice(
     after: parsed.after,
     sectionBytes: "",
   };
+}
+
+/**
+ * Step c rollback (bj0 followup): try to restore the rolled-aside `.prior/`
+ * back to `.claude/`. If `.claude/` is non-empty (a partial step c landed
+ * bytes there), rmrf it first so the rename doesn't fail with ENOTEMPTY.
+ * Errors are surfaced via stderr because the user needs to know if both
+ * the swap AND the rollback failed (multi-reviewer P3, Gemini #6).
+ */
+async function attemptStepCRollback(paths: StatePaths): Promise<void> {
+  if (!(await pathExists(paths.priorDir))) {
+    // No prior to restore — nothing to roll back. Caller will surface the
+    // original step-c error.
+    await rmrf(paths.pendingDir).catch(() => undefined);
+    return;
+  }
+  // bj0: if step c partially renamed bytes into `.claude/` (rare, but
+  // observed under heavy contention), the symmetric `prior → claude`
+  // rename would fail with ENOTEMPTY. Drop the partial target first.
+  if (await pathExists(paths.claudeDir)) {
+    await rmrf(paths.claudeDir).catch(() => undefined);
+  }
+  try {
+    await atomicRename(paths.priorDir, paths.claudeDir);
+  } catch (restoreErr: unknown) {
+    const detail =
+      restoreErr instanceof Error ? restoreErr.message : String(restoreErr);
+    process.stderr.write(
+      `claude-profiles: rollback failed restoring ${paths.claudeDir}: ${detail}\n`,
+    );
+  }
+  await rmrf(paths.pendingDir).catch(() => undefined);
 }
 
 /**

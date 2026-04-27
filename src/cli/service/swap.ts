@@ -38,6 +38,7 @@ import { merge } from "../../merge/index.js";
 import { resolve } from "../../resolver/index.js";
 import {
   readStateFile,
+  reconcileMaterialize,
   withLock,
   type StatePaths,
 } from "../../state/index.js";
@@ -94,6 +95,32 @@ export interface SwapResult {
  * the right exit code (LockHeldError → 3, ResolverError → 3, etc.).
  */
 export async function runSwap(opts: SwapOptions): Promise<SwapResult> {
+  // 0. Reconcile any leftover .pending/.prior from a crashed prior
+  //    materialize BEFORE the outside-lock drift detect (ch5 followup).
+  //    Without this, a killed materialize that left `.claude/` rolled aside
+  //    to `.prior/` (mid step b) would make the outside-lock detect see a
+  //    missing live tree and treat it as drift, exiting 1 in non-interactive
+  //    mode. The materialize() function reconciles internally on the next
+  //    write path, but the drift gate runs OUTSIDE the lock first to drive
+  //    the prompt — so the spec contract ("Next CLI invocation reconciles
+  //    via .prior/ rename-back" — R16/R16a) needed an explicit reconcile
+  //    at the swap entrypoint to hold at the binary surface.
+  //
+  //    Reconcile mutates the filesystem (renames .prior → .claude, etc.),
+  //    so we run it under a short lock acquisition. The cost is one extra
+  //    flock pair on the steady-state path (where reconcile is a no-op
+  //    after two stat calls); the win is that a crashed-mid-write situation
+  //    doesn't masquerade as drift. The main swap critical section below
+  //    re-acquires the lock after drift detection, which is unavoidable —
+  //    the user-facing prompt happens between the two acquisitions.
+  await withLock(
+    opts.paths,
+    async () => {
+      await reconcileMaterialize(opts.paths);
+    },
+    { signalHandlers: opts.signalHandlers },
+  );
+
   // 1. Resolve + merge OUTSIDE the lock. Resolution is a read-only operation
   //    over .claude-profiles/ that doesn't conflict with concurrent work.
   //    R43: reads bypass the lock.

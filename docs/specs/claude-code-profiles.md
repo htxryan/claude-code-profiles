@@ -339,7 +339,7 @@ The canonical parser regex used to locate the managed block is:
 
 Capture groups:
 1. Version number (must match between `:begin` and `:end`).
-2. Optional namespace tail (text between the version and `-->`; empty in the canonical form, reserved for future namespacing).
+2. Optional namespace tail (text between the version and `-->`; whitespace-only in the canonical form — a single space, since the canonical marker is `<!-- claude-profiles:v1:begin -->` — and reserved for future namespacing).
 3. The managed body — the bytes the tool owns. `[\s\S]*?` is non-greedy so multiple managed blocks within a single file (a future possibility) do not collapse into one.
 
 A well-formed file contains exactly one match. Zero matches means the markers are missing (handled per R44/R45). More than one match is reserved and currently rejected; v1 implementations may treat it as malformed.
