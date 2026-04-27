@@ -25,7 +25,7 @@ function ctxFor(json = false) {
 }
 
 function global(json = false): GlobalOptions {
-  return { json, cwd: ".", onDrift: null, noColor: false };
+  return { json, cwd: ".", onDrift: null, noColor: false, quiet: false };
 }
 
 describe("dispatch — top-level routes", () => {
@@ -83,8 +83,8 @@ describe("dispatch — every command kind dispatches without throwing on baselin
     const cases: Command[] = [
       { kind: "list" },
       { kind: "status" },
-      { kind: "drift", preCommitWarn: false, verbose: false },
-      { kind: "diff", a: "a", b: "b" },
+      { kind: "drift", preCommitWarn: false, verbose: false, preview: false },
+      { kind: "diff", a: "a", b: "b", preview: false },
       { kind: "validate", profile: null },
       { kind: "new", profile: "scratch", description: "test" },
     ];

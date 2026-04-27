@@ -73,6 +73,7 @@ export async function dispatch(
         output: ctx.output,
         preCommitWarn: command.preCommitWarn,
         verbose: command.verbose,
+        preview: command.preview,
       });
 
     case "diff":
@@ -81,6 +82,7 @@ export async function dispatch(
         output: ctx.output,
         a: command.a,
         b: command.b,
+        preview: command.preview,
       });
 
     case "validate":

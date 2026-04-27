@@ -25,24 +25,43 @@ export interface OutputChannel {
 
 export interface OutputChannelOptions {
   json: boolean;
+  /**
+   * When true, silence human print()/warn() while keeping json()/error()
+   * intact. Mutually-exclusive with `json` at the parser level (azp); this
+   * field exists independently because the parser has already enforced the
+   * exclusion by the time we build the channel.
+   */
+  quiet?: boolean;
   /** Optional injection points for tests. Default to process streams. */
   stdout?: NodeJS.WritableStream;
   stderr?: NodeJS.WritableStream;
 }
 
 /**
- * Build the output channel. Production callers pass `{ json }`; tests inject
- * `{ json, stdout: capturingWriter, stderr: capturingWriter }` to assert.
+ * Build the output channel. Production callers pass `{ json }` or
+ * `{ quiet }`; tests inject `{ json, stdout: capturingWriter,
+ * stderr: capturingWriter }` to assert.
+ *
+ * Silencing model (azp):
+ *   - jsonMode silences print() AND warn() (epic invariant: --json output is
+ *     STRICTLY one JSON object per command — no human noise).
+ *   - quiet silences print() AND warn() (script-friendly: side-effect-only
+ *     mode; the user is asking for the exit code, not chatter).
+ *   - error() always writes regardless — errors must surface.
+ *   - json() always writes regardless — structured payloads do not vanish in
+ *     quiet mode, even though no command currently emits json() in -q paths.
  */
 export function createOutput(opts: OutputChannelOptions): OutputChannel {
   const out = opts.stdout ?? process.stdout;
   const err = opts.stderr ?? process.stderr;
   const jsonMode = opts.json;
+  const quiet = opts.quiet === true;
+  const silenced = jsonMode || quiet;
 
   return {
     jsonMode,
     print(text: string): void {
-      if (jsonMode) return;
+      if (silenced) return;
       writeSafe(out, text.endsWith("\n") ? text : text + "\n");
     },
     json(payload: unknown): void {
@@ -66,7 +85,7 @@ export function createOutput(opts: OutputChannelOptions): OutputChannel {
       writeSafe(out, line);
     },
     warn(text: string): void {
-      if (jsonMode) return;
+      if (silenced) return;
       writeSafe(err, text.endsWith("\n") ? text : text + "\n");
     },
     error(text: string): void {

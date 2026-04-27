@@ -23,6 +23,7 @@ export type {
   LockHandle,
   ResolvedSourceRef,
   SectionFingerprint,
+  SourceFingerprint,
   StateFile,
 } from "./types.js";
 
@@ -44,6 +45,7 @@ export type { ReconcileOutcome } from "./reconcile.js";
 export {
   compareFingerprint,
   compareFingerprintWithMetrics,
+  computeSourceFingerprint,
   fingerprintFromMergedFiles,
   fingerprintTree,
   hashBytes,

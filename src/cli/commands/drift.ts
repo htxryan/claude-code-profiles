@@ -6,10 +6,16 @@
  * which is fail-open (always exits 0) and writes a brief warning to stderr.
  */
 
+import { promises as fs } from "node:fs";
+import * as path from "node:path";
+
 import { detectDrift, preCommitWarn, type DriftReport } from "../../drift/index.js";
-import { buildStatePaths } from "../../state/index.js";
+import { merge } from "../../merge/index.js";
+import { resolve } from "../../resolver/index.js";
+import { buildStatePaths, readStateFile, type StatePaths } from "../../state/index.js";
 import { formatStateWarning, meaningfulStateWarning } from "../format.js";
 import type { OutputChannel } from "../output.js";
+import { renderHeadPreview, renderUnifiedDiff } from "../preview.js";
 
 export interface DriftCommandPayload {
   schemaVersion: number;
@@ -35,6 +41,12 @@ export interface DriftCommandPayload {
   scannedFiles: number;
   fastPathHits: number;
   slowPathHits: number;
+  /** azp: total bytes added (sum of live file sizes for `added` entries). */
+  addedBytes: number;
+  /** azp: total bytes removed (sum of recorded sizes for `deleted` entries). */
+  removedBytes: number;
+  /** azp: sum of |liveSize - resolvedSize| across `modified` entries. */
+  changedBytes: number;
   warning: { code: string; detail: string } | null;
 }
 
@@ -49,6 +61,13 @@ export interface DriftOptions {
    * exposes the same fields regardless of this flag.
    */
   verbose: boolean;
+  /**
+   * azp: when true, render unified-diff content for each `modified` entry
+   * (and a head preview for `added` entries). Adds a small extra cost
+   * (resolve + merge of the active profile + per-file reads) so it's
+   * opt-in.
+   */
+  preview?: boolean;
 }
 
 export async function runDrift(opts: DriftOptions): Promise<number> {
@@ -62,8 +81,15 @@ export async function runDrift(opts: DriftOptions): Promise<number> {
 
   const report = await detectDrift(paths);
 
+  // azp: compute byte counts for the summary line. We need the recorded
+  // sizes from the state's fingerprint (for `deleted` and the resolved side
+  // of `modified`) and the live sizes via stat (for `added` and the live
+  // side of `modified`). Done upfront so the summary line and JSON payload
+  // both see the same numbers.
+  const byteCounts = await computeByteCounts(paths, report);
+
   if (opts.output.jsonMode) {
-    opts.output.json(reportToPayload(report));
+    opts.output.json(reportToPayload(report, byteCounts));
     return 0;
   }
 
@@ -85,11 +111,19 @@ export async function runDrift(opts: DriftOptions): Promise<number> {
     return 0;
   }
 
+  // azp: when --preview is set, resolve+merge the active profile so we have
+  // the canonical "should be" bytes to diff against the live drifted files.
+  // Skipped when preview is off — drift's standard call path is read-only
+  // and lock-free; we don't pay the resolve cost when the user didn't ask.
+  const resolvedBytes = opts.preview ? await loadResolvedBytes(opts.cwd, report) : null;
+
   opts.output.print(`active: ${report.active}`);
   const scanSuffix = opts.verbose
     ? ` (scanned ${report.scannedFiles}, fast=${report.fastPathHits}, slow=${report.slowPathHits})`
     : "";
-  opts.output.print(`drift: ${report.entries.length} file(s)${scanSuffix}`);
+  opts.output.print(
+    `drift: ${report.entries.length} file(s) (+${byteCounts.addedBytes} -${byteCounts.removedBytes} ~${byteCounts.changedBytes} bytes)${scanSuffix}`,
+  );
   for (const e of report.entries) {
     const prov = e.provenance.map((p) => p.id).join(", ");
     // padEnd(13) widens for 'unrecoverable' so columns line up; older
@@ -100,6 +134,14 @@ export async function runDrift(opts: DriftOptions): Promise<number> {
     if (e.error) {
       opts.output.print(`                 ${e.error}`);
     }
+    if (opts.preview && (e.status === "modified" || e.status === "added")) {
+      const body = await renderEntryPreview(paths, e, resolvedBytes);
+      if (body !== null) {
+        for (const line of body.split("\n")) {
+          opts.output.print(`      ${line}`);
+        }
+      }
+    }
   }
   if (report.warning && report.warning.code !== "Missing") {
     opts.output.warn(formatStateWarning(report.warning));
@@ -107,7 +149,136 @@ export async function runDrift(opts: DriftOptions): Promise<number> {
   return 0;
 }
 
-function reportToPayload(report: DriftReport): DriftCommandPayload {
+interface ByteCounts {
+  addedBytes: number;
+  removedBytes: number;
+  changedBytes: number;
+}
+
+/**
+ * azp: aggregate byte counts for drift's summary line. `modified` files use
+ * |liveSize - recordedSize|, `added` use the live size, `deleted` use the
+ * recorded size. `unrecoverable` entries (project-root CLAUDE.md with
+ * missing markers) contribute zero — there's no meaningful byte delta when
+ * we can't even locate the section.
+ *
+ * Live sizes come from stat(); recorded sizes come from `state.fingerprint.
+ * files`. The state file is already read by `detectDrift`, but it's cheap
+ * to re-read here (single small JSON file, already in OS cache) — keeps
+ * this helper self-contained.
+ */
+async function computeByteCounts(
+  paths: StatePaths,
+  report: DriftReport,
+): Promise<ByteCounts> {
+  if (!report.fingerprintOk || report.entries.length === 0) {
+    return { addedBytes: 0, removedBytes: 0, changedBytes: 0 };
+  }
+  const { state } = await readStateFile(paths);
+  let addedBytes = 0;
+  let removedBytes = 0;
+  let changedBytes = 0;
+  for (const e of report.entries) {
+    if (e.status === "unrecoverable") continue;
+    const recordedSize =
+      e.destination === "projectRoot"
+        ? state.rootClaudeMdSection?.size ?? 0
+        : state.fingerprint.files[e.relPath]?.size ?? 0;
+    let liveSize = 0;
+    try {
+      const filePath = liveFilePathFor(paths, e);
+      const stat = await fs.stat(filePath);
+      liveSize = stat.size;
+    } catch {
+      liveSize = 0;
+    }
+    if (e.status === "added") {
+      addedBytes += liveSize;
+    } else if (e.status === "deleted") {
+      removedBytes += recordedSize;
+    } else if (e.status === "modified") {
+      changedBytes += Math.abs(liveSize - recordedSize);
+    }
+  }
+  return { addedBytes, removedBytes, changedBytes };
+}
+
+function liveFilePathFor(
+  paths: Pick<StatePaths, "claudeDir" | "rootClaudeMdFile">,
+  entry: { relPath: string; destination?: ".claude" | "projectRoot" },
+): string {
+  if (entry.destination === "projectRoot") return paths.rootClaudeMdFile;
+  return path.join(paths.claudeDir, entry.relPath);
+}
+
+/**
+ * azp: resolve+merge the active profile and return a path→bytes map. Used
+ * by --preview rendering to compare drifted live files against the canonical
+ * resolved bytes. Returns null when resolve fails (unusual, but possible if
+ * a contributor disappeared between materialize and the drift check) — the
+ * preview just skips its body in that case; the entry summary still prints.
+ */
+async function loadResolvedBytes(
+  cwd: string,
+  report: DriftReport,
+): Promise<Map<string, Buffer> | null> {
+  if (report.active === null) return null;
+  try {
+    const plan = await resolve(report.active, { projectRoot: cwd });
+    const merged = await merge(plan);
+    const map = new Map<string, Buffer>();
+    for (const m of merged) {
+      // Key by relPath only — we never have a `.claude/` and a `projectRoot`
+      // collision in the report (the destination disambiguates), and the
+      // resolver guarantees one merged entry per (relPath, destination).
+      // For preview purposes the relPath is the unambiguous key into the
+      // entry's bytes.
+      map.set(m.path, Buffer.isBuffer(m.bytes) ? m.bytes : Buffer.from(m.bytes));
+    }
+    return map;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * azp: render a unified-diff or head preview body for one drift entry.
+ * Returns null when there's nothing meaningful to render (binary, missing
+ * resolved bytes, file unreadable). The caller indents the body when it
+ * prints it.
+ */
+async function renderEntryPreview(
+  paths: Pick<StatePaths, "claudeDir" | "rootClaudeMdFile">,
+  entry: { relPath: string; status: string; destination?: ".claude" | "projectRoot" },
+  resolvedBytes: Map<string, Buffer> | null,
+): Promise<string | null> {
+  const livePath = liveFilePathFor(paths, entry);
+  if (entry.status === "modified") {
+    if (resolvedBytes === null) return null;
+    const resolved = resolvedBytes.get(entry.relPath);
+    if (resolved === undefined) return null;
+    let live: Buffer;
+    try {
+      live = await fs.readFile(livePath);
+    } catch {
+      return null;
+    }
+    return renderUnifiedDiff(resolved, live);
+  }
+  if (entry.status === "added") {
+    let live: Buffer;
+    try {
+      live = await fs.readFile(livePath);
+    } catch {
+      return null;
+    }
+    return renderHeadPreview(live);
+  }
+  // 'deleted' entries get nothing extra per spec.
+  return null;
+}
+
+function reportToPayload(report: DriftReport, byteCounts: ByteCounts): DriftCommandPayload {
   return {
     schemaVersion: report.schemaVersion,
     active: report.active,
@@ -127,6 +298,9 @@ function reportToPayload(report: DriftReport): DriftCommandPayload {
     scannedFiles: report.scannedFiles,
     fastPathHits: report.fastPathHits,
     slowPathHits: report.slowPathHits,
+    addedBytes: byteCounts.addedBytes,
+    removedBytes: byteCounts.removedBytes,
+    changedBytes: byteCounts.changedBytes,
     warning: meaningfulStateWarning(report.warning),
   };
 }

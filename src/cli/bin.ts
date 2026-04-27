@@ -59,6 +59,7 @@ export async function main(argv: ReadonlyArray<string>): Promise<number> {
   const parsed = parseArgs(argv, process.cwd());
   const output = createOutput({
     json: parsed.ok ? parsed.invocation.global.json : false,
+    quiet: parsed.ok ? parsed.invocation.global.quiet : false,
   });
 
   if (!parsed.ok) {

@@ -140,4 +140,100 @@ describe("drift (R20, R40)", () => {
     expect(cap.stdout()).not.toMatch(/scanned/);
     expect(cap.stdout()).not.toMatch(/fast=/);
   });
+
+  it("byte-count summary surfaces +added -removed ~changed bytes (azp)", async () => {
+    fx = await setupActive();
+    const paths = buildStatePaths(fx.projectRoot);
+    // Modify CLAUDE.md from "A\n" (2 bytes) to "EDITED LONGER\n" (14 bytes) → ~12 bytes.
+    await fs.writeFile(path.join(paths.claudeDir, "CLAUDE.md"), "EDITED LONGER\n");
+    // Add a new file: 5 bytes.
+    await fs.writeFile(path.join(paths.claudeDir, "added.md"), "ABCDE");
+    // Delete agents/x.md (was "X\n" = 2 bytes) → -2.
+    await fs.unlink(path.join(paths.claudeDir, "agents", "x.md"));
+
+    const cap = captureOutput(false);
+    await runDrift({
+      cwd: fx.projectRoot,
+      output: cap.channel,
+      preCommitWarn: false,
+      verbose: false,
+    });
+    expect(cap.stdout()).toContain("(+5 -2 ~12 bytes)");
+
+    // JSON payload exposes the same numbers.
+    const j = captureOutput(true);
+    await runDrift({
+      cwd: fx.projectRoot,
+      output: j.channel,
+      preCommitWarn: false,
+      verbose: false,
+    });
+    const payload = j.jsonLines()[0] as DriftCommandPayload;
+    expect(payload.addedBytes).toBe(5);
+    expect(payload.removedBytes).toBe(2);
+    expect(payload.changedBytes).toBe(12);
+  });
+
+  it("--preview renders unified-diff body for modified entries (azp)", async () => {
+    fx = await setupActive();
+    const paths = buildStatePaths(fx.projectRoot);
+    await fs.writeFile(
+      path.join(paths.claudeDir, "CLAUDE.md"),
+      "MODIFIED\n",
+    );
+
+    const cap = captureOutput(false);
+    await runDrift({
+      cwd: fx.projectRoot,
+      output: cap.channel,
+      preCommitWarn: false,
+      verbose: false,
+      preview: true,
+    });
+    const out = cap.stdout();
+    // Resolved bytes are "A\n", live bytes are "MODIFIED\n".
+    expect(out).toMatch(/-A/);
+    expect(out).toMatch(/\+MODIFIED/);
+  });
+
+  it("--preview renders head preview for added entries (azp)", async () => {
+    fx = await setupActive();
+    const paths = buildStatePaths(fx.projectRoot);
+    await fs.writeFile(
+      path.join(paths.claudeDir, "newfile.md"),
+      "first\nsecond\nthird\n",
+    );
+
+    const cap = captureOutput(false);
+    await runDrift({
+      cwd: fx.projectRoot,
+      output: cap.channel,
+      preCommitWarn: false,
+      verbose: false,
+      preview: true,
+    });
+    const out = cap.stdout();
+    expect(out).toContain("first");
+    expect(out).toContain("second");
+  });
+
+  it("--preview substitutes binary placeholder for binary files (azp)", async () => {
+    fx = await setupActive();
+    const paths = buildStatePaths(fx.projectRoot);
+    // NUL byte in first 8KB → binary detection triggers.
+    await fs.writeFile(
+      path.join(paths.claudeDir, "CLAUDE.md"),
+      Buffer.concat([Buffer.from("text"), Buffer.from([0]), Buffer.from("more")]),
+    );
+
+    const cap = captureOutput(false);
+    await runDrift({
+      cwd: fx.projectRoot,
+      output: cap.channel,
+      preCommitWarn: false,
+      verbose: false,
+      preview: true,
+    });
+    expect(cap.stdout()).toMatch(/binary file — \d+ bytes/);
+  });
 });

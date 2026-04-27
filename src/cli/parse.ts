@@ -66,6 +66,7 @@ export function parseArgs(argv: ReadonlyArray<string>, defaultCwd: string): Pars
     cwd: defaultCwd,
     onDrift: null,
     noColor: false,
+    quiet: false,
   };
 
   // Side-channel for help/version short-circuit. We still want to parse the
@@ -115,9 +116,21 @@ export function parseArgs(argv: ReadonlyArray<string>, defaultCwd: string): Pars
       // Additive with NO_COLOR env: the flag turns colour off even when env
       // is unset. Threaded through dispatch into createStyle.
       global.noColor = true;
+    } else if (t === "--quiet" || t === "-q") {
+      // Silences human print()/warn() while preserving error() and exit code.
+      // Mutually-exclusive enforcement happens after the full pass so users
+      // see one consolidated error regardless of arg order.
+      global.quiet = true;
     } else {
       verbAndArgs.push(t);
     }
+  }
+
+  // --quiet and --json are mutually exclusive: --json already silences human
+  // output, and a script that asks for both is signalling unclear intent —
+  // surface the conflict at parse time rather than silently picking one.
+  if (global.quiet && global.json) {
+    return parseError(`--quiet and --json are mutually exclusive`);
   }
 
   // Version short-circuit beats verb dispatch (R29 doesn't list `--version`
@@ -215,27 +228,31 @@ export function parseArgs(argv: ReadonlyArray<string>, defaultCwd: string): Pars
     case "drift": {
       let preCommitWarn = false;
       let verbose = false;
+      let preview = false;
       const positional: string[] = [];
       for (const t of rest) {
         if (t === "--pre-commit-warn") preCommitWarn = true;
         else if (t === "--verbose") verbose = true;
+        else if (t === "--preview") preview = true;
         else if (t.startsWith("--")) return parseError(`drift: unknown flag "${t}"`);
         else positional.push(t);
       }
       if (positional.length > 0) return parseError(`drift takes no positional arguments; got "${positional.join(" ")}"`);
-      return ok({ command: { kind: "drift", preCommitWarn, verbose }, global });
+      return ok({ command: { kind: "drift", preCommitWarn, verbose, preview }, global });
     }
 
     case "diff": {
+      let preview = false;
       const positional: string[] = [];
       for (const t of rest) {
-        if (t.startsWith("--")) return parseError(`diff: unknown flag "${t}"`);
-        positional.push(t);
+        if (t === "--preview") preview = true;
+        else if (t.startsWith("--")) return parseError(`diff: unknown flag "${t}"`);
+        else positional.push(t);
       }
       if (positional.length === 0) return parseError(`diff requires at least one profile name`);
       if (positional.length > 2) return parseError(`diff takes one or two profile names; got "${positional.join(" ")}"`);
       return ok({
-        command: { kind: "diff", a: positional[0]!, b: positional[1] ?? null },
+        command: { kind: "diff", a: positional[0]!, b: positional[1] ?? null, preview },
         global,
       });
     }

@@ -42,7 +42,10 @@ describe("diff (R32, R40)", () => {
     expect(byPath["shared.md"]).toBe("changed");
     expect(byPath["only-in-a.md"]).toBe("added");
     expect(byPath["only-in-b.md"]).toBe("removed");
-    expect(payload.totals).toEqual({ added: 1, removed: 1, changed: 1 });
+    expect(payload.totals).toMatchObject({ added: 1, removed: 1, changed: 1 });
+    expect(typeof payload.totals.addedBytes).toBe("number");
+    expect(typeof payload.totals.removedBytes).toBe("number");
+    expect(typeof payload.totals.changedBytes).toBe("number");
     expect(JSON.parse(JSON.stringify(payload))).toEqual(payload);
   });
 
@@ -66,7 +69,14 @@ describe("diff (R32, R40)", () => {
     await runDiff({ cwd: fx.projectRoot, output: cap.channel, a: "a", b: "a" });
     const payload = cap.jsonLines()[0] as DiffPayload;
     expect(payload.entries).toEqual([]);
-    expect(payload.totals).toEqual({ added: 0, removed: 0, changed: 0 });
+    expect(payload.totals).toEqual({
+      added: 0,
+      removed: 0,
+      changed: 0,
+      addedBytes: 0,
+      removedBytes: 0,
+      changedBytes: 0,
+    });
   });
 
   it("one-arg form: compares against active profile", async () => {
@@ -96,5 +106,53 @@ describe("diff (R32, R40)", () => {
     await expect(
       runDiff({ cwd: fx.projectRoot, output: cap.channel, a: "a", b: null }),
     ).rejects.toBeInstanceOf(CliUserError);
+  });
+
+  it("byte-count summary shows added/removed/changed bytes (azp)", async () => {
+    fx = await makeFixture({
+      profiles: {
+        a: {
+          manifest: { name: "a" },
+          files: { "shared.md": "AAA\n", "only-a.md": "XYZ\n" },
+        },
+        b: {
+          manifest: { name: "b" },
+          files: { "shared.md": "BBBBBBB\n", "only-b.md": "QQ\n" },
+        },
+      },
+    });
+    const cap = captureOutput(false);
+    await runDiff({
+      cwd: fx.projectRoot,
+      output: cap.channel,
+      a: "a",
+      b: "b",
+    });
+    const out = cap.stdout();
+    // only-a.md (4 bytes) is added (in a, not b).
+    // only-b.md (3 bytes) is removed (in b, not a).
+    // shared.md changes from 8 bytes to 4 bytes — magnitude 4.
+    expect(out).toContain("(+4 -3 ~4 bytes)");
+  });
+
+  it("--preview renders unified-diff content for changed entries (azp)", async () => {
+    fx = await makeFixture({
+      profiles: {
+        a: { manifest: { name: "a" }, files: { "x.md": "alpha\nbeta\ngamma\n" } },
+        b: { manifest: { name: "b" }, files: { "x.md": "alpha\nBETA\ngamma\n" } },
+      },
+    });
+    const cap = captureOutput(false);
+    await runDiff({
+      cwd: fx.projectRoot,
+      output: cap.channel,
+      a: "a",
+      b: "b",
+      preview: true,
+    });
+    const out = cap.stdout();
+    // Indented preview body shows `-beta` (removed from b side) and `+BETA`.
+    expect(out).toMatch(/-BETA/);
+    expect(out).toMatch(/\+beta/);
   });
 });

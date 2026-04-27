@@ -46,6 +46,7 @@ import type { ResolvedPlan } from "../resolver/types.js";
 import { atomicRename, fsyncDir, pathExists, rmrf } from "./atomic.js";
 import { writeFiles } from "./copy.js";
 import {
+  computeSourceFingerprint,
   fingerprintFromMergedFiles,
   hashBytes,
   recordMtimes,
@@ -275,6 +276,13 @@ export async function materialize(
   // becomes null (we never wrote a section, so there's nothing to track).
   // If the new plan DID contribute one, we use the freshly computed
   // fingerprint from the splice that just landed.
+  // azp: capture the source fingerprint so `status` can detect "source files
+  // changed since last materialize — run sync" without re-resolving the plan.
+  // Computed AFTER the rename pair lands so any same-second mtime jitter from
+  // copyTree doesn't bake into the source fingerprint (we want to record the
+  // mtime the user's editor will write next, not our own write timestamps).
+  const sourceFingerprint = await computeSourceFingerprint(plan);
+
   const newState: StateFile = {
     schemaVersion: STATE_FILE_SCHEMA_VERSION,
     activeProfile: plan.profileName,
@@ -283,6 +291,7 @@ export async function materialize(
     fingerprint,
     externalTrustNotices: trustNotices,
     rootClaudeMdSection: rootSectionFingerprint,
+    sourceFingerprint,
   };
   await writeStateFile(paths, newState);
 

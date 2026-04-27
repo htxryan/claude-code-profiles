@@ -39,6 +39,12 @@ export interface GlobalOptions {
   onDrift: OnDriftFlag | null;
   /** When true, force colour off (additive with NO_COLOR env). */
   noColor: boolean;
+  /**
+   * When true, silence human print()/warn() output but keep error() and the
+   * exit code semantics. Designed for shell chains: `claude-profiles use ci -q
+   * && ./run`. Mutually exclusive with --json (the parser rejects both).
+   */
+  quiet: boolean;
 }
 
 export type CommandKind =
@@ -74,8 +80,8 @@ export type Command =
   | { kind: "list" }
   | { kind: "use"; profile: string }
   | { kind: "status" }
-  | { kind: "drift"; preCommitWarn: boolean; verbose: boolean }
-  | { kind: "diff"; a: string; b: string | null }
+  | { kind: "drift"; preCommitWarn: boolean; verbose: boolean; preview: boolean }
+  | { kind: "diff"; a: string; b: string | null; preview: boolean }
   | { kind: "new"; profile: string; description: string | null }
   | { kind: "validate"; profile: string | null }
   | { kind: "sync" }

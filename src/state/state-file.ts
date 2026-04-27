@@ -173,6 +173,23 @@ function validateStateShape(value: unknown): Ok | Bad {
       return { ok: false, detail: "rootClaudeMdSection.contentHash must be a string" };
     }
   }
+  // azp: sourceFingerprint is OPTIONAL. Legacy state files (written before
+  // azp landed) do not have this key; tolerate absence by treating as null.
+  // When present, validate shape so a malformed entry doesn't crash the
+  // staleness check in `status`.
+  const sourceFp = obj["sourceFingerprint"];
+  if (sourceFp !== undefined && sourceFp !== null) {
+    if (typeof sourceFp !== "object" || Array.isArray(sourceFp)) {
+      return { ok: false, detail: "sourceFingerprint must be an object or null" };
+    }
+    const sf = sourceFp as Record<string, unknown>;
+    if (typeof sf["fileCount"] !== "number" || !Number.isFinite(sf["fileCount"])) {
+      return { ok: false, detail: "sourceFingerprint.fileCount must be a number" };
+    }
+    if (typeof sf["aggregateHash"] !== "string") {
+      return { ok: false, detail: "sourceFingerprint.aggregateHash must be a string" };
+    }
+  }
   return { ok: true, value: obj as unknown as StateFile };
 }
 

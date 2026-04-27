@@ -129,6 +129,39 @@ export interface StateFile {
    * whole-file entries).
    */
   rootClaudeMdSection?: SectionFingerprint | null;
+  /**
+   * azp: aggregate fingerprint of the *resolved source files* the active
+   * materialization came from — keyed by absolute path → size+mtime+(present-
+   * bit). Cached on the state file so `status` can detect "the source files
+   * changed since last materialize — run sync" without re-resolving and
+   * re-merging every time.
+   *
+   * Schema migration: legacy state files (written before azp landed) have no
+   * `sourceFingerprint` field. Readers tolerate its absence (treat as
+   * undefined) and treat the source as "freshness unknown" — `status` shows
+   * no stale-source warning until the first azp-aware materialize lands and
+   * populates the field. This is strictly additive (R42 graceful-degradation
+   * contract preserved); no schemaVersion bump.
+   */
+  sourceFingerprint?: SourceFingerprint | null;
+}
+
+/**
+ * azp: aggregate fingerprint of the resolved-source files at materialize
+ * time. Used by `status` to surface "source updated since last materialize"
+ * without doing a full re-resolve+merge. The aggregate hash is sufficient
+ * (mtime+size, hashed) to flip the freshness bit; we don't need per-file
+ * granularity here — the next `sync` will do the precise work.
+ *
+ * Mtime+size is the same fast-path signal {@link FingerprintEntry} uses
+ * (R18). Hashing the per-file (path,size,mtime) tuples produces a compact
+ * fingerprint that survives state-file bloat over time.
+ */
+export interface SourceFingerprint {
+  /** Number of files included in the aggregate (sanity-check signal). */
+  fileCount: number;
+  /** Hex sha256 of `path|size|mtimeMs` lines, sorted by path. */
+  aggregateHash: string;
 }
 
 /**
@@ -145,6 +178,7 @@ export function defaultState(): StateFile {
     fingerprint: { schemaVersion: FINGERPRINT_SCHEMA_VERSION, files: {} },
     externalTrustNotices: [],
     rootClaudeMdSection: null,
+    sourceFingerprint: null,
   };
 }
 

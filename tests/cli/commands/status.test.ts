@@ -106,4 +106,81 @@ describe("status (R31, R40)", () => {
     expect(payload.warnings.length).toBe(1);
     expect(payload.warnings[0]?.code).toBe("ParseError");
   });
+
+  it("source fresh after materialize: sourceFresh=true and human shows no stale-warning (azp)", async () => {
+    fx = await makeFixture({
+      profiles: {
+        a: { manifest: { name: "a" }, files: { "CLAUDE.md": "A\n" } },
+      },
+    });
+    const plan = await resolve("a", { projectRoot: fx.projectRoot });
+    const merged = await merge(plan);
+    await materialize(buildStatePaths(fx.projectRoot), plan, merged);
+
+    const cap = captureOutput(true);
+    await runStatus({ cwd: fx.projectRoot, output: cap.channel });
+    const payload = cap.jsonLines()[0] as StatusPayload;
+    expect(payload.sourceFresh).toBe(true);
+    expect(typeof payload.sourceFingerprint).toBe("string");
+  });
+
+  it("source updated since materialize: sourceFresh=false and human surfaces sync hint (azp)", async () => {
+    fx = await makeFixture({
+      profiles: {
+        a: { manifest: { name: "a" }, files: { "CLAUDE.md": "A\n" } },
+      },
+    });
+    const plan = await resolve("a", { projectRoot: fx.projectRoot });
+    const merged = await merge(plan);
+    await materialize(buildStatePaths(fx.projectRoot), plan, merged);
+
+    // Mutate a source file (post-materialize) to simulate `git pull` bringing
+    // in new bytes. We rewrite with bumped mtime so the fast-path aggregate
+    // flips even when contents happen to be the same length.
+    const sourceFile = path.join(
+      fx.projectRoot,
+      ".claude-profiles",
+      "a",
+      ".claude",
+      "CLAUDE.md",
+    );
+    await fs.writeFile(sourceFile, "A-EDITED\n");
+    const future = new Date(Date.now() + 5000);
+    await fs.utimes(sourceFile, future, future);
+
+    // Human surface
+    const cap = captureOutput(false);
+    await runStatus({ cwd: fx.projectRoot, output: cap.channel });
+    expect(cap.stdout()).toContain("source: updated since last materialize");
+    expect(cap.stdout()).toContain("claude-profiles sync");
+
+    // JSON surface
+    const j = captureOutput(true);
+    await runStatus({ cwd: fx.projectRoot, output: j.channel });
+    const payload = j.jsonLines()[0] as StatusPayload;
+    expect(payload.sourceFresh).toBe(false);
+  });
+
+  it("legacy state without sourceFingerprint: sourceFresh is null (azp)", async () => {
+    fx = await makeFixture({
+      profiles: {
+        a: { manifest: { name: "a" }, files: { "CLAUDE.md": "A\n" } },
+      },
+    });
+    const plan = await resolve("a", { projectRoot: fx.projectRoot });
+    const merged = await merge(plan);
+    const paths = buildStatePaths(fx.projectRoot);
+    await materialize(paths, plan, merged);
+
+    // Hand-edit the state file to simulate legacy state (drop sourceFingerprint).
+    const raw = JSON.parse(await fs.readFile(paths.stateFile, "utf8"));
+    delete raw.sourceFingerprint;
+    await fs.writeFile(paths.stateFile, JSON.stringify(raw));
+
+    const cap = captureOutput(true);
+    await runStatus({ cwd: fx.projectRoot, output: cap.channel });
+    const payload = cap.jsonLines()[0] as StatusPayload;
+    expect(payload.sourceFresh).toBeNull();
+    expect(payload.sourceFingerprint).toBeNull();
+  });
 });

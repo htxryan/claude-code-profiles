@@ -221,7 +221,18 @@ describe("status — skimmable output", () => {
     await runStatus({ cwd: fx.projectRoot, output: cap.channel });
     const payload = cap.jsonLines()[0];
     const normalized = normalizeForShape(payload);
-    expect(JSON.stringify(normalized)).toBe(
+    // azp: replace the source-fingerprint hex (function of mtime+size, varies
+    // across runs) with a stable placeholder so the shape assertion is byte-
+    // identical without depending on filesystem timestamps. The freshness
+    // bit is always `true` immediately after a clean materialize.
+    const stable = {
+      ...(normalized as Record<string, unknown>),
+      sourceFingerprint:
+        (normalized as Record<string, unknown>)["sourceFingerprint"] !== null
+          ? "<hash>"
+          : null,
+    };
+    expect(JSON.stringify(stable)).toBe(
       JSON.stringify({
         activeProfile: "a",
         materializedAt: "<iso>",
@@ -233,6 +244,8 @@ describe("status — skimmable output", () => {
           unrecoverable: 0,
           total: 0,
         },
+        sourceFresh: true,
+        sourceFingerprint: "<hash>",
         warnings: [],
       }),
     );
@@ -393,8 +406,15 @@ describe("diff — skimmable output", () => {
       JSON.stringify({
         a: "a",
         b: "b",
-        entries: [{ relPath: "x.md", status: "changed" }],
-        totals: { added: 0, removed: 0, changed: 1 },
+        entries: [{ relPath: "x.md", status: "changed", bytesA: 2, bytesB: 2 }],
+        totals: {
+          added: 0,
+          removed: 0,
+          changed: 1,
+          addedBytes: 0,
+          removedBytes: 0,
+          changedBytes: 0,
+        },
       }),
     );
   });

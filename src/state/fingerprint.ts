@@ -19,16 +19,66 @@ import { promises as fs } from "node:fs";
 import * as path from "node:path";
 
 import type { MergedFile } from "../merge/types.js";
+import type { ResolvedPlan } from "../resolver/types.js";
 
 import {
   FINGERPRINT_SCHEMA_VERSION,
   type Fingerprint,
   type FingerprintEntry,
+  type SourceFingerprint,
 } from "./types.js";
 
 /** Compute sha256 of bytes; hex-encoded. */
 export function hashBytes(bytes: Buffer): string {
   return createHash("sha256").update(bytes).digest("hex");
+}
+
+/**
+ * azp: aggregate fingerprint of a resolved plan's *source files* (the inputs
+ * to materialize, not its output). Used by `status` to detect "source files
+ * changed since last materialize — run sync" without re-resolving the plan.
+ *
+ * Algorithm: stat every absPath in `plan.files`, sorted lexicographically,
+ * and feed `relPath|absPath|size|mtimeMs\n` tuples into sha256. We use the
+ * fast-path signal (size+mtime) because the cost of computing this on every
+ * `status` call must stay under 500ms even for a 1000-file profile (epic
+ * acceptance criteria #1). The first call enumerates the file list (which
+ * the caller — typically materialize — already has in memory); subsequent
+ * `status` calls re-stat the same paths.
+ *
+ * Missing files (ENOENT) are recorded with size=-1, mtimeMs=-1 so a
+ * deletion still flips the aggregate hash. Non-ENOENT errors propagate —
+ * those are environment problems, not freshness signals.
+ */
+export async function computeSourceFingerprint(
+  plan: ResolvedPlan,
+): Promise<SourceFingerprint> {
+  const sortedFiles = [...plan.files].sort((a, b) => {
+    const cmp = a.relPath.localeCompare(b.relPath);
+    if (cmp !== 0) return cmp;
+    return a.absPath.localeCompare(b.absPath);
+  });
+  const hasher = createHash("sha256");
+  for (const f of sortedFiles) {
+    let size = -1;
+    let mtimeMs = -1;
+    try {
+      const stat = await fs.stat(f.absPath);
+      size = stat.size;
+      mtimeMs = stat.mtimeMs;
+    } catch (err: unknown) {
+      // ENOENT is expected when a contributor has been deleted between
+      // materialize and the next status call — record the deletion in the
+      // aggregate. Anything else (EACCES, EIO) is an environment fault and
+      // should not be silently swallowed.
+      if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+    }
+    hasher.update(`${f.relPath}|${f.absPath}|${size}|${mtimeMs}\n`);
+  }
+  return {
+    fileCount: sortedFiles.length,
+    aggregateHash: hasher.digest("hex"),
+  };
 }
 
 /**

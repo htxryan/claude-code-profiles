@@ -154,6 +154,48 @@ describe("createStyle (claude-code-profiles-pnf)", () => {
   });
 });
 
+describe("OutputChannel — quiet mode (azp)", () => {
+  function buildQuiet(): { ch: ReturnType<typeof createOutput>; out: StringSink; err: StringSink } {
+    const out = new StringSink();
+    const err = new StringSink();
+    const ch = createOutput({
+      json: false,
+      quiet: true,
+      stdout: out as unknown as NodeJS.WritableStream,
+      stderr: err as unknown as NodeJS.WritableStream,
+    });
+    return { ch, out, err };
+  }
+
+  it("print is silenced", () => {
+    const { ch, out } = buildQuiet();
+    ch.print("hello");
+    expect(out.buf).toBe("");
+  });
+
+  it("warn is silenced", () => {
+    const { ch, err } = buildQuiet();
+    ch.warn("hidden");
+    expect(err.buf).toBe("");
+  });
+
+  it("error still writes (errors must always surface)", () => {
+    const { ch, err } = buildQuiet();
+    ch.error("real");
+    expect(err.buf).toBe("real\n");
+  });
+
+  it("json still writes (structured payloads do not vanish in quiet mode)", () => {
+    const { ch, out } = buildQuiet();
+    ch.json({ a: 1 });
+    expect(out.buf).toBe('{"a":1}\n');
+  });
+
+  it("jsonMode flag is false in quiet mode (the channel is not JSON)", () => {
+    expect(buildQuiet().ch.jsonMode).toBe(false);
+  });
+});
+
 describe("OutputChannel — EPIPE-safety", () => {
   it("write that throws is swallowed", () => {
     const exploding = {

@@ -50,19 +50,22 @@ describe("parseArgs — verbs (R29)", () => {
       kind: "drift",
       preCommitWarn: false,
       verbose: false,
+      preview: false,
     });
     expect(run(["drift", "--pre-commit-warn"]).command).toEqual({
       kind: "drift",
       preCommitWarn: true,
       verbose: false,
+      preview: false,
     });
     expect(run(["drift", "--verbose"]).command).toEqual({
       kind: "drift",
       preCommitWarn: false,
       verbose: true,
+      preview: false,
     });
-    expect(run(["diff", "a"]).command).toEqual({ kind: "diff", a: "a", b: null });
-    expect(run(["diff", "a", "b"]).command).toEqual({ kind: "diff", a: "a", b: "b" });
+    expect(run(["diff", "a"]).command).toEqual({ kind: "diff", a: "a", b: null, preview: false });
+    expect(run(["diff", "a", "b"]).command).toEqual({ kind: "diff", a: "a", b: "b", preview: false });
     expect(run(["new", "minimal"]).command).toEqual({
       kind: "new",
       profile: "minimal",
@@ -152,6 +155,34 @@ describe("parseArgs — global flags", () => {
     expect(run(["--on-drift=abort", "use", "x"]).global.onDrift).toBe("abort");
     expect(run(["--on-drift", "abort", "use", "x"]).global.onDrift).toBe("abort");
     expect(err(["--on-drift=keep", "use", "x"])).toContain("discard|persist|abort");
+  });
+
+  it("--quiet/-q sets global.quiet (azp)", () => {
+    expect(run(["list", "--quiet"]).global.quiet).toBe(true);
+    expect(run(["-q", "list"]).global.quiet).toBe(true);
+    expect(run(["list"]).global.quiet).toBe(false);
+  });
+
+  it("--quiet and --json are mutually exclusive (azp)", () => {
+    // Spec: a script asking for both is signalling unclear intent. Surface
+    // the conflict at parse time rather than silently picking one.
+    expect(err(["--quiet", "--json", "list"])).toContain("mutually exclusive");
+    expect(err(["list", "-q", "--json"])).toContain("mutually exclusive");
+  });
+
+  it("--preview is per-verb on drift and diff (azp)", () => {
+    expect(run(["drift", "--preview"]).command).toEqual({
+      kind: "drift",
+      preCommitWarn: false,
+      verbose: false,
+      preview: true,
+    });
+    expect(run(["diff", "a", "--preview"]).command).toEqual({
+      kind: "diff",
+      a: "a",
+      b: null,
+      preview: true,
+    });
   });
 
   it("--no-color sets global.noColor and is accepted on every verb", () => {
