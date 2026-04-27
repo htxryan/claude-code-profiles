@@ -29,6 +29,7 @@ GLOBAL OPTIONS
   --json                   emit one JSON object per command (silences human output)
   --cwd=<path>             project root (default: current working dir)
   --on-drift=<choice>      discard|persist|abort — required for non-TTY swap with drift
+  --no-color               disable colour output (additive with NO_COLOR env)
   --help, -h               this message; "claude-profiles <verb> --help" for verb-specific help
   --version, -V            print version
 

@@ -26,10 +26,9 @@ export type OnDriftFlag = Exclude<GateChoice, "no-drift-proceed">;
  * Global flags accepted on every verb. `cwd` is the project root the CLI
  * operates against — defaults to process.cwd(); tests inject a fixture path.
  *
- * Note: a `--no-color` flag is intentionally absent — formatters don't emit
- * ANSI colour today, so advertising the flag would be a no-op. When colour is
- * added (future polish pass), a `noColor` field belongs here and must be
- * threaded through `createOutput` and the formatters in the same change.
+ * `--no-color` is treated as additive over the NO_COLOR env var: either one
+ * being set disables colour. The flag exists so users can disable colour ad
+ * hoc without exporting an env var (e.g. piping into a pager).
  */
 export interface GlobalOptions {
   /** When true, all human-readable output is suppressed; only JSON to stdout. */
@@ -38,6 +37,8 @@ export interface GlobalOptions {
   cwd: string;
   /** Honored gate flag for `use`/`sync` non-interactive paths. */
   onDrift: OnDriftFlag | null;
+  /** When true, force colour off (additive with NO_COLOR env). */
+  noColor: boolean;
 }
 
 export type CommandKind =

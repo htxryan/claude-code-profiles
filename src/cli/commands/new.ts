@@ -13,9 +13,10 @@
 
 import { promises as fs } from "node:fs";
 import * as path from "node:path";
+import process from "node:process";
 
 import { CliUserError, EXIT_USER_ERROR } from "../exit.js";
-import type { OutputChannel } from "../output.js";
+import { createStyle, resolveNoColor, type OutputChannel } from "../output.js";
 import { assertValidProfileName } from "../suggest.js";
 
 export interface NewOptions {
@@ -23,6 +24,8 @@ export interface NewOptions {
   output: OutputChannel;
   profile: string;
   description: string | null;
+  /** When true, force colour off (additive with NO_COLOR env). Default false. */
+  noColor?: boolean;
 }
 
 export async function runNew(opts: NewOptions): Promise<number> {
@@ -62,8 +65,15 @@ export async function runNew(opts: NewOptions): Promise<number> {
       created: true,
     });
   } else {
-    opts.output.print(`Created profile "${opts.profile}" at ${profileDir}`);
-    opts.output.print(`  edit ${path.join(profileDir, "profile.json")} to set extends/includes`);
+    const style = createStyle({
+      isTty: Boolean(process.stdout.isTTY),
+      platform: process.platform,
+      noColor: resolveNoColor(opts.noColor === true),
+    });
+    opts.output.print(style.ok(`Created profile "${opts.profile}" at ${profileDir}`));
+    opts.output.print(
+      style.dim(`  edit ${path.join(profileDir, "profile.json")} to set extends/includes`),
+    );
   }
   return 0;
 }

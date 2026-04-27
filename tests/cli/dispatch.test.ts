@@ -25,7 +25,7 @@ function ctxFor(json = false) {
 }
 
 function global(json = false): GlobalOptions {
-  return { json, cwd: ".", onDrift: null };
+  return { json, cwd: ".", onDrift: null, noColor: false };
 }
 
 describe("dispatch — top-level routes", () => {

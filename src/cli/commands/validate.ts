@@ -9,6 +9,7 @@
 
 import { promises as fs } from "node:fs";
 import * as path from "node:path";
+import process from "node:process";
 
 import { PipelineError, type PipelineErrorCode } from "../../errors/index.js";
 import { parseMarkers } from "../../markers.js";
@@ -18,7 +19,7 @@ import { merge } from "../../merge/index.js";
 import { buildStatePaths, readStateFile } from "../../state/index.js";
 import { CliUserError, EXIT_CONFLICT, EXIT_USER_ERROR } from "../exit.js";
 import { formatResolutionWarnings } from "../format.js";
-import type { OutputChannel } from "../output.js";
+import { createStyle, resolveNoColor, type OutputChannel } from "../output.js";
 import { assertValidProfileName, enrichMissingProfileError } from "../suggest.js";
 
 /**
@@ -49,6 +50,8 @@ export interface ValidateOptions {
   output: OutputChannel;
   /** Single profile to validate, or null to validate every profile in the project. */
   profile: string | null;
+  /** When true, force colour off (additive with NO_COLOR env). Default false. */
+  noColor?: boolean;
 }
 
 export async function runValidate(opts: ValidateOptions): Promise<number> {
@@ -120,10 +123,15 @@ export async function runValidate(opts: ValidateOptions): Promise<number> {
     const payload: ValidatePayload = { results, pass };
     opts.output.json(payload);
   } else {
+    const style = createStyle({
+      isTty: Boolean(process.stdout.isTTY),
+      platform: process.platform,
+      noColor: resolveNoColor(opts.noColor === true),
+    });
     for (const r of results) {
       if (r.ok) {
         const warnNote = r.warnings.length > 0 ? ` (${r.warnings.length} warning${r.warnings.length === 1 ? "" : "s"})` : "";
-        opts.output.print(`PASS  ${r.profile}${warnNote}`);
+        opts.output.print(style.ok(`${r.profile}${warnNote}`));
         if (r.warnings.length > 0) {
           const ws = r.warnings.map((w) => {
             const base = { code: w.code as never, message: w.message };
@@ -132,14 +140,19 @@ export async function runValidate(opts: ValidateOptions): Promise<number> {
           opts.output.print(formatResolutionWarnings(ws));
         }
       } else {
-        opts.output.print(`FAIL  ${r.profile}: [${r.errorCode}] ${r.errorMessage}`);
+        // FAIL rows: red glyph + bold profile name to draw the eye.
+        opts.output.print(
+          style.fail(`${style.bold(r.profile)}: [${r.errorCode}] ${r.errorMessage}`),
+        );
       }
     }
     const failed = results.filter((r) => !r.ok).length;
     if (failed === 0) {
-      opts.output.print(`validate: ${results.length} pass`);
+      opts.output.print(style.ok(`${results.length} pass`));
     } else {
-      opts.output.print(`validate: ${results.length - failed} pass, ${failed} fail`);
+      opts.output.print(
+        style.fail(`${results.length - failed} pass, ${failed} fail`),
+      );
     }
   }
 

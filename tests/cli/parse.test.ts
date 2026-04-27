@@ -154,14 +154,13 @@ describe("parseArgs — global flags", () => {
     expect(err(["--on-drift=keep", "use", "x"])).toContain("discard|persist|abort");
   });
 
-  it("--no-color is rejected explicitly with a flag-shaped diagnostic", () => {
-    // Until colour is wired through formatters, --no-color is rejected at the
-    // parser level so the message names the flag — earlier the flag fell
-    // through to the verb dispatcher and produced "list takes no arguments",
-    // which made it look like the flag was a positional.
-    const m = err(["list", "--no-color"]);
-    expect(m).toContain("--no-color");
-    expect(m).toContain("unknown flag");
+  it("--no-color sets global.noColor and is accepted on every verb", () => {
+    // The flag is additive with NO_COLOR env: either disables colour. It
+    // can appear anywhere in argv (before or after the verb).
+    expect(run(["list", "--no-color"]).global.noColor).toBe(true);
+    expect(run(["--no-color", "list"]).global.noColor).toBe(true);
+    // Default is false when neither the flag nor env is set.
+    expect(run(["list"]).global.noColor).toBe(false);
   });
 
   it("--help with no verb returns help command", () => {

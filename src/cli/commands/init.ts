@@ -43,7 +43,7 @@ import {
   type GitignoreUpdate,
 } from "../../state/index.js";
 import { CliUserError, EXIT_USER_ERROR } from "../exit.js";
-import { createStyle, type OutputChannel } from "../output.js";
+import { createStyle, resolveNoColor, type OutputChannel } from "../output.js";
 
 import { installHook, type InstallHookResult } from "./hook.js";
 
@@ -69,6 +69,8 @@ export interface InitOptions {
    * handlers (matches every other write-locked verb).
    */
   signalHandlers: boolean;
+  /** When true, force colour off (additive with NO_COLOR env). Default false. */
+  noColor?: boolean;
 }
 
 /**
@@ -169,7 +171,7 @@ export async function runInit(opts: InitOptions): Promise<number> {
     { signalHandlers: opts.signalHandlers },
   );
 
-  emitOutput(opts.output, result, paths.projectRoot);
+  emitOutput(opts.output, result, paths.projectRoot, opts.noColor === true);
   return 0;
 }
 
@@ -338,7 +340,12 @@ async function ensureRootClaudeMdMarkers(
   return { outcome: "appended", path: claudeMdPath };
 }
 
-function emitOutput(output: OutputChannel, result: InitResult, projectRoot: string): void {
+function emitOutput(
+  output: OutputChannel,
+  result: InitResult,
+  projectRoot: string,
+  noColorFlag: boolean,
+): void {
   if (output.jsonMode) {
     output.json({
       projectRoot,
@@ -368,7 +375,7 @@ function emitOutput(output: OutputChannel, result: InitResult, projectRoot: stri
   const style = createStyle({
     isTty: Boolean(process.stdout.isTTY),
     platform: process.platform,
-    noColor: process.env["NO_COLOR"],
+    noColor: resolveNoColor(noColorFlag),
   });
 
   output.print(style.banner(`claude-profiles initialised`));

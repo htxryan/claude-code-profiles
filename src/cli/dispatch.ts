@@ -62,10 +62,10 @@ export async function dispatch(
     }
 
     case "list":
-      return runList({ cwd: global.cwd, output: ctx.output });
+      return runList({ cwd: global.cwd, output: ctx.output, noColor: global.noColor });
 
     case "status":
-      return runStatus({ cwd: global.cwd, output: ctx.output });
+      return runStatus({ cwd: global.cwd, output: ctx.output, noColor: global.noColor });
 
     case "drift":
       return runDrift({
@@ -88,6 +88,7 @@ export async function dispatch(
         cwd: global.cwd,
         output: ctx.output,
         profile: command.profile,
+        noColor: global.noColor,
       });
 
     case "new":
@@ -96,6 +97,7 @@ export async function dispatch(
         output: ctx.output,
         profile: command.profile,
         description: command.description,
+        noColor: global.noColor,
       });
 
     case "use":
@@ -106,6 +108,7 @@ export async function dispatch(
         mode: ctx.mode,
         onDriftFlag: global.onDrift,
         signalHandlers: ctx.signalHandlers,
+        noColor: global.noColor,
       });
 
     case "sync":
@@ -115,6 +118,7 @@ export async function dispatch(
         mode: ctx.mode,
         onDriftFlag: global.onDrift,
         signalHandlers: ctx.signalHandlers,
+        noColor: global.noColor,
       });
 
     case "init":
@@ -125,6 +129,7 @@ export async function dispatch(
         seedFromClaudeDir: command.seed,
         installHook: command.hook,
         signalHandlers: ctx.signalHandlers,
+        noColor: global.noColor,
       });
 
     case "hook":
@@ -133,6 +138,7 @@ export async function dispatch(
         output: ctx.output,
         action: command.action,
         force: command.force,
+        noColor: global.noColor,
       });
 
     default: {

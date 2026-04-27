@@ -29,9 +29,10 @@
 
 import { promises as fs } from "node:fs";
 import * as path from "node:path";
+import process from "node:process";
 
 import { CliUserError, EXIT_USER_ERROR } from "../exit.js";
-import type { OutputChannel } from "../output.js";
+import { createStyle, resolveNoColor, type OutputChannel } from "../output.js";
 
 /**
  * Sentinel thrown by `resolveHooksDir` when the project has no `.git`
@@ -107,9 +108,17 @@ export interface HookCommandOptions {
   output: OutputChannel;
   action: "install" | "uninstall";
   force: boolean;
+  /** When true, force colour off (additive with NO_COLOR env). Default false. */
+  noColor?: boolean;
 }
 
 export async function runHook(opts: HookCommandOptions): Promise<number> {
+  const style = createStyle({
+    isTty: Boolean(process.stdout.isTTY),
+    platform: process.platform,
+    noColor: resolveNoColor(opts.noColor === true),
+  });
+
   if (opts.action === "install") {
     const result = await installHook({
       cwd: opts.cwd,
@@ -138,13 +147,12 @@ export async function runHook(opts: HookCommandOptions): Promise<number> {
         );
       }
     } else if (result.installed) {
-      opts.output.print(
-        result.preExisting === "absent"
-          ? `Installed pre-commit hook at ${result.hookPath}`
-          : `Overwrote existing pre-commit hook at ${result.hookPath}`,
-      );
+      const verb = result.preExisting === "absent" ? "Installed" : "Overwrote existing";
+      opts.output.print(style.ok(`${verb} pre-commit hook`));
+      opts.output.print(style.dim(`  ${result.hookPath}`));
     } else if (result.preExisting === "ours") {
-      opts.output.print(`Pre-commit hook already installed at ${result.hookPath}`);
+      opts.output.print(style.skip(`Pre-commit hook already installed`));
+      opts.output.print(style.dim(`  ${result.hookPath}`));
     } else {
       // "other" + !force — surface as a user error so the user sees a non-
       // zero exit.
@@ -165,13 +173,16 @@ export async function runHook(opts: HookCommandOptions): Promise<number> {
       removed: result.removed,
     });
   } else if (result.removed) {
-    opts.output.print(`Removed pre-commit hook at ${result.hookPath}`);
+    opts.output.print(style.ok(`Removed pre-commit hook`));
+    opts.output.print(style.dim(`  ${result.hookPath}`));
   } else if (result.preExisting === "absent") {
-    opts.output.print(`No pre-commit hook to remove at ${result.hookPath}`);
+    opts.output.print(style.skip(`No pre-commit hook to remove`));
+    opts.output.print(style.dim(`  ${result.hookPath}`));
   } else {
     opts.output.print(
-      `Pre-commit hook at ${result.hookPath} contains a different script; left untouched`,
+      style.skip(`Pre-commit hook contains a different script; left untouched`),
     );
+    opts.output.print(style.dim(`  ${result.hookPath}`));
   }
   return 0;
 }

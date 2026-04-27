@@ -137,9 +137,11 @@ describe("createStyle (claude-code-profiles-pnf)", () => {
     expect(s.ok("ok").includes("\x1b[")).toBe(true);
   });
 
-  it("NO_COLOR set (even empty string) disables colour and unicode", () => {
-    // Per https://no-color.org/ any non-undefined value disables colour.
-    const s = createStyle({ isTty: true, platform: "linux", noColor: "" });
+  it("noColor: true disables colour and unicode (matches NO_COLOR semantics)", () => {
+    // The createStyle input is now a pre-resolved boolean (env + --no-color
+    // are combined at the call site via resolveNoColor). `true` should
+    // mirror what NO_COLOR=anything used to produce.
+    const s = createStyle({ isTty: true, platform: "linux", noColor: true });
     expect(s.color).toBe(false);
     expect(s.unicode).toBe(false);
     expect(s.ok("ok")).toBe("[ok] ok");

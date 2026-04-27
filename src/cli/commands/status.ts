@@ -20,7 +20,7 @@ import {
   meaningfulStateWarning,
   timestampWithRelative,
 } from "../format.js";
-import { createStyle, type OutputChannel } from "../output.js";
+import { createStyle, resolveNoColor, type OutputChannel } from "../output.js";
 
 export interface StatusPayload {
   activeProfile: string | null;
@@ -45,6 +45,8 @@ export interface StatusPayload {
 export interface StatusOptions {
   cwd: string;
   output: OutputChannel;
+  /** When true, force colour off (additive with NO_COLOR env). Default false. */
+  noColor?: boolean;
 }
 
 export async function runStatus(opts: StatusOptions): Promise<number> {
@@ -77,7 +79,7 @@ export async function runStatus(opts: StatusOptions): Promise<number> {
   const style = createStyle({
     isTty: Boolean(process.stdout.isTTY),
     platform: process.platform,
-    noColor: process.env["NO_COLOR"],
+    noColor: resolveNoColor(opts.noColor === true),
   });
 
   if (state.activeProfile === null) {

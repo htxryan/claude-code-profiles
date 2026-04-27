@@ -22,7 +22,7 @@ import {
   relativeTime,
   renderTable,
 } from "../format.js";
-import { createStyle, type OutputChannel } from "../output.js";
+import { createStyle, resolveNoColor, type OutputChannel } from "../output.js";
 
 export interface ListEntryPayload {
   name: string;
@@ -44,6 +44,8 @@ export interface ListPayload {
 export interface ListOptions {
   cwd: string;
   output: OutputChannel;
+  /** When true, force colour off (additive with NO_COLOR env). Default false. */
+  noColor?: boolean;
 }
 
 export async function runList(opts: ListOptions): Promise<number> {
@@ -81,7 +83,7 @@ export async function runList(opts: ListOptions): Promise<number> {
     const style = createStyle({
       isTty: Boolean(process.stdout.isTTY),
       platform: process.platform,
-      noColor: process.env["NO_COLOR"],
+      noColor: resolveNoColor(opts.noColor === true),
     });
     // Decide which optional columns to render. A column is visible if any
     // row has content for it — keeps the layout tight in the common case

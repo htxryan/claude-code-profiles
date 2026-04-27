@@ -3,9 +3,11 @@
  * `runSwap` — all business logic lives in the service layer.
  */
 
+import process from "node:process";
+
 import type { GateMode } from "../../drift/index.js";
 import { buildStatePaths } from "../../state/index.js";
-import type { OutputChannel } from "../output.js";
+import { createStyle, resolveNoColor, type OutputChannel } from "../output.js";
 import { readlinePrompt } from "../prompt.js";
 import { runSwap } from "../service/swap.js";
 import type { SwapResult } from "../service/swap.js";
@@ -20,6 +22,8 @@ export interface UseOptions {
   onDriftFlag: OnDriftFlag | null;
   /** Bin always passes true; tests pass false. Required to avoid accidental skip. */
   signalHandlers: boolean;
+  /** When true, force colour off (additive with NO_COLOR env). Default false. */
+  noColor?: boolean;
 }
 
 export async function runUse(opts: UseOptions): Promise<number> {
@@ -43,13 +47,22 @@ export async function runUse(opts: UseOptions): Promise<number> {
       backupSnapshot: result.backupSnapshot,
     });
   } else {
+    const style = createStyle({
+      isTty: Boolean(process.stdout.isTTY),
+      platform: process.platform,
+      noColor: resolveNoColor(opts.noColor === true),
+    });
     if (result.action === "persisted-and-materialized") {
-      opts.output.print(`Switched to ${result.activeAfter} (drift saved into previous active profile).`);
+      opts.output.print(
+        style.ok(`Switched to ${result.activeAfter} (drift saved into previous active profile).`),
+      );
     } else if (result.choice === "discard") {
-      const note = result.backupSnapshot ? ` Backup: ${result.backupSnapshot}` : "";
-      opts.output.print(`Switched to ${result.activeAfter} (drift discarded).${note}`);
+      opts.output.print(style.ok(`Switched to ${result.activeAfter} (drift discarded).`));
+      if (result.backupSnapshot) {
+        opts.output.print(style.dim(`  Backup: ${result.backupSnapshot}`));
+      }
     } else {
-      opts.output.print(`Switched to ${result.activeAfter}.`);
+      opts.output.print(style.ok(`Switched to ${result.activeAfter}.`));
     }
   }
   return 0;

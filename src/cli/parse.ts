@@ -7,9 +7,8 @@
  *  - First non-flag token is the verb (R29). `--help`/`--version` short-
  *    circuit verb dispatch.
  *  - Global flags (`--json`, `--cwd=<path>`, `--on-drift=<choice>`,
- *    `--help`, `--version`) may appear anywhere in argv — before or after the
- *    verb. (`--no-color` is intentionally absent until colour is wired
- *    through the formatters.)
+ *    `--no-color`, `--help`, `--version`) may appear anywhere in argv —
+ *    before or after the verb.
  *  - Verb-specific flags (`--description=<txt>` for `new`, `--pre-commit-warn`
  *    for `drift`) are scoped per verb.
  *  - Positional args after the verb are required (e.g. `use <name>`); we
@@ -66,6 +65,7 @@ export function parseArgs(argv: ReadonlyArray<string>, defaultCwd: string): Pars
     json: false,
     cwd: defaultCwd,
     onDrift: null,
+    noColor: false,
   };
 
   // Side-channel for help/version short-circuit. We still want to parse the
@@ -112,12 +112,9 @@ export function parseArgs(argv: ReadonlyArray<string>, defaultCwd: string): Pars
       if (!flag) return parseError(`--on-drift must be discard|persist|abort, got "${v}"`);
       global.onDrift = flag;
     } else if (t === "--no-color") {
-      // --no-color is intentionally unsupported until colour is wired through
-      // the formatters (see types.ts). Reject explicitly here so the user
-      // sees "unknown flag --no-color" rather than the verb dispatcher's
-      // "list takes no arguments" diagnostic, which makes it look like the
-      // flag was treated as a positional.
-      return parseError(`unknown flag "--no-color" (colour output is not yet implemented)`);
+      // Additive with NO_COLOR env: the flag turns colour off even when env
+      // is unset. Threaded through dispatch into createStyle.
+      global.noColor = true;
     } else {
       verbAndArgs.push(t);
     }

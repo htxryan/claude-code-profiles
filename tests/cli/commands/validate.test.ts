@@ -32,9 +32,11 @@ describe("validate (R33)", () => {
       profile: null,
     });
     expect(code).toBe(0);
-    expect(cap.stdout()).toContain("PASS  a");
-    expect(cap.stdout()).toContain("PASS  b");
-    expect(cap.stdout()).toContain("validate: 2 pass");
+    // Non-TTY in tests → glyphs render as `[ok]`. PASS rows now lead with
+    // the ok glyph and drop the `PASS` literal (visual-style epic).
+    expect(cap.stdout()).toContain("[ok] a");
+    expect(cap.stdout()).toContain("[ok] b");
+    expect(cap.stdout()).toContain("[ok] 2 pass");
   });
 
   it("--json all-pass: structured payload with pass:true", async () => {
@@ -71,7 +73,9 @@ describe("validate (R33)", () => {
     await expect(
       runValidate({ cwd: fx.projectRoot, output: cap.channel, profile: null }),
     ).rejects.toMatchObject({ exitCode: EXIT_CONFLICT });
-    expect(cap.stdout()).toContain("FAIL  leaf");
+    // Non-TTY in tests → fail glyph renders as `[x]` ahead of the bold-
+    // styled profile name (bold is a no-op without colour).
+    expect(cap.stdout()).toContain("[x] leaf");
     expect(cap.stdout()).toContain("nope");
   });
 

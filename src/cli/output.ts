@@ -129,6 +129,8 @@ export interface Style {
   skip(text: string): string;
   /** Status glyph for a warning step. */
   warn(text: string): string;
+  /** Status glyph for a hard failure (red). Used by validate FAIL rows. */
+  fail(text: string): string;
   /** Render a one-line banner header with the given title. */
   banner(title: string): string;
   /** Dim secondary text (e.g. paths, counts). */
@@ -149,10 +151,16 @@ export interface StyleOptions {
    */
   platform?: NodeJS.Platform;
   /**
-   * NO_COLOR value (defaults to `process.env.NO_COLOR`). Per the spec, any
-   * non-undefined value (including empty string) disables colour.
+   * Pre-resolved no-colour decision. When `true`, colour and unicode are
+   * forced off (matches NO_COLOR env semantics from https://no-color.org/).
+   * When `undefined` or `false`, colour is gated on `isTty + platform` only.
+   *
+   * Production callers should pass
+   *   `global.noColor || process.env.NO_COLOR !== undefined`
+   * so the `--no-color` flag and the env var are equivalent. Tests pin an
+   * explicit boolean for determinism.
    */
-  noColor?: string | undefined;
+  noColor?: boolean;
 }
 
 /**
@@ -162,7 +170,7 @@ export interface StyleOptions {
  */
 export function createStyle(opts: StyleOptions): Style {
   const platform = opts.platform ?? process.platform;
-  const noColor = opts.noColor !== undefined;
+  const noColor = opts.noColor === true;
   const color = opts.isTty && !noColor;
   // Windows historically chokes on box-drawing + check glyphs in cmd.exe; we
   // also gate unicode on NO_COLOR because users frequently set NO_COLOR in
@@ -188,6 +196,10 @@ export function createStyle(opts: StyleOptions): Style {
       const glyph = unicode ? "!" : "[warn]";
       return `${paint(ANSI.yellow, glyph)} ${text}`;
     },
+    fail(text: string): string {
+      const glyph = unicode ? "✗" : "[x]";
+      return `${paint(ANSI.red, glyph)} ${text}`;
+    },
     banner(title: string): string {
       if (!unicode) return `== ${title} ==`;
       return paint(ANSI.cyan, `╭ ${title} ─`);
@@ -199,4 +211,20 @@ export function createStyle(opts: StyleOptions): Style {
       return paint(ANSI.bold, text);
     },
   };
+}
+
+/**
+ * Resolve the effective "disable colour" decision from the CLI's two inputs:
+ * the `--no-color` flag (parsed into `globalNoColor`) and the `NO_COLOR` env
+ * var. Either being set disables colour. Pulled out so every command site
+ * combines the two inputs identically.
+ *
+ * Pass `env` explicitly in tests to avoid leaking the host environment into
+ * the assertion; production callers default to `process.env`.
+ */
+export function resolveNoColor(
+  globalNoColor: boolean,
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  return globalNoColor || env["NO_COLOR"] !== undefined;
 }
