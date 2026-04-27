@@ -95,9 +95,13 @@ describe("formatDidYouMean", () => {
 
 describe("formatInvalidProfileNameMessage", () => {
   it("includes verb, name, and the disallowed-char phrase", () => {
-    expect(formatInvalidProfileNameMessage("use", "a/b")).toBe(
-      'use: invalid profile name "a/b" (contains /, \\, leading . or _)',
-    );
+    const out = formatInvalidProfileNameMessage("use", "a/b");
+    expect(out).toContain('use: invalid profile name "a/b"');
+    expect(out).toContain("contains /, \\, leading . or _");
+    // claude-code-profiles-36o: surface Windows-reserved-name guidance so
+    // a profile named "CON" gets actionable wording rather than just the
+    // generic separator hint.
+    expect(out).toMatch(/CON\/PRN\/AUX\/NUL\/COM1-9\/LPT1-9/);
   });
 
   it("varies the verb", () => {

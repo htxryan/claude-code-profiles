@@ -90,7 +90,10 @@ export function formatDidYouMean(suggestions: ReadonlyArray<string>): string {
  * consistent string regardless of which command they typed.
  */
 export function formatInvalidProfileNameMessage(verb: string, name: string): string {
-  return `${verb}: invalid profile name "${name}" (contains /, \\, leading . or _)`;
+  return (
+    `${verb}: invalid profile name "${name}" ` +
+    `(contains /, \\, leading . or _, NUL, trailing dot/space, or a Windows-reserved name like CON/PRN/AUX/NUL/COM1-9/LPT1-9)`
+  );
 }
 
 /**

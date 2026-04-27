@@ -20,7 +20,7 @@ export type { MergePolicy } from "./merge-policy.js";
 
 // E5 (CLI) consumes these for the `list` and `new` commands. Promoted to the
 // public surface (vs. reaching into ./paths.js) so the boundary stays clean.
-export { buildPaths, isValidProfileName } from "./paths.js";
+export { buildPaths, isValidProfileName, isWindowsReservedName } from "./paths.js";
 export type { ResolverPaths } from "./paths.js";
 
 export type {
