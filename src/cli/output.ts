@@ -155,10 +155,9 @@ export interface StyleOptions {
    * forced off (matches NO_COLOR env semantics from https://no-color.org/).
    * When `undefined` or `false`, colour is gated on `isTty + platform` only.
    *
-   * Production callers should pass
-   *   `global.noColor || process.env.NO_COLOR !== undefined`
-   * so the `--no-color` flag and the env var are equivalent. Tests pin an
-   * explicit boolean for determinism.
+   * Production callers go through `resolveNoColor(opts.noColor === true)` so
+   * the `--no-color` flag and the env var are combined identically at every
+   * call site. Tests pin an explicit boolean for determinism.
    */
   noColor?: boolean;
 }

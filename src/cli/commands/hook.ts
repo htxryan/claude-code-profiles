@@ -113,11 +113,17 @@ export interface HookCommandOptions {
 }
 
 export async function runHook(opts: HookCommandOptions): Promise<number> {
-  const style = createStyle({
-    isTty: Boolean(process.stdout.isTTY),
-    platform: process.platform,
-    noColor: resolveNoColor(opts.noColor === true),
-  });
+  // Defer style creation until we know we're emitting human output. Skipping
+  // the build under --json keeps every verb consistent (new/use/sync/validate
+  // all build inside the human branch) and avoids reading process.stdout/env
+  // in a path that never paints a glyph.
+  function buildStyle() {
+    return createStyle({
+      isTty: Boolean(process.stdout.isTTY),
+      platform: process.platform,
+      noColor: resolveNoColor(opts.noColor === true),
+    });
+  }
 
   if (opts.action === "install") {
     const result = await installHook({
@@ -147,10 +153,12 @@ export async function runHook(opts: HookCommandOptions): Promise<number> {
         );
       }
     } else if (result.installed) {
+      const style = buildStyle();
       const verb = result.preExisting === "absent" ? "Installed" : "Overwrote existing";
       opts.output.print(style.ok(`${verb} pre-commit hook`));
       opts.output.print(style.dim(`  ${result.hookPath}`));
     } else if (result.preExisting === "ours") {
+      const style = buildStyle();
       opts.output.print(style.skip(`Pre-commit hook already installed`));
       opts.output.print(style.dim(`  ${result.hookPath}`));
     } else {
@@ -173,12 +181,15 @@ export async function runHook(opts: HookCommandOptions): Promise<number> {
       removed: result.removed,
     });
   } else if (result.removed) {
+    const style = buildStyle();
     opts.output.print(style.ok(`Removed pre-commit hook`));
     opts.output.print(style.dim(`  ${result.hookPath}`));
   } else if (result.preExisting === "absent") {
+    const style = buildStyle();
     opts.output.print(style.skip(`No pre-commit hook to remove`));
     opts.output.print(style.dim(`  ${result.hookPath}`));
   } else {
+    const style = buildStyle();
     opts.output.print(
       style.skip(`Pre-commit hook contains a different script; left untouched`),
     );

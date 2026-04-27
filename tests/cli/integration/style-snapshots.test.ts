@@ -290,7 +290,7 @@ describe("hook — style snapshot", () => {
     expect(lines[1]).toMatch(/^  .+pre-commit$/);
   });
 
-  it("uninstall (no hook): skip glyph (no-op path)", async () => {
+  it("uninstall (no hook): skip glyph + dim path (two-line shape)", async () => {
     fx = await makeFixture({});
     await gitInit(fx.projectRoot);
     const cap = captureOutput(false);
@@ -301,7 +301,9 @@ describe("hook — style snapshot", () => {
       force: false,
     });
     const lines = cap.stdout().trimEnd().split("\n");
+    expect(lines).toHaveLength(2);
     expect(lines[0]).toBe("[skip] No pre-commit hook to remove");
+    expect(lines[1]).toMatch(/^  .+pre-commit$/);
   });
 
   it("uninstall (ours): ok glyph + dim path", async () => {
