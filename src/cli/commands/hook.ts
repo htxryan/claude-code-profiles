@@ -119,7 +119,7 @@ export async function runHook(opts: HookCommandOptions): Promise<number> {
   // in a path that never paints a glyph.
   function buildStyle() {
     return createStyle({
-      isTty: Boolean(process.stdout.isTTY),
+      isTty: opts.output.isTty,
       platform: process.platform,
       noColor: resolveNoColor(opts.noColor === true),
     });

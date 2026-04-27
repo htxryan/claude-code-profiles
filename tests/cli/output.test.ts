@@ -194,6 +194,103 @@ describe("OutputChannel — quiet mode (azp)", () => {
   it("jsonMode flag is false in quiet mode (the channel is not JSON)", () => {
     expect(buildQuiet().ch.jsonMode).toBe(false);
   });
+
+  it("phase is silenced in quiet mode", () => {
+    const { ch, err } = buildQuiet();
+    ch.phase("resolving…");
+    expect(err.buf).toBe("");
+  });
+});
+
+describe("OutputChannel — phase() (3yy)", () => {
+  it("writes to stderr in human mode", () => {
+    const { ch, out, err } = build(false);
+    ch.phase("resolving…");
+    expect(err.buf).toBe("resolving…\n");
+    expect(out.buf).toBe("");
+  });
+
+  it("appends a single trailing newline", () => {
+    const { ch, err } = build(false);
+    ch.phase("a\n");
+    expect(err.buf).toBe("a\n");
+  });
+
+  it("is silenced in --json mode", () => {
+    const { ch, err } = build(true);
+    ch.phase("resolving…");
+    expect(err.buf).toBe("");
+  });
+});
+
+describe("OutputChannel — isTty signal (3yy)", () => {
+  it("respects an explicit isTty:true override even when stdout is injected", () => {
+    const out = new StringSink();
+    const ch = createOutput({
+      json: false,
+      isTty: true,
+      stdout: out as unknown as NodeJS.WritableStream,
+    });
+    expect(ch.isTty).toBe(true);
+  });
+
+  it("respects an explicit isTty:false override", () => {
+    const ch = createOutput({ json: false, isTty: false });
+    expect(ch.isTty).toBe(false);
+  });
+
+  it("with injected stdout but no override → isTty is false (test default)", () => {
+    // Tests must not pick up the parent terminal's TTY-ness when they
+    // forget to pass isTty alongside a sink. Pinning to false here is the
+    // safe default — the sink is plainly not a TTY.
+    const out = new StringSink();
+    const ch = createOutput({
+      json: false,
+      stdout: out as unknown as NodeJS.WritableStream,
+    });
+    expect(ch.isTty).toBe(false);
+  });
+});
+
+describe("createStyle — driftStatus + byteDelta (3yy)", () => {
+  it("driftStatus paints clean=green, modified/added=yellow, deleted/unrecoverable=red", () => {
+    const s = createStyle({ isTty: true, platform: "linux" });
+    expect(s.driftStatus("clean", "x")).toBe("\x1b[32mx\x1b[0m");
+    expect(s.driftStatus("modified", "x")).toBe("\x1b[33mx\x1b[0m");
+    expect(s.driftStatus("added", "x")).toBe("\x1b[33mx\x1b[0m");
+    expect(s.driftStatus("deleted", "x")).toBe("\x1b[31mx\x1b[0m");
+    expect(s.driftStatus("unrecoverable", "x")).toBe("\x1b[31mx\x1b[0m");
+  });
+
+  it("driftStatus is a no-op without colour", () => {
+    const s = createStyle({ isTty: false, platform: "linux" });
+    expect(s.driftStatus("clean", "x")).toBe("x");
+    expect(s.driftStatus("deleted", "x")).toBe("x");
+  });
+
+  it("byteDelta dim under 100, normal in 100..10K, bold above 10K", () => {
+    const s = createStyle({ isTty: true, platform: "linux" });
+    // <100 → dim
+    expect(s.byteDelta("+45", 45)).toBe("\x1b[2m+45\x1b[0m");
+    expect(s.byteDelta("+99", 99)).toBe("\x1b[2m+99\x1b[0m");
+    // 100..10240 → unstyled
+    expect(s.byteDelta("+100", 100)).toBe("+100");
+    expect(s.byteDelta("+10240", 10240)).toBe("+10240");
+    // >10240 → bold
+    expect(s.byteDelta("+10241", 10241)).toBe("\x1b[1m+10241\x1b[0m");
+    expect(s.byteDelta("+999999", 999999)).toBe("\x1b[1m+999999\x1b[0m");
+  });
+
+  it("byteDelta is a no-op without colour", () => {
+    const s = createStyle({ isTty: false, platform: "linux" });
+    expect(s.byteDelta("+45", 45)).toBe("+45");
+    expect(s.byteDelta("+99999", 99999)).toBe("+99999");
+  });
+
+  it("zero magnitude lands in the dim bucket (matches the spec wording '<100')", () => {
+    const s = createStyle({ isTty: true, platform: "linux" });
+    expect(s.byteDelta("+0", 0)).toBe("\x1b[2m+0\x1b[0m");
+  });
 });
 
 describe("OutputChannel — EPIPE-safety", () => {

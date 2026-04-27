@@ -74,6 +74,7 @@ export async function dispatch(
         preCommitWarn: command.preCommitWarn,
         verbose: command.verbose,
         preview: command.preview,
+        noColor: global.noColor,
       });
 
     case "diff":
@@ -83,6 +84,7 @@ export async function dispatch(
         a: command.a,
         b: command.b,
         preview: command.preview,
+        noColor: global.noColor,
       });
 
     case "validate":

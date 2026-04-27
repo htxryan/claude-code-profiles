@@ -241,6 +241,35 @@ Both `diff` and `drift` summary lines report byte deltas:
 
 Tells you the magnitude of a change before you drill in.
 
+### Colour and progress hints
+
+Under a TTY, the read-only commands (`list`, `status`, `drift`, `diff`,
+`validate`) colour-code their output so a busy tree can be skimmed at a
+glance:
+
+- `list` — the active profile's name is bold; `*` marks the row.
+- `status` / `drift` — `drift: clean` lights up green; status words
+  (`modified`, `added`, `deleted`, `unrecoverable`) are colour-coded.
+- `drift` / `diff` — the `+N -N ~N bytes` summary intensifies by
+  magnitude (subtle under 100 B, bright over 10 KB) so an outsized
+  delta visually outranks the others.
+
+The mutating verbs (`use`, `sync`, `validate`) emit transient
+phase-progress hints to stderr (`resolving profile…`, `merging files…`,
+`materializing…`, `validating <name>…`) so a 1000-file profile doesn't
+sit on a stuck cursor.
+
+Colour and progress hints are suppressed by:
+
+- `--no-color` (CLI flag)
+- `NO_COLOR=1` (env var, per <https://no-color.org>)
+- `--quiet` / `-q` (silences phase progress in addition to other human output)
+- `--json` (always emits a single structured payload, no human chatter)
+- Non-TTY stdout (CI logs, redirected output, pipes)
+
+`--json` output is byte-identical regardless of colour settings —
+machine consumers see the same payload everywhere.
+
 ## FAQ
 
 **Is this safe to run in CI?**

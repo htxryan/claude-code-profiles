@@ -113,8 +113,19 @@ export async function runValidate(opts: ValidateOptions): Promise<number> {
     return 0;
   }
 
+  // Phase hints (3yy): per-profile progress emitted on stderr so a 50-profile
+  // validate doesn't sit on a stuck cursor. Silenced under --json and --quiet
+  // by the OutputChannel; we still emit when stdout is human (TTY or piped)
+  // so a `claude-profiles validate > log.txt` run shows live progress.
+  const phaseStyle = createStyle({
+    isTty: opts.output.isTty,
+    platform: process.platform,
+    noColor: resolveNoColor(opts.noColor === true),
+  });
   const results: ValidateProfileResult[] = [];
   for (const name of targets) {
+    // phase() is a no-op under --json/--quiet — no extra branch needed here.
+    opts.output.phase(phaseStyle.dim(`validating ${name}…`));
     results.push(await validateOne(opts.cwd, name, opts.profile !== null));
   }
   const pass = results.every((r) => r.ok);
@@ -124,7 +135,7 @@ export async function runValidate(opts: ValidateOptions): Promise<number> {
     opts.output.json(payload);
   } else {
     const style = createStyle({
-      isTty: Boolean(process.stdout.isTTY),
+      isTty: opts.output.isTty,
       platform: process.platform,
       noColor: resolveNoColor(opts.noColor === true),
     });

@@ -388,7 +388,7 @@ function emitOutput(
   // glyphs, suggested next-step block. Style is auto-derived from TTY +
   // NO_COLOR + platform; non-TTY runs degrade to plain ASCII.
   const style = createStyle({
-    isTty: Boolean(process.stdout.isTTY),
+    isTty: output.isTty,
     platform: process.platform,
     noColor: resolveNoColor(noColorFlag),
   });

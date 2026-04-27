@@ -60,6 +60,10 @@ export async function main(argv: ReadonlyArray<string>): Promise<number> {
   const output = createOutput({
     json: parsed.ok ? parsed.invocation.global.json : false,
     quiet: parsed.ok ? parsed.invocation.global.quiet : false,
+    // OutputChannel.isTty drives every command's colour decision. Reading
+    // process.stdout.isTTY here (and only here) keeps the rest of the CLI
+    // testable without monkey-patching the global stdout.
+    isTty: Boolean((process.stdout as { isTTY?: boolean }).isTTY),
   });
 
   if (!parsed.ok) {

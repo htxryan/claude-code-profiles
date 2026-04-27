@@ -12,11 +12,13 @@
  *   - changed: exists in both, bytes differ
  */
 
+import process from "node:process";
+
 import { merge } from "../../merge/index.js";
 import { resolve } from "../../resolver/index.js";
 import { buildStatePaths, readStateFile } from "../../state/index.js";
 import { CliUserError } from "../exit.js";
-import type { OutputChannel } from "../output.js";
+import { createStyle, resolveNoColor, type OutputChannel } from "../output.js";
 import { renderUnifiedDiff } from "../preview.js";
 import { assertValidProfileName, enrichMissingProfileError } from "../suggest.js";
 
@@ -53,6 +55,8 @@ export interface DiffOptions {
   b: string | null;
   /** azp: when true, render unified-diff content for each `changed` entry. */
   preview?: boolean;
+  /** When true, force colour off (additive with NO_COLOR env). Default false. */
+  noColor?: boolean;
 }
 
 export async function runDiff(opts: DiffOptions): Promise<number> {
@@ -153,6 +157,12 @@ export async function runDiff(opts: DiffOptions): Promise<number> {
     return 0;
   }
 
+  const style = createStyle({
+    isTty: opts.output.isTty,
+    platform: process.platform,
+    noColor: resolveNoColor(opts.noColor === true),
+  });
+
   if (entries.length === 0) {
     // The total file count tells the reader "they really do agree on N
     // files" — without it, "identical" is ambiguous (zero files vs.
@@ -162,11 +172,25 @@ export async function runDiff(opts: DiffOptions): Promise<number> {
     opts.output.print(`a=${a} b=${b}: identical (${filesInBoth} files in both)`);
     return 0;
   }
+  // Byte-count intensity bumps so a multi-KB delta in one column visually
+  // outranks the others — same magnitude thresholds drift uses (3yy).
+  const addedSeg = style.byteDelta(`+${totals.addedBytes}`, totals.addedBytes);
+  const removedSeg = style.byteDelta(`-${totals.removedBytes}`, totals.removedBytes);
+  const changedSeg = style.byteDelta(`~${totals.changedBytes}`, totals.changedBytes);
   opts.output.print(
-    `a=${a} b=${b}: ${entries.length} changes (${totals.added} added, ${totals.removed} removed, ${totals.changed} changed) (+${totals.addedBytes} -${totals.removedBytes} ~${totals.changedBytes} bytes)`,
+    `a=${a} b=${b}: ${entries.length} changes (${totals.added} added, ${totals.removed} removed, ${totals.changed} changed) (${addedSeg} ${removedSeg} ${changedSeg} bytes)`,
   );
   for (const e of entries) {
-    const sigil = e.status === "added" ? "+" : e.status === "removed" ? "-" : "~";
+    // Sigils mirror the drift status palette so the reader's eye learns one
+    // colour grammar: green=added, red=removed, yellow=changed.
+    const rawSigil = e.status === "added" ? "+" : e.status === "removed" ? "-" : "~";
+    const sigilDriftStatus =
+      e.status === "added"
+        ? "clean" // green — new bytes lighting up
+        : e.status === "removed"
+          ? "deleted" // red
+          : "modified"; // yellow — changed bytes
+    const sigil = style.driftStatus(sigilDriftStatus, rawSigil);
     // Single-char sigils today render as `  + path`; the leading two spaces
     // form the sigil "column" and keep relPath aligned across rows.
     opts.output.print(`  ${sigil} ${e.relPath}`);

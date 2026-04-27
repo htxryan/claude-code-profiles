@@ -66,7 +66,7 @@ export async function runNew(opts: NewOptions): Promise<number> {
     });
   } else {
     const style = createStyle({
-      isTty: Boolean(process.stdout.isTTY),
+      isTty: opts.output.isTty,
       platform: process.platform,
       noColor: resolveNoColor(opts.noColor === true),
     });

@@ -70,6 +70,14 @@ export interface SwapOptions {
    * so callers can't accidentally skip wiring it through.
    */
   signalHandlers: boolean;
+  /**
+   * Optional callback that emits a transient progress hint between phases
+   * (resolve / merge / materialize). Wired by the use/sync handlers to
+   * `output.phase(...)` — silenced under --json and --quiet via the channel
+   * so callers don't need to re-implement the suppression logic. Undefined
+   * (the swap.test default) skips emission entirely.
+   */
+  onPhase?: (text: string) => void;
 }
 
 export interface SwapResult {
@@ -124,7 +132,14 @@ export async function runSwap(opts: SwapOptions): Promise<SwapResult> {
   // 1. Resolve + merge OUTSIDE the lock. Resolution is a read-only operation
   //    over .claude-profiles/ that doesn't conflict with concurrent work.
   //    R43: reads bypass the lock.
+  //
+  //    Phase hints (3yy): emitted before each long phase so a 1000-file
+  //    profile doesn't sit on a stuck cursor. The callback is silenced
+  //    under --json/--quiet at the OutputChannel level — no suppression
+  //    logic needed here.
+  opts.onPhase?.("resolving profile…");
   const plan = await resolve(opts.targetProfile, { projectRoot: opts.paths.projectRoot });
+  opts.onPhase?.("merging files…");
   const merged = await merge(plan);
 
   // 2. First-pass drift detect outside the lock — used to drive the prompt
@@ -224,6 +239,7 @@ export async function runSwap(opts: SwapOptions): Promise<SwapResult> {
         );
       }
 
+      opts.onPhase?.("materializing…");
       return await applyGate(appliedChoice, {
         paths: opts.paths,
         plan,

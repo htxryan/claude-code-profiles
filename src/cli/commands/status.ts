@@ -108,7 +108,7 @@ export async function runStatus(opts: StatusOptions): Promise<number> {
   }
 
   const style = createStyle({
-    isTty: Boolean(process.stdout.isTTY),
+    isTty: opts.output.isTty,
     platform: process.platform,
     noColor: resolveNoColor(opts.noColor === true),
   });

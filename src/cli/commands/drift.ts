@@ -9,12 +9,14 @@
 import { promises as fs } from "node:fs";
 import * as path from "node:path";
 
+import process from "node:process";
+
 import { detectDrift, preCommitWarn, type DriftReport } from "../../drift/index.js";
 import { merge } from "../../merge/index.js";
 import { resolve } from "../../resolver/index.js";
 import { buildStatePaths, readStateFile, type StatePaths } from "../../state/index.js";
 import { formatStateWarning, meaningfulStateWarning } from "../format.js";
-import type { OutputChannel } from "../output.js";
+import { createStyle, resolveNoColor, type OutputChannel } from "../output.js";
 import { renderHeadPreview, renderUnifiedDiff } from "../preview.js";
 
 export interface DriftCommandPayload {
@@ -68,6 +70,8 @@ export interface DriftOptions {
    * opt-in.
    */
   preview?: boolean;
+  /** When true, force colour off (additive with NO_COLOR env). Default false. */
+  noColor?: boolean;
 }
 
 export async function runDrift(opts: DriftOptions): Promise<number> {
@@ -93,6 +97,12 @@ export async function runDrift(opts: DriftOptions): Promise<number> {
     return 0;
   }
 
+  const style = createStyle({
+    isTty: opts.output.isTty,
+    platform: process.platform,
+    noColor: resolveNoColor(opts.noColor === true),
+  });
+
   if (!report.fingerprintOk) {
     if (report.active === null) {
       opts.output.print("(no active profile)");
@@ -107,7 +117,10 @@ export async function runDrift(opts: DriftOptions): Promise<number> {
 
   if (report.entries.length === 0) {
     opts.output.print(`active: ${report.active}`);
-    opts.output.print("drift: clean");
+    // Green ok glyph for clean drift mirrors `status` (which already prints
+    // `style.ok("drift: clean")`) — keeps the at-a-glance signal consistent
+    // across the two read-only commands.
+    opts.output.print(style.ok("drift: clean"));
     return 0;
   }
 
@@ -121,14 +134,26 @@ export async function runDrift(opts: DriftOptions): Promise<number> {
   const scanSuffix = opts.verbose
     ? ` (scanned ${report.scannedFiles}, fast=${report.fastPathHits}, slow=${report.slowPathHits})`
     : "";
+  // Byte-count intensity (bhq/3yy): the three magnitudes get independent
+  // intensity bumps so an outsized delta in one column ("+45000") visually
+  // outranks the others ("-12 ~5") instead of all three reading flat.
+  const addedSeg = style.byteDelta(`+${byteCounts.addedBytes}`, byteCounts.addedBytes);
+  const removedSeg = style.byteDelta(`-${byteCounts.removedBytes}`, byteCounts.removedBytes);
+  const changedSeg = style.byteDelta(`~${byteCounts.changedBytes}`, byteCounts.changedBytes);
   opts.output.print(
-    `drift: ${report.entries.length} file(s) (+${byteCounts.addedBytes} -${byteCounts.removedBytes} ~${byteCounts.changedBytes} bytes)${scanSuffix}`,
+    `drift: ${report.entries.length} file(s) (${addedSeg} ${removedSeg} ${changedSeg} bytes)${scanSuffix}`,
   );
   for (const e of report.entries) {
     const prov = e.provenance.map((p) => p.id).join(", ");
-    // padEnd(13) widens for 'unrecoverable' so columns line up; older
-    // statuses (modified/added/deleted) still fit comfortably.
-    opts.output.print(`  ${e.status.padEnd(13)} ${e.relPath}${prov ? `  (from: ${prov})` : ""}`);
+    // padEnd is applied to the RAW status word so column alignment is byte-
+    // identical regardless of colour escapes (renderTable uses padEnd-visible
+    // logic; this row is built by hand so we pad the visible width manually).
+    const padded = e.status.padEnd(13);
+    const colored = style.driftStatus(e.status, padded);
+    // Provenance is dimmed so the status + relPath read first; the "from:"
+    // tail is reference-grade context, not the headline.
+    const provTail = prov ? `  ${style.dim(`(from: ${prov})`)}` : "";
+    opts.output.print(`  ${colored} ${e.relPath}${provTail}`);
     // cw6/T5: surface the actionable remediation immediately under the
     // entry so the user doesn't have to hunt for it.
     if (e.error) {

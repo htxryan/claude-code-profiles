@@ -48,7 +48,7 @@ export async function runUse(opts: UseOptions): Promise<number> {
     });
   } else {
     const style = createStyle({
-      isTty: Boolean(process.stdout.isTTY),
+      isTty: opts.output.isTty,
       platform: process.platform,
       noColor: resolveNoColor(opts.noColor === true),
     });
@@ -69,6 +69,15 @@ export async function runUse(opts: UseOptions): Promise<number> {
 }
 
 async function runSwapWithSuggestions(opts: UseOptions): Promise<SwapResult> {
+  // Phase hints (3yy): emit transient progress lines on stderr through the
+  // OutputChannel so --json and --quiet silence them automatically. We pre-
+  // dim them via the same Style the success line uses so they read as
+  // secondary even on a colour-stripped terminal.
+  const style = createStyle({
+    isTty: opts.output.isTty,
+    platform: process.platform,
+    noColor: resolveNoColor(opts.noColor === true),
+  });
   try {
     return await runSwap({
       paths: buildStatePaths(opts.cwd),
@@ -77,6 +86,7 @@ async function runSwapWithSuggestions(opts: UseOptions): Promise<SwapResult> {
       onDriftFlag: opts.onDriftFlag,
       prompt: readlinePrompt,
       signalHandlers: opts.signalHandlers,
+      onPhase: (text) => opts.output.phase(style.dim(text)),
     });
   } catch (err) {
     throw await enrichMissingProfileError(err, opts.cwd, opts.profile);

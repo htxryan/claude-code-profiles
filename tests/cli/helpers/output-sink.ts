@@ -26,11 +26,21 @@ export interface CapturedOutput {
   jsonLines(): unknown[];
 }
 
-export function captureOutput(json: boolean): CapturedOutput {
+export interface CaptureOptions {
+  /**
+   * Override the channel's TTY signal (3yy). Defaults to `false` so existing
+   * tests that captured output via the sink see the no-colour rendering.
+   * Snapshot tests that want to assert the TTY-mode shape pass `isTty: true`.
+   */
+  isTty?: boolean;
+}
+
+export function captureOutput(json: boolean, opts: CaptureOptions = {}): CapturedOutput {
   const out = new StringSink();
   const err = new StringSink();
   const channel = createOutput({
     json,
+    isTty: opts.isTty ?? false,
     stdout: out as unknown as NodeJS.WritableStream,
     stderr: err as unknown as NodeJS.WritableStream,
   });

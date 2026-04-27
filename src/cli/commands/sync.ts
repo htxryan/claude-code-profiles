@@ -34,6 +34,13 @@ export async function runSync(opts: SyncOptions): Promise<number> {
       EXIT_USER_ERROR,
     );
   }
+  // Phase hints (3yy): emit transient progress lines on stderr through the
+  // OutputChannel so --json and --quiet silence them automatically.
+  const phaseStyle = createStyle({
+    isTty: opts.output.isTty,
+    platform: process.platform,
+    noColor: resolveNoColor(opts.noColor === true),
+  });
   const result = await runSwap({
     paths,
     targetProfile: state.activeProfile,
@@ -42,6 +49,7 @@ export async function runSync(opts: SyncOptions): Promise<number> {
     prompt: readlinePrompt,
     isSync: true,
     signalHandlers: opts.signalHandlers,
+    onPhase: (text) => opts.output.phase(phaseStyle.dim(text)),
   });
 
   if (opts.output.jsonMode) {
@@ -54,7 +62,7 @@ export async function runSync(opts: SyncOptions): Promise<number> {
     });
   } else {
     const style = createStyle({
-      isTty: Boolean(process.stdout.isTTY),
+      isTty: opts.output.isTty,
       platform: process.platform,
       noColor: resolveNoColor(opts.noColor === true),
     });

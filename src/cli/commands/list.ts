@@ -81,7 +81,7 @@ export async function runList(opts: ListOptions): Promise<number> {
     opts.output.print("(no profiles — run `claude-profiles new <name>` to create one)");
   } else {
     const style = createStyle({
-      isTty: Boolean(process.stdout.isTTY),
+      isTty: opts.output.isTty,
       platform: process.platform,
       noColor: resolveNoColor(opts.noColor === true),
     });
