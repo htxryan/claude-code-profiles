@@ -375,6 +375,10 @@ describe("materialize: projectRoot section splice (cw6/T4 / R45)", () => {
         const msg = (err as Error).message;
         expect(msg).toContain("claude-profiles init");
         expect(msg).toContain(paths.rootClaudeMdFile);
+        // ppo: spell out the literal marker pair the user should expect to
+        // see, so a user who accidentally deleted them knows what to put back.
+        expect(msg).toContain("<!-- claude-profiles:v1:begin -->");
+        expect(msg).toContain("<!-- claude-profiles:v1:end -->");
       }
     });
   });

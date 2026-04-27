@@ -14,9 +14,9 @@
 import { promises as fs } from "node:fs";
 import * as path from "node:path";
 
-import { isValidProfileName } from "../../resolver/index.js";
 import { CliUserError, EXIT_USER_ERROR } from "../exit.js";
 import type { OutputChannel } from "../output.js";
+import { assertValidProfileName } from "../suggest.js";
 
 export interface NewOptions {
   cwd: string;
@@ -26,12 +26,9 @@ export interface NewOptions {
 }
 
 export async function runNew(opts: NewOptions): Promise<number> {
-  if (!isValidProfileName(opts.profile)) {
-    throw new CliUserError(
-      `new: invalid profile name "${opts.profile}" — must be a bare directory name without /, \\, leading . or _`,
-      EXIT_USER_ERROR,
-    );
-  }
+  // ppo: route through the shared validator so all four name-taking verbs
+  // (new/use/diff/validate) emit identical wording on bad input.
+  assertValidProfileName("new", opts.profile);
 
   const profilesRoot = path.join(opts.cwd, ".claude-profiles");
   const profileDir = path.join(profilesRoot, opts.profile);

@@ -70,8 +70,12 @@ export class LockHeldError extends Error {
   readonly lockPath: string;
 
   constructor(lockPath: string, holderPid: number, holderTimestamp: string) {
+    // Polish epic claude-code-profiles-ppo: every error names the next step.
+    // The original message satisfies §7 (names the file/PID/timestamp); the
+    // remediation tail tells a user staring at a wedged lock what to do —
+    // wait, or hand-clean the lock if the holder is dead.
     super(
-      `Lock at "${lockPath}" is held by PID ${holderPid} (acquired at ${holderTimestamp})`,
+      `Lock at "${lockPath}" is held by PID ${holderPid} (acquired at ${holderTimestamp}) — wait for the other process, or remove "${lockPath}" if the PID is dead`,
     );
     this.name = "LockHeldError";
     this.lockPath = lockPath;

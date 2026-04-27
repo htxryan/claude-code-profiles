@@ -17,6 +17,7 @@ import { resolve } from "../../resolver/index.js";
 import { buildStatePaths, readStateFile } from "../../state/index.js";
 import { CliUserError } from "../exit.js";
 import type { OutputChannel } from "../output.js";
+import { assertValidProfileName, enrichMissingProfileError } from "../suggest.js";
 
 export interface DiffEntry {
   relPath: string;
@@ -40,6 +41,11 @@ export interface DiffOptions {
 export async function runDiff(opts: DiffOptions): Promise<number> {
   const a = opts.a;
   let b = opts.b;
+  // ppo: validate user-supplied names BEFORE touching the filesystem so a
+  // path-traversal-shaped name fails with the standardized invalid-name
+  // message rather than a vague "Profile does not exist".
+  assertValidProfileName("diff", a);
+  if (b !== null) assertValidProfileName("diff", b);
   if (b === null) {
     const { state } = await readStateFile(buildStatePaths(opts.cwd));
     if (state.activeProfile === null) {
@@ -65,8 +71,13 @@ export async function runDiff(opts: DiffOptions): Promise<number> {
     return 0;
   }
 
-  const planA = await resolve(a, { projectRoot: opts.cwd });
-  const planB = await resolve(b, { projectRoot: opts.cwd });
+  // ppo: enrich top-level typo against `a`/`b` with did-you-mean suggestions.
+  // The second positional name `b` may have been auto-filled from
+  // state.activeProfile above; even so, treat it as a top-level lookup —
+  // a stale state could name a profile the user has since renamed, and a
+  // "did you mean" still helps.
+  const planA = await resolveWithSuggestions(a, opts.cwd);
+  const planB = await resolveWithSuggestions(b, opts.cwd);
   const mergedA = await merge(planA);
   const mergedB = await merge(planB);
 
@@ -117,3 +128,15 @@ export async function runDiff(opts: DiffOptions): Promise<number> {
   }
   return 0;
 }
+
+async function resolveWithSuggestions(name: string, cwd: string): Promise<ResolvedPlanForDiff> {
+  try {
+    return await resolve(name, { projectRoot: cwd });
+  } catch (err) {
+    throw await enrichMissingProfileError(err, cwd, name);
+  }
+}
+
+// Minimal local alias so we don't have to plumb the resolver's exported
+// ResolvedPlan type through the diff command's surface (it never escapes).
+type ResolvedPlanForDiff = Awaited<ReturnType<typeof resolve>>;

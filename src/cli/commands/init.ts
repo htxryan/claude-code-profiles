@@ -112,8 +112,11 @@ export async function runInit(opts: InitOptions): Promise<number> {
       // so "already initialised" is "any non-lock/non-tmp content exists".
       const profilesDirCreated = await classifyProfilesDir(paths.profilesDir);
       if (profilesDirCreated === "already-initialised") {
+        // ppo: append a forward-momentum hint so the user doesn't dead-end
+        // on "refusing to overwrite" — they almost always want either
+        // `status` (inspect) or `new <name>` (extend) next.
         throw new CliUserError(
-          `init: ".claude-profiles/" is already initialised in this project; refusing to overwrite`,
+          `init: ".claude-profiles/" is already initialised in this project; refusing to overwrite (run "claude-profiles status" to see current state, or "claude-profiles new <name>" to add a profile)`,
           EXIT_USER_ERROR,
         );
       }

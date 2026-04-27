@@ -504,6 +504,147 @@ describe("E7 scenarios S1-S18 (cross-epic CLI gate)", () => {
   });
 });
 
+describe("ppo: error messages name the next step", () => {
+  // Did-you-mean: typo within Levenshtein distance 2 → suggestion appended to
+  // the MissingProfile message. Exit code stays exit-1 (CLI typo class —
+  // referencedBy=undefined). Code field is unchanged ("MissingProfile") so
+  // machines keying off it are unaffected.
+  it("`use <typo>` near an existing profile → 'did you mean: <name>?' in stderr", async () => {
+    await ensureBuilt();
+    fx = await makeFixture({
+      profiles: {
+        ghost: { manifest: { name: "ghost" }, files: { "x.md": "x\n" } },
+      },
+    });
+    const r = await runCli({
+      args: ["--cwd", fx.projectRoot, "use", "ghst"],
+    });
+    expect(r.exitCode).toBe(1);
+    expect(r.stderr).toContain('Profile "ghst" does not exist');
+    expect(r.stderr).toContain("did you mean: ghost?");
+  });
+
+  it("`diff <typo> <real>` near an existing profile → suggestion appended", async () => {
+    await ensureBuilt();
+    fx = await makeFixture({
+      profiles: {
+        alpha: { manifest: { name: "alpha" }, files: { "x.md": "a\n" } },
+        beta: { manifest: { name: "beta" }, files: { "x.md": "b\n" } },
+      },
+    });
+    const r = await runCli({
+      args: ["--cwd", fx.projectRoot, "diff", "alfa", "beta"],
+    });
+    expect(r.exitCode).toBe(1);
+    expect(r.stderr).toContain("did you mean: alpha?");
+  });
+
+  it("`validate <typo>` near an existing profile → suggestion in FAIL row", async () => {
+    await ensureBuilt();
+    fx = await makeFixture({
+      profiles: {
+        production: { manifest: { name: "production" }, files: {} },
+      },
+    });
+    const r = await runCli({
+      args: ["--cwd", fx.projectRoot, "validate", "prodction"],
+    });
+    expect(r.exitCode).toBe(3); // validation failure → conflict class
+    // Human output prints `[MissingProfile] Profile "..." does not exist (did you mean: ...)`
+    const out = `${r.stdout}${r.stderr}`;
+    expect(out).toContain("did you mean: production?");
+  });
+
+  it("typo with NO close match → no suggestion (current behaviour preserved)", async () => {
+    await ensureBuilt();
+    fx = await makeFixture({
+      profiles: {
+        alpha: { manifest: { name: "alpha" }, files: {} },
+      },
+    });
+    const r = await runCli({
+      args: ["--cwd", fx.projectRoot, "use", "zzzzz"],
+    });
+    expect(r.exitCode).toBe(1);
+    expect(r.stderr).toContain('Profile "zzzzz" does not exist');
+    expect(r.stderr).not.toContain("did you mean");
+  });
+
+  it("multiple matches within distance 2 → comma-separated list, max 3", async () => {
+    await ensureBuilt();
+    fx = await makeFixture({
+      profiles: {
+        abcd: { manifest: { name: "abcd" }, files: {} },
+        abce: { manifest: { name: "abce" }, files: {} },
+        abcf: { manifest: { name: "abcf" }, files: {} },
+        abcg: { manifest: { name: "abcg" }, files: {} },
+        abch: { manifest: { name: "abch" }, files: {} },
+      },
+    });
+    const r = await runCli({
+      args: ["--cwd", fx.projectRoot, "use", "abc"],
+    });
+    expect(r.exitCode).toBe(1);
+    // The suggestion list is bounded to 3 entries; the exact set is the
+    // first 3 sorted lex (since distance is the same for all five).
+    expect(r.stderr).toContain("did you mean: abcd, abce, abcf?");
+  });
+
+  // Path-traversal-shaped names: pre-flight rejects with the standardized
+  // "invalid profile name (contains /, \\, leading . or _)" wording rather
+  // than a generic missing-profile error.
+  it("`use a/b` → 'invalid profile name' wording (path separator)", async () => {
+    await ensureBuilt();
+    fx = await makeFixture({
+      profiles: { real: { manifest: { name: "real" }, files: {} } },
+    });
+    const r = await runCli({
+      args: ["--cwd", fx.projectRoot, "use", "a/b"],
+    });
+    expect(r.exitCode).toBe(1);
+    expect(r.stderr).toContain('invalid profile name "a/b"');
+    expect(r.stderr).toContain("contains /, \\, leading . or _");
+  });
+
+  it("`diff a/b real` → 'invalid profile name' wording", async () => {
+    await ensureBuilt();
+    fx = await makeFixture({
+      profiles: { real: { manifest: { name: "real" }, files: {} } },
+    });
+    const r = await runCli({
+      args: ["--cwd", fx.projectRoot, "diff", "a/b", "real"],
+    });
+    expect(r.exitCode).toBe(1);
+    expect(r.stderr).toContain('invalid profile name "a/b"');
+  });
+
+  it("`validate a/b` → 'invalid profile name' wording", async () => {
+    await ensureBuilt();
+    fx = await makeFixture({});
+    const r = await runCli({
+      args: ["--cwd", fx.projectRoot, "validate", "a/b"],
+    });
+    expect(r.exitCode).toBe(1);
+    expect(r.stderr).toContain('invalid profile name "a/b"');
+  });
+
+  // Init on already-initialised: hint suffix telling the user what to do next.
+  it("`init` on already-initialised project → hint about status / new", async () => {
+    await ensureBuilt();
+    fx = await makeFixture({
+      profiles: { existing: { manifest: { name: "existing" }, files: {} } },
+    });
+    const r = await runCli({
+      args: ["--cwd", fx.projectRoot, "init"],
+    });
+    expect(r.exitCode).toBe(1);
+    expect(r.stderr).toContain("already initialised");
+    // Forward-momentum hint per ppo AC.
+    expect(r.stderr).toContain('claude-profiles status');
+    expect(r.stderr).toContain('claude-profiles new');
+  });
+});
+
 describe("E7 contracts: ResolvedPlan provenance survives the CLI surface", () => {
   it("ResolvedPlan contributors persist into .state.json.resolvedSources via CLI use", async () => {
     await ensureBuilt();

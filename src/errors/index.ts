@@ -83,16 +83,31 @@ export class MaterializeError extends PipelineError {
 export class MissingProfileError extends ResolverError {
   readonly missing: string;
   readonly referencedBy: string | undefined;
+  /**
+   * Optional "did you mean" suggestions, populated by CLI command handlers
+   * when the missing name is a top-level CLI typo (referencedBy === undefined)
+   * and at least one in-project profile is within Levenshtein distance 2.
+   * The resolver itself never sets this — only the use/diff/validate
+   * commands enrich the error before letting it propagate, so the resolver
+   * stays decoupled from CLI-layer concerns.
+   */
+  readonly suggestions: ReadonlyArray<string>;
 
-  constructor(missing: string, referencedBy?: string) {
+  constructor(
+    missing: string,
+    referencedBy?: string,
+    suggestions: ReadonlyArray<string> = [],
+  ) {
     const ref = referencedBy ? ` (referenced by "${referencedBy}")` : "";
+    const sug = suggestions.length > 0 ? ` (did you mean: ${suggestions.join(", ")}?)` : "";
     super(
       "MissingProfile",
-      `Profile "${missing}" does not exist${ref}`,
+      `Profile "${missing}" does not exist${ref}${sug}`,
     );
     this.name = "MissingProfileError";
     this.missing = missing;
     this.referencedBy = referencedBy;
+    this.suggestions = suggestions;
   }
 }
 
@@ -209,7 +224,10 @@ export class RootClaudeMdMarkersMissingError extends MaterializeError {
   constructor(filePath: string) {
     super(
       "RootClaudeMdMarkersMissing",
-      `project-root CLAUDE.md is missing claude-profiles markers — run \`claude-profiles init\` to repair (file: ${filePath})`,
+      // Spell out the literal marker pair so a user who accidentally deleted
+      // them knows what bytes to put back without needing to grep the spec.
+      // Polish epic claude-code-profiles-ppo: "every error names the next step".
+      `project-root CLAUDE.md is missing claude-profiles markers — run \`claude-profiles init\` to repair (file: ${filePath}; expected: <!-- claude-profiles:v1:begin --> ... <!-- claude-profiles:v1:end -->)`,
     );
     this.name = "RootClaudeMdMarkersMissingError";
     this.filePath = filePath;

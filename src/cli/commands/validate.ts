@@ -19,6 +19,7 @@ import { buildStatePaths, readStateFile } from "../../state/index.js";
 import { CliUserError, EXIT_CONFLICT, EXIT_USER_ERROR } from "../exit.js";
 import { formatResolutionWarnings } from "../format.js";
 import type { OutputChannel } from "../output.js";
+import { assertValidProfileName, enrichMissingProfileError } from "../suggest.js";
 
 /**
  * Stable union of error-code strings the `validate` command may emit in its
@@ -51,6 +52,13 @@ export interface ValidateOptions {
 }
 
 export async function runValidate(opts: ValidateOptions): Promise<number> {
+  // ppo: when the user passes an explicit profile name, pre-validate it
+  // against `isValidProfileName` so a path-traversal-shaped name surfaces
+  // the standardized invalid-name message instead of a per-profile FAIL row.
+  if (opts.profile !== null) {
+    assertValidProfileName("validate", opts.profile);
+  }
+
   // cw6 / R44: when a profile is active AND that profile's resolved plan
   // contributes to the project-root CLAUDE.md, verify the live root file
   // has the managed-block markers. This is a project-wide environment check,
@@ -104,7 +112,7 @@ export async function runValidate(opts: ValidateOptions): Promise<number> {
 
   const results: ValidateProfileResult[] = [];
   for (const name of targets) {
-    results.push(await validateOne(opts.cwd, name));
+    results.push(await validateOne(opts.cwd, name, opts.profile !== null));
   }
   const pass = results.every((r) => r.ok);
 
@@ -162,7 +170,9 @@ async function assertRootClaudeMdMarkers(projectRoot: string): Promise<void> {
   } catch (err: unknown) {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") {
       throw new CliUserError(
-        "project-root CLAUDE.md is missing claude-profiles markers — run `claude-profiles init` to add them",
+        // Marker pair appended for ppo/AC: a user who accidentally deleted
+        // the markers needs to know exactly what bytes to put back.
+        "project-root CLAUDE.md is missing claude-profiles markers — run `claude-profiles init` to add them (expected: <!-- claude-profiles:v1:begin --> ... <!-- claude-profiles:v1:end -->)",
         EXIT_USER_ERROR,
       );
     }
@@ -171,13 +181,23 @@ async function assertRootClaudeMdMarkers(projectRoot: string): Promise<void> {
   const parsed = parseMarkers(content);
   if (!parsed.found) {
     throw new CliUserError(
-      "project-root CLAUDE.md is missing claude-profiles markers — run `claude-profiles init` to add them",
+      "project-root CLAUDE.md is missing claude-profiles markers — run `claude-profiles init` to add them (expected: <!-- claude-profiles:v1:begin --> ... <!-- claude-profiles:v1:end -->)",
       EXIT_USER_ERROR,
     );
   }
 }
 
-async function validateOne(cwd: string, name: string): Promise<ValidateProfileResult> {
+async function validateOne(
+  cwd: string,
+  name: string,
+  /**
+   * True iff this name came from `validate <name>` (an explicit user typed
+   * argument). When false (`validate` over every profile in the project),
+   * a missing profile means listProfiles disagreed with the filesystem mid-
+   * walk — not a typo — so we skip suggestion enrichment.
+   */
+  enrichTopLevelTypo: boolean,
+): Promise<ValidateProfileResult> {
   try {
     const plan = await resolve(name, { projectRoot: cwd });
     // Run merge to surface settings.json parse errors / read failures even
@@ -197,11 +217,18 @@ async function validateOne(cwd: string, name: string): Promise<ValidateProfileRe
       externalPaths: plan.externalPaths.map((e) => e.resolvedPath),
     };
   } catch (err: unknown) {
+    // ppo: when the user typed `validate <typo>` and the typo doesn't exist
+    // but a close in-project profile does, append the "did you mean" hint to
+    // the FAIL row. The errorCode field stays "MissingProfile" so machines
+    // can still key off it (per ppo AC: codes do not change).
+    const enriched = enrichTopLevelTypo
+      ? await enrichMissingProfileError(err, cwd, name)
+      : err;
     // Pin errorCode to PipelineErrorCode | "Unknown" so the --json payload
     // never leaks arbitrary class names (e.g. "TypeError", "SyntaxError")
     // into a field downstream tooling parses against the documented union.
-    const code: ValidateErrorCode = err instanceof PipelineError ? err.code : "Unknown";
-    const message = err instanceof Error ? err.message : String(err);
+    const code: ValidateErrorCode = enriched instanceof PipelineError ? enriched.code : "Unknown";
+    const message = enriched instanceof Error ? enriched.message : String(enriched);
     return {
       profile: name,
       ok: false,

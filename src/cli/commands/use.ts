@@ -8,6 +8,8 @@ import { buildStatePaths } from "../../state/index.js";
 import type { OutputChannel } from "../output.js";
 import { readlinePrompt } from "../prompt.js";
 import { runSwap } from "../service/swap.js";
+import type { SwapResult } from "../service/swap.js";
+import { assertValidProfileName, enrichMissingProfileError } from "../suggest.js";
 import type { OnDriftFlag } from "../types.js";
 
 export interface UseOptions {
@@ -21,14 +23,17 @@ export interface UseOptions {
 }
 
 export async function runUse(opts: UseOptions): Promise<number> {
-  const result = await runSwap({
-    paths: buildStatePaths(opts.cwd),
-    targetProfile: opts.profile,
-    mode: opts.mode,
-    onDriftFlag: opts.onDriftFlag,
-    prompt: readlinePrompt,
-    signalHandlers: opts.signalHandlers,
-  });
+  // Pre-flight name validation (claude-code-profiles-ppo): reject path-like
+  // names with the same wording `new` uses BEFORE handing off to runSwap.
+  // Without this, `use a/b` would surface as a generic "Profile does not
+  // exist" — accurate but missing the actionable "fix the name" cue.
+  assertValidProfileName("use", opts.profile);
+
+  // ppo: enrich top-level MissingProfileError with "did you mean: …"
+  // suggestions when at least one in-project profile is within distance 2.
+  // Pass-through for structural (extends-chain) misses — those need
+  // "edit a profile.json" remediation, not a typo nudge.
+  const result: SwapResult = await runSwapWithSuggestions(opts);
 
   if (opts.output.jsonMode) {
     opts.output.json({
@@ -48,4 +53,19 @@ export async function runUse(opts: UseOptions): Promise<number> {
     }
   }
   return 0;
+}
+
+async function runSwapWithSuggestions(opts: UseOptions): Promise<SwapResult> {
+  try {
+    return await runSwap({
+      paths: buildStatePaths(opts.cwd),
+      targetProfile: opts.profile,
+      mode: opts.mode,
+      onDriftFlag: opts.onDriftFlag,
+      prompt: readlinePrompt,
+      signalHandlers: opts.signalHandlers,
+    });
+  } catch (err) {
+    throw await enrichMissingProfileError(err, opts.cwd, opts.profile);
+  }
 }

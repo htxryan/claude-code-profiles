@@ -86,6 +86,18 @@ describe("formatError — AC-17 (always names file/profile/path)", () => {
     expect(out).toContain("2026-04-25T12:34:56.789Z");
   });
 
+  // ppo: LockHeldError must name the next step (wait, or hand-clean the
+  // lock if the PID is dead). The PID + timestamp from the §7 quality bar
+  // are still present (covered by the previous case).
+  it("LockHeldError: includes a remediation suggestion", () => {
+    const out = formatError(
+      new LockHeldError("/p/.claude-profiles/.meta/lock", 4242, "2026-04-25T12:34:56.789Z"),
+    );
+    expect(out.toLowerCase()).toContain("wait for the other process");
+    // Tells the user where to delete the lock by name.
+    expect(out).toContain("/p/.claude-profiles/.meta/lock");
+  });
+
   it("Unknown error: still produces the claude-profiles: prefix", () => {
     const out = formatError(new Error("something broke"));
     expect(out.startsWith("claude-profiles:")).toBe(true);
