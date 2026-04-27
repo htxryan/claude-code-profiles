@@ -16,7 +16,7 @@
  *  - Unknown verbs / flags / values are ParseErrors with exit-code-1 semantics.
  */
 
-import type { GlobalOptions, OnDriftFlag, ParsedInvocation } from "./types.js";
+import type { CompletionShell, GlobalOptions, OnDriftFlag, ParsedInvocation } from "./types.js";
 
 export interface ParseError {
   ok: false;
@@ -41,7 +41,15 @@ const VERBS = new Set([
   "validate",
   "sync",
   "hook",
+  "doctor",
+  "completions",
   "help",
+]);
+
+const COMPLETION_SHELLS: ReadonlySet<CompletionShell> = new Set<CompletionShell>([
+  "bash",
+  "zsh",
+  "fish",
 ]);
 
 const ON_DRIFT_VALUES: ReadonlySet<OnDriftFlag> = new Set<OnDriftFlag>([
@@ -335,6 +343,38 @@ export function parseArgs(argv: ReadonlyArray<string>, defaultCwd: string): Pars
         return parseError(`hook uninstall does not accept --force (a non-matching hook is never removed)`);
       }
       return ok({ command: { kind: "hook", action, force }, global });
+    }
+
+    case "doctor": {
+      // Read-only diagnostic verb (epic claude-code-profiles-0zn). No flags.
+      const positional: string[] = [];
+      for (const t of rest) {
+        if (t.startsWith("--")) return parseError(`doctor: unknown flag "${t}"`);
+        else positional.push(t);
+      }
+      if (positional.length > 0) {
+        return parseError(`doctor takes no positional arguments; got "${positional.join(" ")}"`);
+      }
+      return ok({ command: { kind: "doctor" }, global });
+    }
+
+    case "completions": {
+      const positional: string[] = [];
+      for (const t of rest) {
+        if (t.startsWith("--")) return parseError(`completions: unknown flag "${t}"`);
+        else positional.push(t);
+      }
+      if (positional.length === 0) {
+        return parseError(`completions requires a shell (bash|zsh|fish)`);
+      }
+      if (positional.length > 1) {
+        return parseError(`completions takes one positional argument; got "${positional.join(" ")}"`);
+      }
+      const shell = positional[0]!;
+      if (!COMPLETION_SHELLS.has(shell as CompletionShell)) {
+        return parseError(`completions shell must be bash|zsh|fish, got "${shell}"`);
+      }
+      return ok({ command: { kind: "completions", shell: shell as CompletionShell }, global });
     }
 
     default: {

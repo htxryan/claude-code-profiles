@@ -67,10 +67,15 @@ export type CommandKind =
   | "validate"
   | "sync"
   | "hook"
+  | "doctor"
+  | "completions"
   | "help"
   | "version";
 
 export type HookAction = "install" | "uninstall";
+
+/** Shells supported by `claude-profiles completions <shell>`. */
+export type CompletionShell = "bash" | "zsh" | "fish";
 
 /**
  * Command discriminated union. Each variant carries verb-specific args;
@@ -95,6 +100,8 @@ export type Command =
   | { kind: "validate"; profile: string | null; brief: boolean }
   | { kind: "sync" }
   | { kind: "hook"; action: HookAction; force: boolean }
+  | { kind: "doctor" }
+  | { kind: "completions"; shell: CompletionShell }
   | { kind: "help"; verb: string | null }
   | { kind: "version" };
 

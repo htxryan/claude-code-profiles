@@ -40,6 +40,14 @@ claude-profiles use dev
 claude-profiles status
 ```
 
+> **`CLAUDE.md` section ownership is opt-in.** By default `claude-profiles` only
+> touches `.claude/`. To *also* let a profile manage a section of your
+> **project-root** `CLAUDE.md`, you need both (a) a `CLAUDE.md` next to the
+> profile's `profile.json`, and (b) `claude-profiles init` (which injects
+> markers into the root `CLAUDE.md`). Skip both, and project-root `CLAUDE.md` is
+> never opened or written. See [profile-managed `CLAUDE.md` sections](#profile-managed-claudemd-sections)
+> below and [docs/migration/cw6-section-ownership.md](docs/migration/cw6-section-ownership.md).
+
 ## Concepts
 
 - **Profile** — a named directory under `.claude-profiles/<name>/` containing a
@@ -69,6 +77,8 @@ claude-profiles status
 | `validate [<name>]`         | Dry-run resolve+merge over one or all profiles                               |
 | `sync`                      | Re-materialize the active profile (drift-gated)                              |
 | `hook install\|uninstall`   | Manage the git pre-commit hook                                               |
+| `doctor`                    | Read-only health check (state, lock, gitignore, hook, markers, externals)    |
+| `completions <shell>`       | Emit a `bash`/`zsh`/`fish` completion script (eval to install)               |
 
 Run `claude-profiles <verb> --help` for full per-verb help.
 
@@ -163,6 +173,31 @@ If you've edited `.claude/` since the last materialization (drift), `use` and
 In non-TTY contexts (CI, scripts) you must pass `--on-drift=discard|persist|abort`
 explicitly — the gate refuses to default, so a CI job never silently destroys
 work.
+
+## Exit codes
+
+Every `claude-profiles` invocation returns one of four codes. CI scripts can
+gate on these without parsing stdout/stderr:
+
+| Code | Meaning                  | Examples                                                         |
+|------|--------------------------|------------------------------------------------------------------|
+| `0`  | Success                  | `use` swap completed; `validate` passed; `drift` ran read-only   |
+| `1`  | User error               | bad argv; `use <typo>`; drift `--on-drift=abort`; `validate` failed; `init` already-initialised; missing `--on-drift` in non-TTY |
+| `2`  | System error             | IO/permission fault; ENOSPC; unwritable `.git/hooks/`            |
+| `3`  | Structural conflict      | cycle in `extends`; missing `extends` parent or include; lock held by another process |
+
+```bash
+# Skip the script if the project is unhealthy:
+claude-profiles doctor || exit 0
+
+# Branch on conflict vs. user error:
+claude-profiles use ci --on-drift=abort
+case $? in
+  0) echo "swapped to ci" ;;
+  1) echo "drift abort or typo — fix and retry" ;;
+  3) echo "structural problem — run \`claude-profiles validate\`" ;;
+esac
+```
 
 ## Power-user affordances
 

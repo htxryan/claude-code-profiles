@@ -6,6 +6,8 @@
 
 import type { GateMode } from "../drift/types.js";
 
+import { runCompletions } from "./commands/completions.js";
+import { runDoctor } from "./commands/doctor.js";
 import { runDrift } from "./commands/drift.js";
 import { runDiff } from "./commands/diff.js";
 import { runHook } from "./commands/hook.js";
@@ -146,6 +148,19 @@ export async function dispatch(
         action: command.action,
         force: command.force,
         noColor: global.noColor,
+      });
+
+    case "doctor":
+      return runDoctor({
+        cwd: global.cwd,
+        output: ctx.output,
+        noColor: global.noColor,
+      });
+
+    case "completions":
+      return runCompletions({
+        shell: command.shell,
+        output: ctx.output,
       });
 
     default: {

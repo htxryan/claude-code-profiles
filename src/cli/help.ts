@@ -18,12 +18,14 @@ COMMANDS
   list                     show all profiles + active marker
   use <name>               switch to <name>; runs the drift gate
   status                   show active profile + drift summary
-  drift                    per-file drift report (read-only)
-  diff <a> [<b>]           file-level diff of two profiles' resolved trees
+  drift                    per-file drift report (read-only); --preview shows inline unified diffs
+  diff <a> [<b>]           file-level diff of two profiles' resolved trees; --preview shows inline content
   new <name>               scaffold an empty profile
   validate [<name>]        dry-run resolve+merge over one or all profiles
   sync                     re-materialize the active profile (drift-gated)
   hook install|uninstall   install / remove the git pre-commit hook
+  doctor                   read-only health check (state, lock, gitignore, hook, markers)
+  completions <shell>      emit a bash|zsh|fish completion script (eval to install)
 
 GLOBAL OPTIONS
   --json                   emit one JSON object per command (silences human output)
@@ -272,6 +274,51 @@ const VERBS: Record<string, VerbHelp> = {
       "1  no profile is currently active; drift abort; missing --on-drift in non-TTY",
       "2  IO fault",
       "3  cycle / missing include / lock held by peer",
+    ],
+  },
+  doctor: {
+    tagline: "read-only health check across state, lock, gitignore, hook, markers",
+    synopsis: "doctor [options]",
+    description:
+      "Runs the same checks as `validate` plus environment diagnostics:\n" +
+      "state-file schema (R42), lock liveness (R41), gitignore correctness\n" +
+      "(R15), pre-commit hook byte-equality (R25a), backup retention count\n" +
+      "(R23a), external-path reachability (R37a), and managed-block markers\n" +
+      "in project-root CLAUDE.md (R44/R45). Read-only — never writes.\n" +
+      "Returns 0 when every check passes and 1 on any actionable warning so\n" +
+      "CI scripts can `claude-profiles doctor || exit 0` for soft checks.",
+    options: [],
+    globals: COMMON_GLOBALS,
+    examples: [
+      "claude-profiles doctor                # human-readable status table",
+      "claude-profiles doctor --json         # machine-readable summary for CI",
+      "claude-profiles doctor || echo \"check failed\"  # gate a script on health",
+    ],
+    exitCodes: [
+      "0  all checks passed",
+      "1  one or more checks reported a warning or failure",
+      "2  IO/permission fault while running checks",
+    ],
+  },
+  completions: {
+    tagline: "emit a shell completion script (bash | zsh | fish)",
+    synopsis: "completions <shell>",
+    description:
+      "Prints a static completion script to stdout. Source the output in\n" +
+      "your shell's startup file (or eval it inline) to enable tab-complete\n" +
+      "for verbs, --flags, and profile names on `use`/`diff`/`validate`/\n" +
+      "`sync`. Profile names are read from `.claude-profiles/` at tab time;\n" +
+      "no daemon, no state-file reads.",
+    options: [],
+    globals: COMMON_GLOBALS,
+    examples: [
+      "claude-profiles completions zsh > ~/.zfunc/_claude-profiles",
+      "eval \"$(claude-profiles completions bash)\"",
+      "claude-profiles completions fish > ~/.config/fish/completions/claude-profiles.fish",
+    ],
+    exitCodes: [
+      "0  success",
+      "1  bad argv (missing shell, unsupported shell)",
     ],
   },
   hook: {

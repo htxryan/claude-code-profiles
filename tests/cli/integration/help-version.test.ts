@@ -39,7 +39,7 @@ describe("--help / --version (AC-20)", () => {
   // future help-text edit can't quietly drop a section.
   it("every verb's help has the standard sections", async () => {
     await ensureBuilt();
-    const verbs = ["init", "list", "use", "status", "drift", "diff", "new", "validate", "sync", "hook"];
+    const verbs = ["init", "list", "use", "status", "drift", "diff", "new", "validate", "sync", "hook", "doctor", "completions"];
     for (const verb of verbs) {
       const r = await runCli({ args: [verb, "--help"] });
       expect(r.exitCode, `${verb} --help exited non-zero`).toBe(0);
