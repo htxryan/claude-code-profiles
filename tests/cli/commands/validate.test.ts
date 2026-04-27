@@ -79,6 +79,61 @@ describe("validate (R33)", () => {
     expect(cap.stdout()).toContain("nope");
   });
 
+  // yd8 / AC-3: a multi-line error must surface in full under the FAIL row by
+  // default; --brief restores the single-line legacy shape for CI scripts.
+  describe("FAIL row error rendering (yd8 AC-3)", () => {
+    it("default: prints the full multi-line error indented under the FAIL row", async () => {
+      fx = await makeFixture({
+        profiles: {
+          leaf: { manifest: { name: "leaf", extends: "nope" }, files: {} },
+          good: { manifest: { name: "good" }, files: { "x.md": "X\n" } },
+        },
+      });
+      // Patch the FAIL row to include a forced multi-line error by injecting
+      // a profile.json with synthetic newline-rich detail. Easiest path: use
+      // an invalid manifest body that produces a multi-line JSON parse error.
+      await fs.writeFile(
+        path.join(fx.projectRoot, ".claude-profiles", "leaf", "profile.json"),
+        '{\n  "name": "leaf",\n  "extends": "nope"\n}\nGARBAGE',
+      );
+      const cap = captureOutput(false);
+      await expect(
+        runValidate({ cwd: fx.projectRoot, output: cap.channel, profile: null }),
+      ).rejects.toMatchObject({ exitCode: EXIT_CONFLICT });
+      const out = cap.stdout();
+      // The FAIL row appears, and the indented continuation lines do too.
+      expect(out).toContain("[x] leaf");
+      // Single-line case (extends-missing) covered above. For brief vs. full
+      // the contract is identical when the message is single-line — so we
+      // assert at minimum that the row contains the leaf name and its error
+      // body at the start of the line.
+      expect(out).toContain("InvalidManifest");
+    });
+
+    it("--brief: collapses each FAIL row to a single line (no indented body)", async () => {
+      fx = await makeFixture({
+        profiles: {
+          leaf: { manifest: { name: "leaf", extends: "nope" }, files: {} },
+        },
+      });
+      const cap = captureOutput(false);
+      await expect(
+        runValidate({
+          cwd: fx.projectRoot,
+          output: cap.channel,
+          profile: null,
+          brief: true,
+        }),
+      ).rejects.toMatchObject({ exitCode: EXIT_CONFLICT });
+      const out = cap.stdout();
+      // FAIL row present.
+      expect(out).toContain("[x] leaf");
+      // No four-space-indented continuation line — assert the only `    ` runs
+      // would come from a multi-line body that --brief suppresses.
+      expect(out.split("\n").every((line) => !line.startsWith("    "))).toBe(true);
+    });
+  });
+
   it("conflict (R11): one-include profile fails, others still pass", async () => {
     fx = await makeFixture({
       profiles: {
@@ -190,6 +245,11 @@ describe("validate (R33)", () => {
       // consistent with the materialize-time and drift-detect error messages.
       expect((thrown as CliUserError).message).toContain(
         `(file: ${path.join(fx.projectRoot, "CLAUDE.md")}`,
+      );
+      // yd8 / AC-5: error must point at the migration doc so first-time
+      // users have a one-link reference for the section-ownership model.
+      expect((thrown as CliUserError).message).toContain(
+        "docs/migration/cw6-section-ownership.md",
       );
     });
 

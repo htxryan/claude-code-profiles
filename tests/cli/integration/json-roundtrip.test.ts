@@ -89,6 +89,51 @@ describe("--json round-trip (AC-14)", () => {
     expect(r.stderr).toBe("");
   });
 
+  // yd8 / AC-2: pre-swap dry-run summary appears in --json as planSummary
+  // and as a stderr line in human mode.
+  it("use --json: payload includes planSummary alongside choice/action", async () => {
+    await ensureBuilt();
+    fx = await setup();
+    const r = await runCli({
+      args: ["--cwd", fx.projectRoot, "--json", "--on-drift=discard", "use", "b"],
+    });
+    expect(r.exitCode).toBe(0);
+    const payload = JSON.parse(r.stdout);
+    expect(payload.activeProfile).toBe("b");
+    expect(payload.planSummary).toBeDefined();
+    expect(typeof payload.planSummary.replace).toBe("number");
+    expect(typeof payload.planSummary.add).toBe("number");
+    expect(typeof payload.planSummary.delete).toBe("number");
+    expect(typeof payload.planSummary.bytesAdded).toBe("number");
+    expect(typeof payload.planSummary.bytesRemoved).toBe("number");
+    // --json silences the human stderr line.
+    expect(r.stderr).toBe("");
+  });
+
+  it("use (human, drift present): pre-swap summary line on stderr", async () => {
+    await ensureBuilt();
+    fx = await setup();
+    // Drift: edit the live tree.
+    await fs.writeFile(path.join(fx.projectRoot, ".claude", "CLAUDE.md"), "EDIT\n");
+    const r = await runCli({
+      args: ["--cwd", fx.projectRoot, "--on-drift=discard", "use", "b"],
+    });
+    expect(r.exitCode).toBe(0);
+    expect(r.stderr).toContain("this swap will replace");
+    expect(r.stderr).toMatch(/\+\d+ -\d+ bytes/);
+  });
+
+  it("use --quiet: pre-swap summary line is silenced", async () => {
+    await ensureBuilt();
+    fx = await setup();
+    await fs.writeFile(path.join(fx.projectRoot, ".claude", "CLAUDE.md"), "EDIT\n");
+    const r = await runCli({
+      args: ["--cwd", fx.projectRoot, "--quiet", "--on-drift=discard", "use", "b"],
+    });
+    expect(r.exitCode).toBe(0);
+    expect(r.stderr).not.toContain("this swap will replace");
+  });
+
   it("validate --json: parses pass:true on healthy fixture", async () => {
     await ensureBuilt();
     fx = await setup();

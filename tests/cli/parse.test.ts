@@ -76,8 +76,8 @@ describe("parseArgs — verbs (R29)", () => {
       profile: "x",
       description: "foo",
     });
-    expect(run(["validate"]).command).toEqual({ kind: "validate", profile: null });
-    expect(run(["validate", "x"]).command).toEqual({ kind: "validate", profile: "x" });
+    expect(run(["validate"]).command).toEqual({ kind: "validate", profile: null, brief: false });
+    expect(run(["validate", "x"]).command).toEqual({ kind: "validate", profile: "x", brief: false });
     expect(run(["sync"]).command).toEqual({ kind: "sync" });
     expect(run(["hook", "install"]).command).toEqual({
       kind: "hook",

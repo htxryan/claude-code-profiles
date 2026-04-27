@@ -45,6 +45,15 @@ export interface GlobalOptions {
    * && ./run`. Mutually exclusive with --json (the parser rejects both).
    */
   quiet: boolean;
+  /**
+   * yd8 / AC-4: when set, mutating verbs (`use`, `sync`, `init`, `new`)
+   * poll a held lock with exponential backoff for up to `waitMs`
+   * milliseconds before failing with LockHeldError. Off by default — opt-in
+   * only so non-interactive scripts that forgot to pass --wait still fail
+   * fast at the first conflict. The CLI surface is `--wait` (defaults to a
+   * sensible 30s) or `--wait=<seconds>`.
+   */
+  waitMs: number | null;
 }
 
 export type CommandKind =
@@ -83,7 +92,7 @@ export type Command =
   | { kind: "drift"; preCommitWarn: boolean; verbose: boolean; preview: boolean }
   | { kind: "diff"; a: string; b: string | null; preview: boolean }
   | { kind: "new"; profile: string; description: string | null }
-  | { kind: "validate"; profile: string | null }
+  | { kind: "validate"; profile: string | null; brief: boolean }
   | { kind: "sync" }
   | { kind: "hook"; action: HookAction; force: boolean }
   | { kind: "help"; verb: string | null }

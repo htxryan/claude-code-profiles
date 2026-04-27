@@ -31,6 +31,7 @@
  *    lock from a recycled PID is reclaimable (multi-reviewer P1, Gemini #2).
  */
 
+import { execFileSync } from "node:child_process";
 import { promises as fs, unlinkSync } from "node:fs";
 import * as os from "node:os";
 // Default import (NOT namespace import) — `process.on` is an EventEmitter
@@ -63,25 +64,84 @@ const ACQUIRE_MAX_RETRIES = 3;
  * Raised when `.lock` exists and the holding PID is still alive (R41a). The
  * caller (E5 CLI) renders this as a non-zero exit with the holder's PID and
  * timestamp per the §7 quality bar.
+ *
+ * yd8 / AC-4: enriched with the holder's cmdline (best-effort via `ps`) and
+ * the elapsed age, plus a literal rerun hint that names `--wait`. The user
+ * staring at "lock held" should not have to read three man pages to figure
+ * out the next move.
  */
 export class LockHeldError extends Error {
   readonly holderPid: number;
   readonly holderTimestamp: string;
   readonly lockPath: string;
+  /** Best-effort holder command line; null if `ps` is unavailable or fails. */
+  readonly holderCmdline: string | null;
+  /** Elapsed milliseconds between holder acquisition and now; null when timestamp unparseable. */
+  readonly holderAgeMs: number | null;
 
   constructor(lockPath: string, holderPid: number, holderTimestamp: string) {
+    const cmdline = describePidCommand(holderPid);
+    const ageMs = computeAgeMs(holderTimestamp);
+    const ageStr = ageMs !== null ? formatDuration(ageMs) : "?";
+    const cmdStr = cmdline !== null ? `: ${cmdline}` : "";
     // Polish epic claude-code-profiles-ppo: every error names the next step.
-    // The original message satisfies §7 (names the file/PID/timestamp); the
-    // remediation tail tells a user staring at a wedged lock what to do —
-    // wait, or hand-clean the lock if the holder is dead.
+    // yd8 / AC-4: append cmdline + age + literal rerun hint with --wait so
+    // the user has the full context (who's holding, how long, what to do).
     super(
-      `Lock at "${lockPath}" is held by PID ${holderPid} (acquired at ${holderTimestamp}) — wait for the other process, or remove "${lockPath}" if the PID is dead`,
+      `Lock at "${lockPath}" is held by PID ${holderPid} (acquired at ${holderTimestamp}, ${ageStr} ago${cmdStr}) — ` +
+        `wait for the other process to finish, retry with --wait to poll politely, ` +
+        `or remove "${lockPath}" if the PID is dead`,
     );
     this.name = "LockHeldError";
     this.lockPath = lockPath;
     this.holderPid = holderPid;
     this.holderTimestamp = holderTimestamp;
+    this.holderCmdline = cmdline;
+    this.holderAgeMs = ageMs;
   }
+}
+
+/**
+ * Best-effort lookup of a PID's command line via `ps -p <pid> -o args=`.
+ * Returns null on Windows (no `ps`) and on any spawn failure. Trimmed and
+ * truncated to a reasonable length so a 200-char invocation doesn't bury
+ * the rest of the error message.
+ */
+function describePidCommand(pid: number): string | null {
+  if (process.platform === "win32") return null;
+  try {
+    const out = execFileSync("ps", ["-p", String(pid), "-o", "args="], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 1000,
+    }).trim();
+    if (out === "") return null;
+    return out.length > 160 ? `${out.slice(0, 157)}...` : out;
+  } catch {
+    return null;
+  }
+}
+
+function computeAgeMs(timestamp: string): number | null {
+  const tsMs = Date.parse(timestamp);
+  if (!Number.isFinite(tsMs)) return null;
+  const age = Date.now() - tsMs;
+  return age >= 0 ? age : 0;
+}
+
+/**
+ * Render a duration in a coarse human-friendly form (e.g. "3s", "2m", "1h").
+ * Exported for the lock-acquisition wait notice so the formatting stays
+ * consistent across error and progress output.
+ */
+export function formatDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  const seconds = Math.floor(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h`;
 }
 
 /**
@@ -201,17 +261,96 @@ async function tryClaimExclusive(lockFile: string): Promise<string | null> {
 }
 
 /**
+ * yd8 / AC-4: opt-in polling configuration for `acquireLock`. When supplied,
+ * a `LockHeldError` from the inner attempt is caught, a single "waiting on
+ * lock held by PID N…" line is emitted via `onWait`, and the acquire is
+ * retried with exponential backoff until the lock is acquired or the budget
+ * is exhausted (then the original error is re-thrown).
+ *
+ * Default off everywhere — opt-in only so non-interactive scripts that
+ * forgot to pass --wait still fail fast at the first conflict.
+ */
+export interface LockWaitOptions {
+  /** Total wall time the caller is willing to wait, in ms. */
+  totalMs: number;
+  /** Initial backoff delay between polls, in ms. Doubled on each retry up to maxBackoffMs. */
+  initialBackoffMs?: number;
+  /** Cap on the backoff delay. */
+  maxBackoffMs?: number;
+  /** Optional callback fired ONCE when the wait begins (so the user sees a "waiting" line). */
+  onWait?: (info: { pid: number; timestamp: string; cmdline: string | null }) => void;
+}
+
+/**
  * Acquire the project lock. Returns a `LockHandle` with idempotent release.
  * `signalHandlers` defaults to true — registers SIGINT/SIGTERM handlers that
  * release the lock and exit (R41c). Tests pass false so they can synchronize
  * on release without process-level handlers.
+ *
+ * yd8 / AC-4: optional `wait` parameter polls the lock with exponential
+ * backoff instead of failing fast on first conflict. Off by default; the
+ * caller (CLI --wait) opts in explicitly.
  */
 export async function acquireLock(
   paths: StatePaths,
-  opts: { signalHandlers?: boolean } = {},
+  opts: { signalHandlers?: boolean; wait?: LockWaitOptions } = {},
 ): Promise<LockHandle> {
   await fs.mkdir(paths.metaDir, { recursive: true });
 
+  // yd8 / AC-4: when `wait` is supplied, wrap the core acquire in a polling
+  // loop. We only retry on LockHeldError — every other failure (FS error,
+  // corrupt lock that exhausts internal retries) propagates immediately.
+  // signalHandlers defaults to true (must be explicitly set to false to skip);
+  // matches the prior `opts.signalHandlers !== false` semantics.
+  const wantSignals = opts.signalHandlers !== false;
+  if (opts.wait !== undefined) {
+    return acquireLockWithWait(paths, wantSignals, opts.wait);
+  }
+
+  return acquireLockOnce(paths, wantSignals);
+}
+
+async function acquireLockWithWait(
+  paths: StatePaths,
+  signalHandlers: boolean,
+  wait: LockWaitOptions,
+): Promise<LockHandle> {
+  const totalMs = Math.max(0, wait.totalMs);
+  const startedAt = Date.now();
+  const initialBackoff = Math.max(50, wait.initialBackoffMs ?? 250);
+  const maxBackoff = Math.max(initialBackoff, wait.maxBackoffMs ?? 2000);
+  let backoff = initialBackoff;
+  let waitNoticeSent = false;
+
+  while (true) {
+    try {
+      return await acquireLockOnce(paths, signalHandlers);
+    } catch (err: unknown) {
+      if (!(err instanceof LockHeldError)) throw err;
+      const elapsed = Date.now() - startedAt;
+      if (elapsed >= totalMs) throw err;
+      if (!waitNoticeSent && wait.onWait) {
+        // Emit the "waiting" line exactly once so a long wait doesn't spam
+        // the user; subsequent retries are silent until success or timeout.
+        wait.onWait({
+          pid: err.holderPid,
+          timestamp: err.holderTimestamp,
+          cmdline: err.holderCmdline,
+        });
+        waitNoticeSent = true;
+      }
+      const remaining = totalMs - elapsed;
+      const sleepMs = Math.min(backoff, remaining);
+      await new Promise((resolve) => setTimeout(resolve, sleepMs));
+      backoff = Math.min(maxBackoff, backoff * 2);
+    }
+  }
+}
+
+async function acquireLockOnce(
+  paths: StatePaths,
+  signalHandlers: boolean,
+): Promise<LockHandle> {
   const pid = process.pid;
   let lastError: Error | undefined;
   for (let attempt = 0; attempt < ACQUIRE_MAX_RETRIES; attempt++) {
@@ -221,7 +360,7 @@ export async function acquireLock(
     // (Codex #1, Gemini #1).
     const claimedAt = await tryClaimExclusive(paths.lockFile);
     if (claimedAt !== null) {
-      return buildHandle(paths.lockFile, pid, claimedAt, opts);
+      return buildHandle(paths.lockFile, pid, claimedAt, { signalHandlers });
     }
 
     // Lock exists. Read its contents to determine liveness.
@@ -300,7 +439,7 @@ function buildHandle(
   lockFile: string,
   pid: number,
   acquiredAt: string,
-  opts: { signalHandlers?: boolean },
+  opts: { signalHandlers: boolean },
 ): LockHandle {
   let released = false;
   let signalCleanup: (() => void) | undefined;
@@ -317,7 +456,7 @@ function buildHandle(
       if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
     }
   };
-  if (opts.signalHandlers !== false) {
+  if (opts.signalHandlers) {
     signalCleanup = registerSignalRelease(lockFile, () => {
       released = true;
     });
@@ -333,11 +472,14 @@ function buildHandle(
 /**
  * Convenience wrapper: acquire, run `fn`, always release (even on throw).
  * Mirrors the using/with idiom Node lacks. Used by every E3 mutating op.
+ *
+ * yd8 / AC-4: pass `wait` to opt into polling-with-backoff instead of
+ * fail-fast on first conflict. Default is unchanged (fail-fast).
  */
 export async function withLock<T>(
   paths: StatePaths,
   fn: (handle: LockHandle) => Promise<T>,
-  opts: { signalHandlers?: boolean } = {},
+  opts: { signalHandlers?: boolean; wait?: LockWaitOptions } = {},
 ): Promise<T> {
   const handle = await acquireLock(paths, opts);
   try {

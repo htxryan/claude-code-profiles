@@ -17,6 +17,19 @@ export interface PromptInput {
   activeProfile: string;
   /** Target profile being switched to. */
   targetProfile: string;
+  /**
+   * yd8 / AC-1: a sample of drifted file names to surface above the prompt
+   * so the user sees WHICH files they're choosing about. Capped to a small
+   * number by the caller (e.g. 5) so the prompt stays one screenful even
+   * for a large drift set. Empty array hides the line entirely.
+   */
+  driftedSample?: ReadonlyArray<string>;
+  /**
+   * yd8 / AC-1: total drifted count when `driftedSample` was capped, so the
+   * prompt can render "and N more" without recomputing. When equal to the
+   * sample length, no overflow note is rendered.
+   */
+  driftedTotal?: number;
 }
 
 /**
@@ -60,8 +73,21 @@ export function makeReadlinePrompt(streams: ReadlinePromptStreams): GatePrompt {
     const onClose = () => ac.abort();
     rl.once("close", onClose);
     try {
+      // yd8 / AC-1: name the affected files so the user sees WHICH bytes
+      // they're choosing about. We cap the visible list at a few names
+      // (caller-provided sample) and append "and N more" if the total
+      // exceeds the cap — keeps the prompt one screenful even when a
+      // big edit batch drifts.
+      const sample = input.driftedSample ?? [];
+      const total = input.driftedTotal ?? input.driftedCount;
+      const overflow = total > sample.length ? ` and ${total - sample.length} more` : "";
+      const filesLine =
+        sample.length > 0
+          ? `  files: ${sample.join(", ")}${overflow}\n`
+          : "";
       streams.output.write(
         `\nDrift detected: ${input.driftedCount} file(s) in .claude/ vs active profile "${input.activeProfile}"\n` +
+          filesLine +
           `  discard - destroy live edits, materialize "${input.targetProfile}" (snapshots .claude/ first)\n` +
           `  persist - save live .claude/ into "${input.activeProfile}", then materialize "${input.targetProfile}"\n` +
           `  abort   - make no changes\n`,
@@ -69,8 +95,15 @@ export function makeReadlinePrompt(streams: ReadlinePromptStreams): GatePrompt {
       while (true) {
         let answer: string;
         try {
+          // yd8 / AC-1: extend the choice line with one-line cost annotations
+          // so a first-time user picks knowing the consequence — including
+          // the R23a backup behaviour for discard, which the original prompt
+          // hid behind a bare "destroy" verb.
           answer = (
-            await rl.question("[d]iscard / [p]ersist / [a]bort? ", { signal: ac.signal })
+            await rl.question(
+              "[d]iscard — drop edits (snapshot saved to .meta/backup/) | [p]ersist — copy live tree into active profile | [a]bort — no change\n? ",
+              { signal: ac.signal },
+            )
           )
             .trim()
             .toLowerCase();

@@ -23,6 +23,8 @@ export interface SyncOptions {
   signalHandlers: boolean;
   /** When true, force colour off (additive with NO_COLOR env). Default false. */
   noColor?: boolean;
+  /** yd8 / AC-4: optional lock-wait budget in ms. Null/undefined = fail-fast. */
+  waitMs?: number | null;
 }
 
 export async function runSync(opts: SyncOptions): Promise<number> {
@@ -50,6 +52,18 @@ export async function runSync(opts: SyncOptions): Promise<number> {
     isSync: true,
     signalHandlers: opts.signalHandlers,
     onPhase: (text) => opts.output.phase(phaseStyle.dim(text)),
+    // yd8 / AC-2: phase-channel emission inherits --json/--quiet silencing.
+    onPlanSummary: (line) => {
+      if (line !== null) opts.output.phase(phaseStyle.dim(line));
+    },
+    // yd8 / AC-4: opt-in lock polling.
+    waitMs: opts.waitMs ?? null,
+    onLockWait: (info) => {
+      const cmd = info.cmdline !== null ? `: ${info.cmdline}` : "";
+      opts.output.warn(
+        phaseStyle.dim(`waiting on lock held by PID ${info.pid} (acquired ${info.timestamp}${cmd})…`),
+      );
+    },
   });
 
   if (opts.output.jsonMode) {
@@ -59,6 +73,8 @@ export async function runSync(opts: SyncOptions): Promise<number> {
       choice: result.choice,
       backupSnapshot: result.backupSnapshot,
       sync: true,
+      // yd8 / AC-2: pre-swap dry-run breakdown for --json consumers.
+      planSummary: result.planSummary,
     });
   } else {
     const style = createStyle({

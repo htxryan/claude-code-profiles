@@ -30,6 +30,7 @@ GLOBAL OPTIONS
   --quiet, -q              silence human output; preserves errors + exit codes (mutually exclusive with --json)
   --cwd=<path>             project root (default: current working dir)
   --on-drift=<choice>      discard|persist|abort — required for non-TTY swap with drift
+  --wait[=<seconds>]       poll a held lock instead of failing fast (default 30s)
   --no-color               disable colour output (additive with NO_COLOR env)
   --help, -h               this message; "claude-profiles <verb> --help" for verb-specific help
   --version, -V            print version
@@ -71,7 +72,11 @@ const COMMON_GLOBALS = [
   "--json           machine-readable output (silences human output)",
   "--quiet, -q      silence human output (preserves errors + exit codes); incompatible with --json",
 ];
-const SWAP_GLOBALS = [...COMMON_GLOBALS, "--on-drift=<v>   discard|persist|abort (required in non-TTY when drift exists)"];
+const SWAP_GLOBALS = [
+  ...COMMON_GLOBALS,
+  "--on-drift=<v>   discard|persist|abort (required in non-TTY when drift exists)",
+  "--wait[=<sec>]   poll a held lock with backoff instead of failing fast (default 30s)",
+];
 
 const VERBS: Record<string, VerbHelp> = {
   init: {
@@ -233,11 +238,14 @@ const VERBS: Record<string, VerbHelp> = {
       "validates every profile in the project and reports pass/fail per profile.\n" +
       "When a profile is active, also checks that project-root CLAUDE.md has the\n" +
       "claude-profiles markers (run `init` to add them).",
-    options: [],
+    options: [
+      "--brief            collapse FAIL rows to one line each (CI-friendly)",
+    ],
     globals: COMMON_GLOBALS,
     examples: [
-      "claude-profiles validate              # validate all profiles",
+      "claude-profiles validate              # validate all profiles (full error per FAIL)",
       "claude-profiles validate dev          # validate just dev",
+      "claude-profiles validate --brief      # one-line FAIL rows (CI scripts)",
       "claude-profiles validate --json",
     ],
     exitCodes: [

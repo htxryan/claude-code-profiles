@@ -227,7 +227,10 @@ export class RootClaudeMdMarkersMissingError extends MaterializeError {
       // Spell out the literal marker pair so a user who accidentally deleted
       // them knows what bytes to put back without needing to grep the spec.
       // Polish epic claude-code-profiles-ppo: "every error names the next step".
-      `project-root CLAUDE.md is missing claude-profiles markers — run \`claude-profiles init\` to repair (file: ${filePath}; expected: <!-- claude-profiles:v1:begin --> ... <!-- claude-profiles:v1:end -->)`,
+      // yd8 / AC-5: append the migration doc path so a user seeing this for
+      // the first time has a one-link reference for the section-ownership
+      // model rather than blindly running `init` and hoping.
+      `project-root CLAUDE.md is missing claude-profiles markers — run \`claude-profiles init\` to repair (file: ${filePath}; expected: <!-- claude-profiles:v1:begin --> ... <!-- claude-profiles:v1:end -->; see docs/migration/cw6-section-ownership.md)`,
     );
     this.name = "RootClaudeMdMarkersMissingError";
     this.filePath = filePath;

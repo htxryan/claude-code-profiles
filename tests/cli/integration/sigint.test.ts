@@ -89,6 +89,50 @@ describe("SIGINT releases lock (AC-15)", () => {
     await expect(fs.access(paths.lockFile)).rejects.toMatchObject({ code: "ENOENT" });
   }, 10_000);
 
+  // yd8 / AC-4: when a peer holds the lock, the CLI must surface a single
+  // actionable message naming PID, age, and a literal --wait remediation.
+  // We spawn the lock-holder, then run `claude-profiles use` against the
+  // same project to assert exit 3 + the enriched stderr message.
+  it("yd8 AC-4: lock-held UX names PID, age, and the --wait remediation", async () => {
+    await ensureBuilt();
+    fx = await makeFixture({
+      profiles: {
+        a: { manifest: { name: "a" }, files: { "x.md": "X\n" } },
+      },
+    });
+
+    const holder = spawn(process.execPath, [HOLDER, fx.projectRoot], {
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    try {
+      // Wait for the holder to acquire.
+      await new Promise<void>((resolve, reject) => {
+        const t = setTimeout(() => reject(new Error("timeout LOCKED")), 5000);
+        holder.stdout.on("data", (chunk: Buffer) => {
+          if (chunk.toString().includes("LOCKED")) {
+            clearTimeout(t);
+            resolve();
+          }
+        });
+      });
+      // Now spawn a `use` invocation that will hit the lock.
+      const { runCli } = await import("./spawn.js");
+      const r = await runCli({
+        args: ["--cwd", fx.projectRoot, "use", "a"],
+        timeoutMs: 5000,
+      });
+      // Lock-held maps to exit 3 (peer holds project).
+      expect(r.exitCode).toBe(3);
+      // Stderr message must include the PID + remediation.
+      expect(r.stderr).toContain(`PID ${holder.pid}`);
+      expect(r.stderr).toContain("--wait");
+      expect(r.stderr).toContain("ago");
+    } finally {
+      holder.kill("SIGTERM");
+      await new Promise((resolve) => holder.on("close", resolve));
+    }
+  }, 10_000);
+
   it("SIGTERM also releases the lock (exit 143)", async () => {
     await ensureBuilt();
     fx = await makeFixture({});

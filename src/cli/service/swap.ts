@@ -43,6 +43,11 @@ import {
   type StatePaths,
 } from "../../state/index.js";
 import { CliUserError, EXIT_USER_ERROR } from "../exit.js";
+import {
+  formatPlanSummaryLine,
+  summarizePlan,
+  type PlanSummary,
+} from "../plan-summary.js";
 import type { GatePrompt } from "../prompt.js";
 import type { OnDriftFlag } from "../types.js";
 
@@ -78,6 +83,28 @@ export interface SwapOptions {
    * (the swap.test default) skips emission entirely.
    */
   onPhase?: (text: string) => void;
+  /**
+   * yd8 / AC-2: optional callback fired with the pre-swap plan summary line
+   * once the dry-run delta has been computed (after merge, before the gate).
+   * Wired by use/sync to `output.phase(...)` so the line is silenced under
+   * --json and --quiet but appears on stderr otherwise. The structured
+   * payload is also returned on SwapResult for --json consumers.
+   *
+   * Receives null when the swap is a true no-op (no replace/add/delete).
+   */
+  onPlanSummary?: (line: string | null, summary: PlanSummary) => void;
+  /**
+   * yd8 / AC-4: when set, lock acquisition polls a held lock with backoff
+   * for up to this many ms before failing. Null/undefined preserves the
+   * legacy fail-fast behaviour.
+   */
+  waitMs?: number | null;
+  /**
+   * yd8 / AC-4: notification fired ONCE when the wait begins (lock held +
+   * --wait was supplied). Wired by use/sync to a stderr "waiting on lock
+   * held by PID N…" line so the user knows the CLI is alive.
+   */
+  onLockWait?: (info: { pid: number; timestamp: string; cmdline: string | null }) => void;
 }
 
 export interface SwapResult {
@@ -92,6 +119,13 @@ export interface SwapResult {
   backupSnapshot: string | null;
   /** Active profile after the swap (== targetProfile unless aborted). */
   activeAfter: string | null;
+  /**
+   * yd8 / AC-2: structured pre-swap plan summary so --json consumers see
+   * counts/byte deltas alongside the choice. Always present (even on
+   * abort) so a script inspecting a no-change run still has the dry-run
+   * data it needs to decide whether to retry.
+   */
+  planSummary: PlanSummary;
 }
 
 /**
@@ -126,7 +160,12 @@ export async function runSwap(opts: SwapOptions): Promise<SwapResult> {
     async () => {
       await reconcileMaterialize(opts.paths);
     },
-    { signalHandlers: opts.signalHandlers },
+    {
+      signalHandlers: opts.signalHandlers,
+      ...(opts.waitMs !== null && opts.waitMs !== undefined
+        ? { wait: { totalMs: opts.waitMs, ...(opts.onLockWait ? { onWait: opts.onLockWait } : {}) } }
+        : {}),
+    },
   );
 
   // 1. Resolve + merge OUTSIDE the lock. Resolution is a read-only operation
@@ -145,6 +184,18 @@ export async function runSwap(opts: SwapOptions): Promise<SwapResult> {
   // 2. First-pass drift detect outside the lock — used to drive the prompt
   //    without blocking other readers (apply.ts contract).
   const reportOutside = await detectDrift(opts.paths);
+
+  // yd8 / AC-2: pre-swap dry-run summary. Computed once so the same payload
+  // drives both the human stderr line (via onPlanSummary) and the --json
+  // SwapResult.planSummary. Does NOT short-circuit any decision — this is
+  // pure observation that the user reads to sanity-check their invocation.
+  const planSummary = await summarizePlan(opts.paths, merged);
+  const planSummaryLine = formatPlanSummaryLine(planSummary);
+  // Always notify so callers can route to JSON / human channels themselves.
+  // Suppression for non-drift/no-op paths happens at the call-site (the line
+  // is null when there's nothing to report), and --json/--quiet silencing is
+  // handled by the OutputChannel.phase shim used by use.ts/sync.ts.
+  opts.onPlanSummary?.(planSummaryLine, planSummary);
 
   // 3. Decide.
   const outcome = decideGate({
@@ -165,10 +216,16 @@ export async function runSwap(opts: SwapOptions): Promise<SwapResult> {
       );
     }
     const driftedCount = reportOutside.entries.length;
+    // yd8 / AC-1: surface up to 5 drifted file names so the prompt header
+    // names what's at stake. The prompt module renders "and N more" when
+    // the total exceeds the sample length.
+    const driftedSample = reportOutside.entries.slice(0, 5).map((e) => e.relPath);
     const userChoice = await opts.prompt({
       driftedCount,
       activeProfile: reportOutside.active ?? "?",
       targetProfile: opts.targetProfile,
+      driftedSample,
+      driftedTotal: driftedCount,
     });
     chosen = userChoice;
   } else if (outcome.choice !== null) {
@@ -247,7 +304,12 @@ export async function runSwap(opts: SwapOptions): Promise<SwapResult> {
         activeProfileName: activeBeforeInside,
       });
     },
-    { signalHandlers: opts.signalHandlers },
+    {
+      signalHandlers: opts.signalHandlers,
+      ...(opts.waitMs !== null && opts.waitMs !== undefined
+        ? { wait: { totalMs: opts.waitMs, ...(opts.onLockWait ? { onWait: opts.onLockWait } : {}) } }
+        : {}),
+    },
   );
 
   // The materialize() call already wrote the new state; we surface the
@@ -257,5 +319,6 @@ export async function runSwap(opts: SwapOptions): Promise<SwapResult> {
     choice: chosen,
     backupSnapshot: applyResult.backupSnapshot,
     activeAfter: applyResult.materializeResult?.state.activeProfile ?? null,
+    planSummary,
   };
 }

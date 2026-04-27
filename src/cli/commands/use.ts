@@ -24,6 +24,12 @@ export interface UseOptions {
   signalHandlers: boolean;
   /** When true, force colour off (additive with NO_COLOR env). Default false. */
   noColor?: boolean;
+  /**
+   * yd8 / AC-4: when set, the lock acquisition polls a held lock with
+   * exponential backoff for up to this many ms before failing. Null/undefined
+   * preserves the legacy fail-fast behaviour.
+   */
+  waitMs?: number | null;
 }
 
 export async function runUse(opts: UseOptions): Promise<number> {
@@ -45,6 +51,9 @@ export async function runUse(opts: UseOptions): Promise<number> {
       activeProfile: result.activeAfter,
       choice: result.choice,
       backupSnapshot: result.backupSnapshot,
+      // yd8 / AC-2: structured pre-swap delta so --json consumers see the
+      // dry-run breakdown (replace/add/delete counts + byte deltas).
+      planSummary: result.planSummary,
     });
   } else {
     const style = createStyle({
@@ -87,6 +96,21 @@ async function runSwapWithSuggestions(opts: UseOptions): Promise<SwapResult> {
       prompt: readlinePrompt,
       signalHandlers: opts.signalHandlers,
       onPhase: (text) => opts.output.phase(style.dim(text)),
+      // yd8 / AC-2: route the pre-swap dry-run line through the phase
+      // channel so it inherits --json/--quiet silencing. Skip when the
+      // line is null (true no-op swap — nothing useful to say).
+      onPlanSummary: (line) => {
+        if (line !== null) opts.output.phase(style.dim(line));
+      },
+      // yd8 / AC-4: opt-in lock polling. Emit a single "waiting…" line so
+      // the user sees the CLI is alive while it waits.
+      waitMs: opts.waitMs ?? null,
+      onLockWait: (info) => {
+        const cmd = info.cmdline !== null ? `: ${info.cmdline}` : "";
+        opts.output.warn(
+          style.dim(`waiting on lock held by PID ${info.pid} (acquired ${info.timestamp}${cmd})…`),
+        );
+      },
     });
   } catch (err) {
     throw await enrichMissingProfileError(err, opts.cwd, opts.profile);

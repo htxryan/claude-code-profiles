@@ -112,6 +112,79 @@ describe("lock primitive", () => {
     await expect(fs.access(paths.lockFile)).rejects.toThrow();
   });
 
+  // yd8 / AC-4: the LockHeldError message must include holder cmdline +
+  // age + a literal rerun hint so a user staring at "lock held" knows
+  // exactly what to do next without re-reading docs.
+  it("LockHeldError message includes age, cmdline (best-effort), and a --wait rerun hint", async () => {
+    const paths = buildStatePaths(root);
+    await fs.mkdir(paths.metaDir, { recursive: true });
+    const ts = new Date(Date.now() - 5000).toISOString();
+    await fs.writeFile(paths.lockFile, `${process.pid} ${ts}\n`);
+    let thrown: unknown;
+    try {
+      await acquireLock(paths, { signalHandlers: false });
+    } catch (err) {
+      thrown = err;
+    }
+    expect(thrown).toBeInstanceOf(LockHeldError);
+    const msg = (thrown as LockHeldError).message;
+    // Hint mentions --wait so the user discovers the polite-poll path.
+    expect(msg).toContain("--wait");
+    // Names the literal lock path and the holder PID + timestamp.
+    expect(msg).toContain(`PID ${process.pid}`);
+    expect(msg).toContain(ts);
+    // The age field is always rendered (even as "?"); a fresh lock should
+    // surface a single-digit-second age.
+    expect(msg).toMatch(/ago/);
+    // Structured fields exposed for programmatic dispatch.
+    const lhe = thrown as LockHeldError;
+    expect(lhe.holderAgeMs).not.toBeNull();
+    expect(lhe.holderAgeMs).toBeGreaterThan(0);
+  });
+
+  it("--wait polls a held lock until it's released, then succeeds", async () => {
+    const paths = buildStatePaths(root);
+    const initial = await acquireLock(paths, { signalHandlers: false });
+    let waitNoticeFired = 0;
+    const startedAt = Date.now();
+    const acquireP = acquireLock(paths, {
+      signalHandlers: false,
+      wait: {
+        totalMs: 5_000,
+        initialBackoffMs: 50,
+        maxBackoffMs: 100,
+        onWait: () => {
+          waitNoticeFired++;
+        },
+      },
+    });
+    // Release after a short delay so the waiter polls at least once.
+    setTimeout(() => {
+      void initial.release();
+    }, 200);
+    const acquired = await acquireP;
+    const elapsed = Date.now() - startedAt;
+    // Wait notice fires exactly once per acquire (per the contract).
+    expect(waitNoticeFired).toBe(1);
+    // Acquire eventually succeeds.
+    expect(acquired.pid).toBe(process.pid);
+    // The wait was bounded by the release delay, not the totalMs cap.
+    expect(elapsed).toBeLessThan(2_000);
+    await acquired.release();
+  });
+
+  it("--wait gives up and throws LockHeldError when the budget is exhausted", async () => {
+    const paths = buildStatePaths(root);
+    const initial = await acquireLock(paths, { signalHandlers: false });
+    await expect(
+      acquireLock(paths, {
+        signalHandlers: false,
+        wait: { totalMs: 250, initialBackoffMs: 50, maxBackoffMs: 100 },
+      }),
+    ).rejects.toBeInstanceOf(LockHeldError);
+    await initial.release();
+  });
+
   // Regression: rename-based claim had a replace-existing TOCTOU where two
   // concurrent acquirers could both succeed (Codex review #1, Gemini #1).
   // The exclusive-create primitive should serialize all parallel attempts

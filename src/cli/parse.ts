@@ -67,6 +67,7 @@ export function parseArgs(argv: ReadonlyArray<string>, defaultCwd: string): Pars
     onDrift: null,
     noColor: false,
     quiet: false,
+    waitMs: null,
   };
 
   // Side-channel for help/version short-circuit. We still want to parse the
@@ -121,6 +122,18 @@ export function parseArgs(argv: ReadonlyArray<string>, defaultCwd: string): Pars
       // Mutually-exclusive enforcement happens after the full pass so users
       // see one consolidated error regardless of arg order.
       global.quiet = true;
+    } else if (t === "--wait") {
+      // yd8 / AC-4: bare --wait → 30 second default budget. Picked to be
+      // long enough that a typical short swap (sub-second) clears, while
+      // capping accidental hangs at well under the impatient-user threshold.
+      global.waitMs = 30_000;
+    } else if (t.startsWith("--wait=")) {
+      const v = t.slice("--wait=".length);
+      const seconds = Number.parseFloat(v);
+      if (!Number.isFinite(seconds) || seconds < 0) {
+        return parseError(`--wait must be a non-negative number of seconds; got "${v}"`);
+      }
+      global.waitMs = Math.round(seconds * 1000);
     } else {
       verbAndArgs.push(t);
     }
@@ -286,14 +299,16 @@ export function parseArgs(argv: ReadonlyArray<string>, defaultCwd: string): Pars
     }
 
     case "validate": {
+      let brief = false;
       const positional: string[] = [];
       for (const t of rest) {
-        if (t.startsWith("--")) return parseError(`validate: unknown flag "${t}"`);
-        positional.push(t);
+        if (t === "--brief") brief = true;
+        else if (t.startsWith("--")) return parseError(`validate: unknown flag "${t}"`);
+        else positional.push(t);
       }
       if (positional.length > 1) return parseError(`validate takes at most one profile name; got "${positional.join(" ")}"`);
       return ok({
-        command: { kind: "validate", profile: positional[0] ?? null },
+        command: { kind: "validate", profile: positional[0] ?? null, brief },
         global,
       });
     }

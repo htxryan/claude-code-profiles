@@ -52,6 +52,14 @@ export interface ValidateOptions {
   profile: string | null;
   /** When true, force colour off (additive with NO_COLOR env). Default false. */
   noColor?: boolean;
+  /**
+   * yd8 / AC-3: when true, FAIL rows render as a single line (the legacy
+   * format). Default (false) prints the full multi-line error indented under
+   * the row so the user doesn't have to re-run `validate <name>` to see why
+   * a profile broke. The flag exists for CI scripts that grep one-line per
+   * profile.
+   */
+  brief?: boolean;
 }
 
 export async function runValidate(opts: ValidateOptions): Promise<number> {
@@ -152,9 +160,25 @@ export async function runValidate(opts: ValidateOptions): Promise<number> {
         }
       } else {
         // FAIL rows: red glyph + bold profile name to draw the eye.
+        // yd8 / AC-3: by default, print the FULL multi-line error indented
+        // beneath the FAIL row so a multi-profile run surfaces every cause
+        // without forcing the user to re-run `validate <name>`. --brief
+        // restores the old one-line format for CI scripts that key on a
+        // line-per-profile shape.
+        const message = r.errorMessage ?? "";
+        const firstLine = message.split("\n", 1)[0] ?? "";
         opts.output.print(
-          style.fail(`${style.bold(r.profile)}: [${r.errorCode}] ${r.errorMessage}`),
+          style.fail(`${style.bold(r.profile)}: [${r.errorCode}] ${firstLine}`),
         );
+        if (opts.brief !== true) {
+          // Print remaining lines indented; skip if the message was a single
+          // line (already shown above). The indent ("    ") matches a typical
+          // wrapped-quote marker so multi-profile output reads as a tree.
+          const rest = message.split("\n").slice(1);
+          for (const line of rest) {
+            opts.output.print(`    ${line}`);
+          }
+        }
       }
     }
     const failed = results.filter((r) => !r.ok).length;
@@ -199,7 +223,10 @@ async function assertRootClaudeMdMarkers(projectRoot: string): Promise<void> {
         // `(file: <path>)` suffix matches the materialize-time and drift
         // detect error messages so grep/log scraping is consistent across
         // the three sites that emit this remediation (cw6.2 followup).
-        `project-root CLAUDE.md is missing claude-profiles markers — run \`claude-profiles init\` to add them (file: ${claudeMdPath}; expected: <!-- claude-profiles:v1:begin --> ... <!-- claude-profiles:v1:end -->)`,
+        // yd8 / AC-5: doc link appended for the same reason as the
+        // materialize-side message — give a one-stop reference for the
+        // section-ownership model.
+        `project-root CLAUDE.md is missing claude-profiles markers — run \`claude-profiles init\` to add them (file: ${claudeMdPath}; expected: <!-- claude-profiles:v1:begin --> ... <!-- claude-profiles:v1:end -->; see docs/migration/cw6-section-ownership.md)`,
         EXIT_USER_ERROR,
       );
     }
@@ -208,7 +235,8 @@ async function assertRootClaudeMdMarkers(projectRoot: string): Promise<void> {
   const parsed = parseMarkers(content);
   if (!parsed.found) {
     throw new CliUserError(
-      "project-root CLAUDE.md is missing claude-profiles markers — run `claude-profiles init` to add them (expected: <!-- claude-profiles:v1:begin --> ... <!-- claude-profiles:v1:end -->)",
+      // yd8 / AC-5: same trailing doc link.
+      `project-root CLAUDE.md is missing claude-profiles markers — run \`claude-profiles init\` to add them (file: ${claudeMdPath}; expected: <!-- claude-profiles:v1:begin --> ... <!-- claude-profiles:v1:end -->; see docs/migration/cw6-section-ownership.md)`,
       EXIT_USER_ERROR,
     );
   }

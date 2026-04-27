@@ -151,7 +151,7 @@ async function compareRootClaudeMdSection(
         status: "unrecoverable",
         provenance,
         destination: "projectRoot",
-        error: `project-root CLAUDE.md is missing — run \`claude-profiles init\` to recreate, then \`claude-profiles validate\` to verify (file: ${paths.rootClaudeMdFile})`,
+        error: `project-root CLAUDE.md is missing — run \`claude-profiles init\` to recreate, then \`claude-profiles validate\` to verify (file: ${paths.rootClaudeMdFile}; see docs/migration/cw6-section-ownership.md)`,
       };
     }
     // Other IO errors (EACCES, EIO) propagate — those are not user-content
@@ -173,7 +173,7 @@ async function compareRootClaudeMdSection(
       status: "unrecoverable",
       provenance,
       destination: "projectRoot",
-      error: `project-root CLAUDE.md markers are missing or malformed — run \`claude-profiles init\` to repair, then \`claude-profiles validate\` to verify (file: ${paths.rootClaudeMdFile})`,
+      error: `project-root CLAUDE.md markers are missing or malformed — run \`claude-profiles init\` to repair, then \`claude-profiles validate\` to verify (file: ${paths.rootClaudeMdFile}; see docs/migration/cw6-section-ownership.md)`,
     };
   }
 

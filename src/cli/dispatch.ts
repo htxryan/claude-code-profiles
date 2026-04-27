@@ -93,6 +93,7 @@ export async function dispatch(
         output: ctx.output,
         profile: command.profile,
         noColor: global.noColor,
+        brief: command.brief,
       });
 
     case "new":
@@ -113,6 +114,7 @@ export async function dispatch(
         onDriftFlag: global.onDrift,
         signalHandlers: ctx.signalHandlers,
         noColor: global.noColor,
+        waitMs: global.waitMs,
       });
 
     case "sync":
@@ -123,6 +125,7 @@ export async function dispatch(
         onDriftFlag: global.onDrift,
         signalHandlers: ctx.signalHandlers,
         noColor: global.noColor,
+        waitMs: global.waitMs,
       });
 
     case "init":
