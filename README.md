@@ -164,6 +164,83 @@ In non-TTY contexts (CI, scripts) you must pass `--on-drift=discard|persist|abor
 explicitly — the gate refuses to default, so a CI job never silently destroys
 work.
 
+## Power-user affordances
+
+`claude-profiles` is built to be embedded in scripts and pipelines. A few
+flags you'll reach for once profiles are part of your workflow:
+
+### `--quiet` / `-q`
+
+Silences human output but preserves errors and exit codes. Useful for shell
+chains where the side-effect is what you want, not the chatter:
+
+```bash
+claude-profiles use ci -q && ./run.sh
+```
+
+`--quiet` is **mutually exclusive** with `--json` (a script that asks for
+both is ambiguous; the parser rejects the combination).
+
+### Stale-source detection (`status`)
+
+When a teammate edits `.claude-profiles/dev/.claude/` and you `git pull`,
+the bytes in `.claude/` are now stale relative to the source. `status`
+surfaces this:
+
+```text
+$ claude-profiles status
+active: dev
+materialized: 2026-04-25T09:12:34.567Z (3h ago)
+✓ drift: clean
+! source: updated since last materialize — run `claude-profiles sync`
+```
+
+Under `--json`, the same signal is `sourceFresh: false` plus the new
+`sourceFingerprint` field for round-tripping the value across runs.
+
+### Content previews (`diff --preview`, `drift --preview`)
+
+By default, `diff` and `drift` show one line per affected path:
+
+```text
+$ claude-profiles diff dev ci
+a=dev b=ci: 2 changes (1 added, 0 removed, 1 changed) (+45 -0 ~12 bytes)
+  + dev-only.md
+  ~ shared.md
+```
+
+Pass `--preview` to inline a unified diff (capped at 20 lines per file,
+with a `(truncated, N more lines)` footer when over):
+
+```text
+$ claude-profiles diff dev ci --preview
+a=dev b=ci: 2 changes (1 added, 0 removed, 1 changed) (+45 -0 ~12 bytes)
+  + dev-only.md
+  ~ shared.md
+       alpha
+      -BETA
+      +beta
+       gamma
+```
+
+`drift --preview` works the same way for files that have been edited in
+the live `.claude/` tree, plus a head preview for newly-added files.
+Binary files (NUL byte in the first 8KB) are summarised as
+`(binary file — N bytes)` rather than rendered.
+
+### Byte-count summaries
+
+Both `diff` and `drift` summary lines report byte deltas:
+
+- `+N`  — bytes contributed by added files (size of files only on the `a`
+  side for `diff`, or newly-created files in `.claude/` for `drift`)
+- `-N`  — bytes contributed by removed files (size of files only on the
+  `b` side for `diff`, or recorded sizes of deleted files for `drift`)
+- `~N`  — magnitude of the changed-file size deltas (sum of
+  `|bytesA − bytesB|` for `changed` / `modified` entries)
+
+Tells you the magnitude of a change before you drill in.
+
 ## FAQ
 
 **Is this safe to run in CI?**

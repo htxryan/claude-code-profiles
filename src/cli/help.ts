@@ -27,6 +27,7 @@ COMMANDS
 
 GLOBAL OPTIONS
   --json                   emit one JSON object per command (silences human output)
+  --quiet, -q              silence human output; preserves errors + exit codes (mutually exclusive with --json)
   --cwd=<path>             project root (default: current working dir)
   --on-drift=<choice>      discard|persist|abort — required for non-TTY swap with drift
   --no-color               disable colour output (additive with NO_COLOR env)
@@ -65,7 +66,11 @@ interface VerbHelp {
   exitCodes: string[];
 }
 
-const COMMON_GLOBALS = ["--cwd=<path>     project root (default: cwd)", "--json           machine-readable output (silences human output)"];
+const COMMON_GLOBALS = [
+  "--cwd=<path>     project root (default: cwd)",
+  "--json           machine-readable output (silences human output)",
+  "--quiet, -q      silence human output (preserves errors + exit codes); incompatible with --json",
+];
 const SWAP_GLOBALS = [...COMMON_GLOBALS, "--on-drift=<v>   discard|persist|abort (required in non-TTY when drift exists)"];
 
 const VERBS: Record<string, VerbHelp> = {
@@ -116,8 +121,11 @@ const VERBS: Record<string, VerbHelp> = {
     synopsis: "status [options]",
     description:
       "Reports the active profile name (with its description, when present),\n" +
-      "the count of drifted files in the live .claude/ tree, and any resolver\n" +
-      "warnings carried over from the last swap.",
+      "the count of drifted files in the live .claude/ tree, any resolver\n" +
+      "warnings carried over from the last swap, AND a stale-source signal\n" +
+      "when the active profile's source files have changed since the last\n" +
+      "materialize (a teammate's `git pull` brings in new bytes that .claude/\n" +
+      "hasn't picked up yet — run `claude-profiles sync` to apply them).",
     options: [],
     globals: COMMON_GLOBALS,
     examples: [
@@ -132,15 +140,18 @@ const VERBS: Record<string, VerbHelp> = {
     description:
       "Lists each file in .claude/ that differs from the active profile's\n" +
       "resolved+merged tree, naming the contributor each file came from.\n" +
-      "Read-only — does not change anything on disk.",
+      "Read-only — does not change anything on disk. The summary line shows\n" +
+      "byte deltas: `(+added -removed ~changed bytes)`.",
     options: [
       "--pre-commit-warn  fail-open hook entry point (always exits 0)",
       "--verbose          include scan stats (scanned N, fast=X, slow=Y) in the summary",
+      "--preview          render unified-diff content for modified entries (capped at 20 lines per file)",
     ],
     globals: COMMON_GLOBALS,
     examples: [
       "claude-profiles drift",
       "claude-profiles drift --json",
+      "claude-profiles drift --preview            # show what changed inside each drifted file",
       "claude-profiles drift --pre-commit-warn   # used by the git hook; never blocks",
     ],
     exitCodes: ["0  success (drift present or absent)", "2  IO fault"],
@@ -150,12 +161,16 @@ const VERBS: Record<string, VerbHelp> = {
     synopsis: "diff <a> [<b>] [options]",
     description:
       "Compares two profiles' resolved+merged file lists. If <b> is omitted,\n" +
-      "compares <a> to the currently active profile.",
-    options: [],
+      "compares <a> to the currently active profile. The summary line shows\n" +
+      "byte deltas: `(+added -removed ~changed bytes)`.",
+    options: [
+      "--preview          render unified-diff content for changed entries (capped at 20 lines per file)",
+    ],
     globals: COMMON_GLOBALS,
     examples: [
       "claude-profiles diff dev ci          # compare two profiles",
       "claude-profiles diff dev             # compare dev to the active profile",
+      "claude-profiles diff dev ci --preview # also show what changed inside each file",
     ],
     exitCodes: [
       "0  success",
