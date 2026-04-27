@@ -48,46 +48,62 @@ export function timestampWithRelative(iso: string | null, now: number = Date.now
  * in that column except the LAST column, so the trailing-edge of every line
  * is the natural end of the data — no ragged trailing whitespace.
  *
- * - rows: each row is an array of cells; missing trailing cells are treated
- *   as empty strings so callers can omit columns per row when they have
- *   nothing to show.
- * - options.header: optional header row drawn above the data (its widths
- *   participate in column width calculation).
+ * Each row is an array of cells; missing trailing cells are treated as empty
+ * strings so callers can omit columns per row when they have nothing to show.
  *
- * Visible column widths are computed including the header so headers and
- * data align even when the longest cell is in the header.
+ * Cells may contain ANSI SGR escape sequences (colour, bold). Width
+ * measurement uses VISIBLE length only (escapes stripped) so a bolded cell
+ * does not push subsequent columns out of alignment under a real TTY.
  */
-export function renderTable(
-  rows: ReadonlyArray<ReadonlyArray<string>>,
-  options?: { header?: ReadonlyArray<string> },
-): string {
-  if (rows.length === 0 && !options?.header) return "";
-  const allRows = options?.header ? [options.header, ...rows] : [...rows];
-  const numCols = Math.max(...allRows.map((r) => r.length));
+export function renderTable(rows: ReadonlyArray<ReadonlyArray<string>>): string {
+  if (rows.length === 0) return "";
+  const numCols = Math.max(...rows.map((r) => r.length));
   const widths: number[] = [];
   for (let c = 0; c < numCols; c++) {
     let w = 0;
-    for (const r of allRows) {
-      const cell = r[c] ?? "";
-      if (cell.length > w) w = cell.length;
+    for (const r of rows) {
+      const len = visibleLength(r[c] ?? "");
+      if (len > w) w = len;
     }
     widths.push(w);
   }
-  const lines = allRows.map((r) => {
+  const lines = rows.map((r) => {
     const cells: string[] = [];
     for (let c = 0; c < numCols; c++) {
       const cell = r[c] ?? "";
       // Last column: emit raw (no padEnd) so trailing whitespace never leaks.
-      // Earlier columns: pad to the column width so the next column starts
-      // at a stable visual offset.
+      // Earlier columns: pad to the column's visible width so the next
+      // column starts at a stable visual offset.
       if (c === numCols - 1) cells.push(cell);
-      else cells.push(cell.padEnd(widths[c]!));
+      else cells.push(padEndVisible(cell, widths[c]!));
     }
     // Two-space gap is the standard column separator across the codebase
     // (matches the prior renderTable output for the existing two-column case).
     return cells.join("  ").trimEnd();
   });
   return lines.join("\n");
+}
+
+/**
+ * Strip CSI/SGR ANSI escape sequences when measuring column widths so that
+ * `style.bold("name")` (which adds ~9 bytes of escape codes around 4 visible
+ * chars) does not over-pad neighbouring rows. The pattern matches the
+ * minimal subset we emit from `createStyle` (colour + bold + dim + reset).
+ */
+const ANSI_RE = /\x1b\[[0-9;]*m/g;
+function visibleLength(s: string): number {
+  return s.replace(ANSI_RE, "").length;
+}
+
+/**
+ * `padEnd` that pads to a target VISIBLE width (i.e. accounts for embedded
+ * ANSI escapes). Falls back to native padEnd for plain strings so the hot
+ * path (no escapes) stays branch-light.
+ */
+function padEndVisible(s: string, targetVisible: number): string {
+  const visible = visibleLength(s);
+  if (visible >= targetVisible) return s;
+  return s + " ".repeat(targetVisible - visible);
 }
 
 /**

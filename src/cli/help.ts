@@ -95,11 +95,13 @@ const VERBS: Record<string, VerbHelp> = {
     ],
   },
   list: {
-    tagline: "list all profiles with active marker, extends, includes",
+    tagline: "list all profiles with active marker, description, tags",
     synopsis: "list [options]",
     description:
-      "Prints one row per profile: name, active marker (*), extends, includes,\n" +
-      "last-materialized timestamp.",
+      "Prints one row per profile: name (active is marked `*` and bold),\n" +
+      "description (column shown only when at least one profile has one),\n" +
+      "tags (column shown only when at least one profile has any), and a\n" +
+      "trailing meta column with extends/includes/last-materialized.",
     options: [],
     globals: COMMON_GLOBALS,
     examples: [
@@ -109,11 +111,12 @@ const VERBS: Record<string, VerbHelp> = {
     exitCodes: ["0  success", "2  IO fault reading .claude-profiles/"],
   },
   status: {
-    tagline: "print active profile, drift summary, warnings",
+    tagline: "print active profile, description, drift summary, warnings",
     synopsis: "status [options]",
     description:
-      "Reports the active profile name, the count of drifted files in the live\n" +
-      ".claude/ tree, and any resolver warnings carried over from the last swap.",
+      "Reports the active profile name (with its description, when present),\n" +
+      "the count of drifted files in the live .claude/ tree, and any resolver\n" +
+      "warnings carried over from the last swap.",
     options: [],
     globals: COMMON_GLOBALS,
     examples: [

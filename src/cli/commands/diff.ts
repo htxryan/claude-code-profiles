@@ -109,13 +109,11 @@ export async function runDiff(opts: DiffOptions): Promise<number> {
   opts.output.print(
     `a=${a} b=${b}: ${entries.length} changes (${totals.added} added, ${totals.removed} removed, ${totals.changed} changed)`,
   );
-  // Pad the sigil column so the relPath column stays aligned even if a new
-  // status sigil ever widens past 1 char (defensive — keeps the layout
-  // stable as the data model evolves).
-  const sigilWidth = Math.max(1, ...entries.map(() => 1));
   for (const e of entries) {
     const sigil = e.status === "added" ? "+" : e.status === "removed" ? "-" : "~";
-    opts.output.print(`  ${sigil.padEnd(sigilWidth)} ${e.relPath}`);
+    // Single-char sigils today render as `  + path`; the leading two spaces
+    // form the sigil "column" and keep relPath aligned across rows.
+    opts.output.print(`  ${sigil} ${e.relPath}`);
   }
   return 0;
 }
