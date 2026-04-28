@@ -1,0 +1,35 @@
+==== $ node /Users/redhale/src/claude-code-profiles/dist/cli/bin.js use --help ====
+
+claude-profiles use — switch to profile <name>; runs the drift gate
+
+USAGE
+  claude-profiles use <name> [options]
+
+DESCRIPTION
+  Materializes <name> into .claude/. If <name> (or any contributor) has a
+  profile-root CLAUDE.md, also splices its content between the markers in
+  project-root CLAUDE.md (user content above/below preserved). If .claude/
+  has uncommitted edits (drift), prompts you to discard / persist / abort.
+  Non-TTY sessions MUST pass --on-drift=<choice>; otherwise the command
+  exits 1 immediately so CI scripts never block on a hidden prompt.
+
+GLOBAL OPTIONS
+  --cwd=<path>     project root (default: cwd)
+  --json           machine-readable output (silences human output)
+  --quiet, -q      silence human output (preserves errors + exit codes); incompatible with --json
+  --on-drift=<v>   discard|persist|abort (required in non-TTY when drift exists)
+  --wait[=<sec>]   poll a held lock with backoff instead of failing fast (default 30s)
+
+EXAMPLES
+  claude-profiles use dev                       # interactive (prompts on drift)
+  claude-profiles use ci --on-drift=discard     # CI: drop drifted edits
+  claude-profiles use dev --on-drift=persist    # write drift back to active first
+  claude-profiles use dev --json --on-drift=abort
+
+EXIT CODES
+  0  success
+  1  drift abort, missing --on-drift in non-TTY, profile-name typo
+  2  IO fault during materialize/backup
+  3  cycle / missing include / missing extends parent / lock held by peer
+
+[exit=0]

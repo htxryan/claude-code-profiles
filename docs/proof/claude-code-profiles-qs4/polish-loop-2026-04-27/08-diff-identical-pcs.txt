@@ -1,0 +1,5 @@
+==== $ node /Users/redhale/src/claude-code-profiles/dist/cli/bin.js diff dev ====
+
+a=dev b=dev: identical (same profile)
+
+[exit=0]

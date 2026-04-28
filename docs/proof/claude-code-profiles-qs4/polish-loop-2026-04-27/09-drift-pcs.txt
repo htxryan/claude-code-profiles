@@ -1,0 +1,6 @@
+==== $ node /Users/redhale/src/claude-code-profiles/dist/cli/bin.js drift ====
+
+active: dev
+[ok] drift: clean
+
+[exit=0]

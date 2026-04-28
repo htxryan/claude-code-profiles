@@ -1,0 +1,6 @@
+==== $ node /Users/redhale/src/claude-code-profiles/dist/cli/bin.js use dve ====
+
+resolving profile…
+claude-profiles: Profile "dve" does not exist (did you mean: dev?)
+
+[exit=1]

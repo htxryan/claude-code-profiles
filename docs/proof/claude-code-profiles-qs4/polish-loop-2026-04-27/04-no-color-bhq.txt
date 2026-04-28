@@ -1,0 +1,7 @@
+==== $ node /Users/redhale/src/claude-code-profiles/dist/cli/bin.js --no-color status ====
+
+active: dev
+materialized: 2026-04-27T16:58:49.397Z (0s ago)
+[ok] drift: clean
+
+[exit=0]

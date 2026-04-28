@@ -1,0 +1,7 @@
+==== $ node /Users/redhale/src/claude-code-profiles/dist/cli/bin.js drift ====
+
+active: dev
+drift: 1 file(s) (+0 -0 ~3 bytes)
+  modified      settings.local.json  (from: dev)
+
+[exit=0]

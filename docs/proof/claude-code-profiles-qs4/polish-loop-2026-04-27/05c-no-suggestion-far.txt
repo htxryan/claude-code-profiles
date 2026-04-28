@@ -1,0 +1,6 @@
+==== $ node /Users/redhale/src/claude-code-profiles/dist/cli/bin.js use xyz ====
+
+resolving profile…
+claude-profiles: Profile "xyz" does not exist
+
+[exit=1]

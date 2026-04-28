@@ -1,0 +1,6 @@
+==== $ node /Users/redhale/src/claude-code-profiles/dist/cli/bin.js use BAD..NAME ====
+
+resolving profile…
+claude-profiles: Profile "BAD..NAME" does not exist
+
+[exit=1]

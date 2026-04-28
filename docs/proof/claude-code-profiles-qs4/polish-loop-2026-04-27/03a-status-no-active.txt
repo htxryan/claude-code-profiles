@@ -1,0 +1,5 @@
+==== $ node /Users/redhale/src/claude-code-profiles/dist/cli/bin.js status ====
+
+(no active profile — run `claude-profiles use <name>` to activate)
+
+[exit=0]

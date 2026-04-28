@@ -1,0 +1,5 @@
+==== $ node /Users/redhale/src/claude-code-profiles/dist/cli/bin.js status --json ====
+
+{"activeProfile":"dev","materializedAt":"2026-04-27T16:59:29.492Z","drift":{"fingerprintOk":true,"modified":1,"added":0,"deleted":0,"unrecoverable":0,"total":1},"sourceFresh":false,"sourceFingerprint":"5f14c49e02b02142d607e7128cb529bfe276ac19e9219302035d217b99230f78","warnings":[]}
+
+[exit=0]

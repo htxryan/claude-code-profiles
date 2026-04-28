@@ -1,0 +1,6 @@
+==== $ node /Users/redhale/src/claude-code-profiles/dist/cli/bin.js diff dev prod ====
+
+a=dev b=prod: 1 changes (0 added, 0 removed, 1 changed) (+0 -0 ~1 bytes)
+  ~ settings.local.json
+
+[exit=0]

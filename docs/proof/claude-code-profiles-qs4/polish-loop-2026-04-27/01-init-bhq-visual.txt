@@ -1,0 +1,5 @@
+==== $ node /Users/redhale/src/claude-code-profiles/dist/cli/bin.js init ====
+
+claude-profiles: init: ".claude-profiles/" is already initialised in this project; refusing to overwrite (run "claude-profiles status" to see current state, or "claude-profiles new <name>" to add a profile)
+
+[exit=1]

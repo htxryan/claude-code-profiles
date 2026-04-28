@@ -1,0 +1,8 @@
+==== $ node /Users/redhale/src/claude-code-profiles/dist/cli/bin.js status ====
+
+active: dev
+materialized: 2026-04-27T16:59:29.492Z (0s ago)
+[ok] drift: clean
+[warn] source: updated since last materialize — run `claude-profiles sync`
+
+[exit=0]

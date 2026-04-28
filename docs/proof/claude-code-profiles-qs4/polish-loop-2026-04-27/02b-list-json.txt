@@ -1,0 +1,5 @@
+==== $ node /Users/redhale/src/claude-code-profiles/dist/cli/bin.js list --json ====
+
+{"profiles":[{"name":"dev","active":false,"description":null,"extends":null,"includes":[],"tags":[],"lastMaterialized":null},{"name":"prod","active":false,"description":null,"extends":null,"includes":[],"tags":[],"lastMaterialized":null}],"stateWarning":null}
+
+[exit=0]

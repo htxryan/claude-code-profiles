@@ -1,0 +1,6 @@
+==== $ node /Users/redhale/src/claude-code-profiles/dist/cli/bin.js list ====
+
+  dev
+  prod
+
+[exit=0]

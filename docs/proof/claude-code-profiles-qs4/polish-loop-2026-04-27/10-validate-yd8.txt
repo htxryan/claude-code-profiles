@@ -1,0 +1,12 @@
+==== $ node /Users/redhale/src/claude-code-profiles/dist/cli/bin.js validate ====
+
+validating broken…
+validating dev…
+validating prod…
+[x] broken: [MissingProfile] Profile "missing-parent" does not exist (referenced by "broken")
+[ok] dev
+[ok] prod
+[x] 2 pass, 1 fail
+claude-profiles: validation failed for 1 profile(s)
+
+[exit=3]

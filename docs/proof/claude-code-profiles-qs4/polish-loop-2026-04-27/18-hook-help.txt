@@ -1,0 +1,35 @@
+==== $ node /Users/redhale/src/claude-code-profiles/dist/cli/bin.js hook --help ====
+
+claude-profiles hook — manage the git pre-commit hook
+
+USAGE
+  claude-profiles hook install|uninstall [options]
+
+DESCRIPTION
+  The hook script content is fixed and minimal (R25a) and fail-open: a
+  missing or broken claude-profiles binary never blocks commits.
+  
+  install:    writes .git/hooks/pre-commit (preserves existing hook unless --force)
+  uninstall:  removes the hook only if its content matches the canonical
+              script (a user-edited or third-party hook is left untouched)
+
+OPTIONS
+  --force            (install only) overwrite an existing pre-commit hook
+
+GLOBAL OPTIONS
+  --cwd=<path>     project root (default: cwd)
+  --json           machine-readable output (silences human output)
+  --quiet, -q      silence human output (preserves errors + exit codes); incompatible with --json
+
+EXAMPLES
+  claude-profiles hook install
+  claude-profiles hook install --force
+  claude-profiles hook uninstall
+  claude-profiles hook install --json
+
+EXIT CODES
+  0  success (or no-op if hook is already in the desired state)
+  1  bad argv (missing install|uninstall, install with conflicting hook + no --force)
+  2  IO/permission fault, missing .git/ directory
+
+[exit=0]

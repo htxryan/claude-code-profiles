@@ -1,0 +1,8 @@
+==== $ node /Users/redhale/src/claude-code-profiles/dist/cli/bin.js use prod ====
+
+resolving profile…
+merging files…
+this swap will replace 1, add 0, delete 0 (+10 -12 bytes)
+claude-profiles: drift detected in .claude/ and session is non-interactive; pass --on-drift=discard|persist|abort
+
+[exit=1]
