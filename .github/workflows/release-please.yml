@@ -2,12 +2,18 @@ name: release-please
 
 # Maintains a perpetual "release PR" against main bundling all unreleased
 # conventional-commit changes. When the release PR is merged, release-please
-# tags the commit + creates a GitHub release; the publish workflow (separate
-# file) then triggers off the new tag and runs `npm publish --provenance`.
+# tags the commit + creates a GitHub release. We then chain the npm publish
+# steps into the same job (gated on `release_created` output).
 #
-# The npm publish step uses GitHub Actions OIDC trusted publishers — no
-# long-lived NPM_TOKEN secret required. The package must be configured for
-# OIDC publishing on npmjs.com first (one-time human setup).
+# Why publish in this job instead of a separate workflow on `release: published`?
+# Releases created by release-please use the default GITHUB_TOKEN. GitHub's
+# anti-loop policy explicitly prevents workflows from triggering other
+# workflows when the trigger is a GITHUB_TOKEN-authored event. Chaining the
+# publish steps inline sidesteps that without needing a PAT.
+#
+# Auth for `npm publish`: NPM_TOKEN secret. After the first publish lands,
+# this can be migrated to tokenless OIDC trusted publishers — see comments
+# at the top of publish.yml for the migration steps.
 
 on:
   push:
@@ -16,14 +22,56 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  id-token: write  # Required for npm provenance via Sigstore OIDC.
 
 jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
-      - uses: googleapis/release-please-action@v4
+      - id: release
+        uses: googleapis/release-please-action@v4
         with:
           # Single-package repo. release-please reads .release-please-config.json
           # and .release-please-manifest.json from the repo root.
           config-file: .release-please-config.json
           manifest-file: .release-please-manifest.json
+
+      # Everything below runs only on the release commit (the merge of the
+      # release PR). On normal pushes (which only update the open release PR),
+      # `release_created` is empty and these steps are skipped.
+
+      - name: Checkout
+        if: ${{ steps.release.outputs.release_created }}
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        if: ${{ steps.release.outputs.release_created }}
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node 20
+        if: ${{ steps.release.outputs.release_created }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install dependencies
+        if: ${{ steps.release.outputs.release_created }}
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        if: ${{ steps.release.outputs.release_created }}
+        run: pnpm run build
+
+      - name: Test
+        if: ${{ steps.release.outputs.release_created }}
+        run: pnpm test
+
+      - name: Publish to npm with provenance
+        if: ${{ steps.release.outputs.release_created }}
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

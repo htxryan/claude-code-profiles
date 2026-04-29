@@ -1,7 +1,16 @@
 name: publish
 
-# Triggers when release-please tags a new release. Builds, tests, and
-# publishes to npm with provenance attestation.
+# Manual / fallback publish workflow. The primary publish path is the
+# release-please.yml job, which handles the merge → tag → release → publish
+# chain in a single job. This workflow is the manual escape hatch:
+#
+#   - Re-publishing an existing tag if the release-please run failed mid-way.
+#   - Publishing a tag that pre-dates the release-please integration
+#     (the very first 0.2.0 release was tagged before publish was chained
+#     into release-please.yml).
+#
+# Trigger via the Actions UI or:
+#   gh workflow run publish.yml --ref v0.2.0
 #
 # Auth: uses an automation NPM_TOKEN secret (required for the first publish
 # because OIDC trusted publishers can only be configured after a package
@@ -15,8 +24,7 @@ name: publish
 # OIDC regardless of whether auth uses a token or trusted publishers.
 
 on:
-  release:
-    types: [published]
+  workflow_dispatch:
 
 permissions:
   contents: read

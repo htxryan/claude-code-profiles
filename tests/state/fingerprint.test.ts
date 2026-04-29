@@ -83,10 +83,21 @@ describe("fingerprint", () => {
     let fp = fingerprintFromMergedFiles([
       { path: "f.md", bytes: Buffer.from("v1"), contributors: ["a"], mergePolicy: "concat", destination: ".claude" },
     ]);
-    await fs.writeFile(path.join(root, "f.md"), "v1");
+    const fpath = path.join(root, "f.md");
+    await fs.writeFile(fpath, "v1");
     fp = await recordMtimes(root, fp);
     // Modify the file with different content but same byte length.
-    await fs.writeFile(path.join(root, "f.md"), "v2");
+    await fs.writeFile(fpath, "v2");
+    // Force the slow path deterministically: set the file's mtime back to
+    // the recorded value so size+mtime match (fast-path "unchanged" branch).
+    // Without this, on filesystems with coarse mtime resolution (Windows
+    // NTFS, macOS HFS+ on legacy hosts) two back-to-back writes can land in
+    // different mtime ticks and the test would actually traverse the fast
+    // path's "metadata-changed → slow-path" branch instead of the
+    // "metadata-equal → slow-path" branch we mean to exercise here.
+    const recordedMtimeMs = fp.files["f.md"]!.mtimeMs;
+    const recordedMtime = new Date(recordedMtimeMs);
+    await fs.utimes(fpath, recordedMtime, recordedMtime);
     const drift = await compareFingerprint(root, fp);
     expect(drift).toEqual([{ relPath: "f.md", kind: "modified" }]);
   });
