@@ -12,16 +12,13 @@ name: publish
 # Trigger via the Actions UI or:
 #   gh workflow run publish.yml --ref v0.2.0
 #
-# Auth: uses an automation NPM_TOKEN secret (required for the first publish
-# because OIDC trusted publishers can only be configured after a package
-# already exists on the registry). After the initial 0.2.0 publish, switch
-# to OIDC by:
-#   1. Register this repo + this workflow as a trusted publisher on
-#      npmjs.com (Settings -> Trusted Publishers).
-#   2. Delete the NPM_TOKEN repo secret.
-#   3. Remove the NODE_AUTH_TOKEN env from the publish step below.
-# The `id-token: write` permission stays — npm provenance uses Sigstore
-# OIDC regardless of whether auth uses a token or trusted publishers.
+# Auth: tokenless OIDC trusted publisher. The repo + this workflow file
+# path must be registered as a trusted publisher for `claude-code-profiles`
+# on npmjs.com (npm UI: package settings → Trusted Publishers; supports
+# "pending" rules for packages that don't exist on the registry yet).
+#
+# The `id-token: write` permission below is required for both auth (npm
+# trusted publishers) and provenance signing (Sigstore).
 
 on:
   workflow_dispatch:
@@ -60,5 +57,3 @@ jobs:
 
       - name: Publish to npm with provenance
         run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
