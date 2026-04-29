@@ -9,7 +9,7 @@
   "packages": {
     ".": {
       "release-type": "node",
-      "package-name": "claude-code-profiles",
+      "package-name": "claude-code-config-profiles",
       "changelog-path": "CHANGELOG.md"
     }
   }

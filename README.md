@@ -1,14 +1,15 @@
-# claude-code-profiles
+# claude-code-config-profiles (C3P)
 
 Swappable `.claude/` configurations for Claude Code projects.
 
-`claude-code-profiles` (CLI: `claude-profiles`) lets you maintain multiple named
-`.claude/` configurations in a project — for example a `dev` profile with verbose
-agents and looser permissions, and a `ci` profile with terse output and locked-down
-permissions — and switch between them atomically. Profiles compose via
-single-parent `extends` and additive `includes` (composable components), and a
-**drift gate** ensures uncommitted edits to the active `.claude/` are never lost
-when switching.
+> **npm package**: `claude-code-config-profiles` &nbsp;·&nbsp; **CLI binary**: `claude-profiles` &nbsp;·&nbsp; **GitHub repo**: `claude-code-profiles` &nbsp;·&nbsp; **short name**: C3P
+
+C3P lets you maintain multiple named `.claude/` configurations in a project —
+for example a `dev` profile with verbose agents and looser permissions, and a
+`ci` profile with terse output and locked-down permissions — and switch between
+them atomically. Profiles compose via single-parent `extends` and additive
+`includes` (composable components), and a **drift gate** ensures uncommitted
+edits to the active `.claude/` are never lost when switching.
 
 > **Status**: alpha. The CLI surface is stable. Pre-1.0 means the on-disk layout
 > may still change in minor versions.
@@ -16,10 +17,10 @@ when switching.
 ## Install
 
 ```bash
-npm install -g claude-code-profiles
+npm install -g claude-code-config-profiles
 ```
 
-Requires Node 20+.
+Requires Node 20+. The installed binary is `claude-profiles`.
 
 ## Quickstart
 
