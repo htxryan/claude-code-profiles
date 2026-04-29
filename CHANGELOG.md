@@ -1,0 +1,50 @@
+# Changelog
+
+## [0.2.0](https://github.com/htxryan/claude-code-profiles/compare/v0.1.0...v0.2.0) (2026-04-29)
+
+
+### Features
+
+* **cli/0zn:** doctor + completions + discoverability docs ([0c36113](https://github.com/htxryan/claude-code-profiles/commit/0c3611317abfaa00f62ffc47318231d5fb0648ce))
+* **cli/3yy:** charm-style visual hierarchy — colour, byte intensity, phase progress ([b2517f7](https://github.com/htxryan/claude-code-profiles/commit/b2517f7bc05d6c7939f4d62a21850ad6f97baa31))
+* **cli/azp:** power-user affordances — quiet, stale-source, previews, byte counts ([0eda8ff](https://github.com/htxryan/claude-code-profiles/commit/0eda8ffa74f96cf5c38d688b344cdc045355718b))
+* **cli/bhq:** visual style consistency across mutating verbs ([8000051](https://github.com/htxryan/claude-code-profiles/commit/8000051bb598efc5d39c9edfd2eb04a1181e45d0))
+* **cli/ppo:** every error names the next step ([c88b418](https://github.com/htxryan/claude-code-profiles/commit/c88b418adaff1557340516590ee912685d776e80))
+* **cli/yd8:** polish decision-point UX (gate, lock, validate, marker errors) ([ae36227](https://github.com/htxryan/claude-code-profiles/commit/ae362270316570474d40dbb1ec46ac416339df6f))
+* **cli:** E6 — init flow + hook install/uninstall ([f861b21](https://github.com/htxryan/claude-code-profiles/commit/f861b213a1d1157cb1e048b4fa9127a66a6edb9e))
+* **cli:** markers module + init injection + validate check (cw6/T6) ([60ec73c](https://github.com/htxryan/claude-code-profiles/commit/60ec73c67919fdf711ad414897696350072d1c94))
+* **cli:** skimmable read-only commands (list/status/drift/diff) ([0d5ed0a](https://github.com/htxryan/claude-code-profiles/commit/0d5ed0a84d69fe11324d27a874b58f26b0a2880b))
+* **cli:** T1+T2 — argv parser, output channel, exit-code policy ([4f65dff](https://github.com/htxryan/claude-code-profiles/commit/4f65dff0a83b70f9b1e43af047f33c7abb818c30))
+* **cli:** T3 — list, status, drift read commands ([6a6362b](https://github.com/htxryan/claude-code-profiles/commit/6a6362ba0a9815c3f7a87577334730b98c163467))
+* **cli:** T4 — diff + validate commands ([eba2dab](https://github.com/htxryan/claude-code-profiles/commit/eba2dabf5dcbcad9a37a25ecf94ca0bdd1873a35))
+* **cli:** T5 — swap orchestrator + use/sync commands + interactive prompt ([4327bac](https://github.com/htxryan/claude-code-profiles/commit/4327bac455daa210e11a7b4ca92e2f708bfcde01))
+* **cli:** T6+T7+T8 — bin entry, dispatcher, new command, integration tests ([2a05f5c](https://github.com/htxryan/claude-code-profiles/commit/2a05f5c3f7c4fd1c900128256ef2f0c89c8e8846))
+* **drift,persist:** section-only fingerprint and profile-root write-back (cw6/T5) ([66727f7](https://github.com/htxryan/claude-code-profiles/commit/66727f7147e7da9210a46b605901919e7441dd1f))
+* **drift:** implement E4 — detect, gate, apply, pre-commit warn ([b0a901c](https://github.com/htxryan/claude-code-profiles/commit/b0a901c26a0051a5d889a5cef3842f2974da1e19))
+* init UX polish, GitHub Actions CI/CD, npm publish metadata ([449cf4e](https://github.com/htxryan/claude-code-profiles/commit/449cf4e17a7e9e14d88699ddeada64fb322e15ff))
+* **merge:** destination-aware grouping for project-root CLAUDE.md (cw6/T3) ([044ed69](https://github.com/htxryan/claude-code-profiles/commit/044ed6988b6ae5562e683f3a54f09b3f7b890b09))
+* **merge:** implement E2 — strategy-pattern merge engine over ResolvedPlan ([b667497](https://github.com/htxryan/claude-code-profiles/commit/b66749750e3362709f6b8573e1368709d1cf3aba))
+* **resolver:** destination-aware PlanFile for project-root CLAUDE.md (cw6/T2) ([cdf2516](https://github.com/htxryan/claude-code-profiles/commit/cdf251620987a6086f5a9cb46e0d3c22f154f3f9))
+* **resolver:** implement E1 — manifest parsing, extends/includes resolution ([62654ff](https://github.com/htxryan/claude-code-profiles/commit/62654ff9faec0ef0b8fd3d22487a708cdf5d4f29))
+* **state:** atomic section splice for projectRoot CLAUDE.md (cw6/T4) ([2df33e1](https://github.com/htxryan/claude-code-profiles/commit/2df33e186946ce41e446bf13e9031c3bf1521662))
+* **state:** implement E3 — materialization, state, concurrency ([289bc05](https://github.com/htxryan/claude-code-profiles/commit/289bc05a5c6172cea309ef68a2f904cc97301a3c))
+
+
+### Bug Fixes
+
+* **ci:** platform-gate Windows-incompatible tests + dependabot + audit ([799c3d0](https://github.com/htxryan/claude-code-profiles/commit/799c3d04107fb5ed57c116f309d44c29ecf88201))
+* **cli/azp:** apply external review feedback ([5c04335](https://github.com/htxryan/claude-code-profiles/commit/5c04335c5023d7c75e64db74c8b81224fb6d53be))
+* **cli/bhq:** apply external review feedback ([c83ac44](https://github.com/htxryan/claude-code-profiles/commit/c83ac445afcee9d4e50f828394007a463ca2e49e))
+* **cli/pcs:** ANSI-aware column padding + help-text refresh ([cccb7ec](https://github.com/htxryan/claude-code-profiles/commit/cccb7ec63f5ded67e336614427525d8865a38f69))
+* **cli:** address E5 multi-reviewer feedback (P1/P2) ([a0393f4](https://github.com/htxryan/claude-code-profiles/commit/a0393f452f4b568e8db8f947dd2bf07c338d02d7))
+* **cli:** address E5 third-pass review feedback (P1/P2/P3) ([c28d6fc](https://github.com/htxryan/claude-code-profiles/commit/c28d6fc8e7460fdb704d2efdf67edb29c9432a7f))
+* **cli:** address E6 third-pass review feedback (P2/P3) ([ce506ef](https://github.com/htxryan/claude-code-profiles/commit/ce506ef54f47d58c48dc9d7b65d72fbf66421389))
+* **cw6:** address P1 review findings — validate gating, stale section, e2e scenario, spec wording ([e69dea4](https://github.com/htxryan/claude-code-profiles/commit/e69dea4f70d3e64f2834e71d174087d4843f434b))
+* **drift:** address E4 multi-reviewer feedback (P0/P1) ([c3a7ef3](https://github.com/htxryan/claude-code-profiles/commit/c3a7ef348b8388e1311ce0425b3b941a3d3555ce))
+* **drift:** second-pass review — surface state warning in pre-commit ([04254ea](https://github.com/htxryan/claude-code-profiles/commit/04254eafd4a7741c4e246909438ec6a8a9b1c368))
+* **merge:** address E2 multi-reviewer feedback (P2/P3) ([6d89d4a](https://github.com/htxryan/claude-code-profiles/commit/6d89d4abe68c1b250d4df9e9aa54d165d9c82a65))
+* **n0u:** clear correctness debt — cw6 followups + ch5/bj0/j44 ([9d3ba85](https://github.com/htxryan/claude-code-profiles/commit/9d3ba85a6ed1f7b61e815a5c79a5aee3ca2d5c5a))
+* **publish:** wire NPM_TOKEN secret for first publish ([26f5bf1](https://github.com/htxryan/claude-code-profiles/commit/26f5bf15f3a858f4e61bb23819026fd30c38f09d))
+* **resolver:** address E1 multi-reviewer feedback (P1/P2/P3) ([e1895ba](https://github.com/htxryan/claude-code-profiles/commit/e1895baf69f22b0fce84cb9808fff425c4d733ff))
+* **state:** address E3 multi-reviewer feedback (P1/P2/P3) ([4b699dc](https://github.com/htxryan/claude-code-profiles/commit/4b699dcc03a2acdaa494c29672af0d49807949b4))
+* **state:** second-pass E3 review fixes (lock TOCTOU, tmp-paths, ENOENT) ([b3733f7](https://github.com/htxryan/claude-code-profiles/commit/b3733f7f680fb61a97a5bcfca2488275693607ab))
