@@ -1,8 +1,18 @@
 name: publish
 
 # Triggers when release-please tags a new release. Builds, tests, and
-# publishes to npm with provenance attestation. No NPM_TOKEN secret needed
-# when the package is configured for OIDC trusted publishers on npmjs.com.
+# publishes to npm with provenance attestation.
+#
+# Auth: uses an automation NPM_TOKEN secret (required for the first publish
+# because OIDC trusted publishers can only be configured after a package
+# already exists on the registry). After the initial 0.2.0 publish, switch
+# to OIDC by:
+#   1. Register this repo + this workflow as a trusted publisher on
+#      npmjs.com (Settings -> Trusted Publishers).
+#   2. Delete the NPM_TOKEN repo secret.
+#   3. Remove the NODE_AUTH_TOKEN env from the publish step below.
+# The `id-token: write` permission stays — npm provenance uses Sigstore
+# OIDC regardless of whether auth uses a token or trusted publishers.
 
 on:
   release:
@@ -42,3 +52,5 @@ jobs:
 
       - name: Publish to npm with provenance
         run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
