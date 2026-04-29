@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.1](https://github.com/htxryan/claude-code-profiles/compare/v0.2.0...v0.2.1) (2026-04-29)
+
+
+### Bug Fixes
+
+* **ci,release:** chain publish into release-please + Windows fingerprint flake ([d4c4291](https://github.com/htxryan/claude-code-profiles/commit/d4c42919f29e7f169bd55ee79f7e9971e8c95efe))
+* **publish:** restore NODE_AUTH_TOKEN for first-publish bootstrap ([ba50a0b](https://github.com/htxryan/claude-code-profiles/commit/ba50a0b8312abf68b153df8e48af9b7592beeabb))
+* **publish:** switch npm auth to tokenless OIDC trusted publisher ([441afdf](https://github.com/htxryan/claude-code-profiles/commit/441afdfbf518e1d530abb07bba64dba4fc5ff051))
+
 ## [0.2.0](https://github.com/htxryan/claude-code-profiles/compare/v0.1.0...v0.2.0) (2026-04-29)
 
 

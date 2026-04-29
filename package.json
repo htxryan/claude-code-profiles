@@ -1,6 +1,6 @@
 {
   "name": "claude-code-profiles",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Swappable .claude/ configurations for Claude Code projects",
   "license": "MIT",
   "type": "module",
