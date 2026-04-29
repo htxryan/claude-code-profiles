@@ -42,7 +42,13 @@ async function ensureBuilt() {
   }
 }
 
-describe("SIGINT releases lock (AC-15)", () => {
+// Windows lacks POSIX SIGINT/SIGTERM semantics — Node maps them onto
+// unrelated console events, exit codes don't follow `128 + signo`, and the
+// hand-off between the spawned holder and the test harness is unreliable.
+// The behavior these tests pin is a POSIX invariant; skip the suite there.
+const describePosix = process.platform === "win32" ? describe.skip : describe;
+
+describePosix("SIGINT releases lock (AC-15)", () => {
   it("spawned holder receives SIGINT → exit 130 + lock file removed", async () => {
     await ensureBuilt();
     fx = await makeFixture({});

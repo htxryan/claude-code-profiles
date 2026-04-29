@@ -58,3 +58,32 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+  audit:
+    name: pnpm audit (high+critical)
+    runs-on: ubuntu-latest
+    # Non-blocking advisory check: surfaces known-vulnerable deps without
+    # gating PR merges. A clean pnpm audit run is cheap; flagging is the
+    # whole point. continue-on-error keeps the job green even when an
+    # advisory lands so the rest of CI is still merge-ready.
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: pnpm audit (high + critical only)
+        run: pnpm audit --audit-level=high

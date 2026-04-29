@@ -1,0 +1,40 @@
+# Dependabot keeps npm dependencies and GitHub-Actions versions fresh.
+# Weekly cadence is enough — this CLI has a small dependency surface and
+# burning a daily PR-review slot on Renovate-style churn isn't worth it.
+
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: America/Los_Angeles
+    open-pull-requests-limit: 5
+    # Group all non-major updates into a single weekly PR so review is one
+    # round-trip per week. Majors still arrive as their own PR for case-by-case
+    # review (a major bump might require code changes).
+    groups:
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+    labels:
+      - dependencies
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: America/Los_Angeles
+    open-pull-requests-limit: 5
+    groups:
+      ci-actions:
+        patterns:
+          - "*"
+    labels:
+      - dependencies
+      - ci

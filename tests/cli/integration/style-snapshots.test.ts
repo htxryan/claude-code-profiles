@@ -61,6 +61,18 @@ const TTY_STYLE = createStyle({
   noColor: false,
 });
 
+/**
+ * Style mirror that follows the *host* platform — for assertions that compare
+ * against production-command output (runStatus/runDrift/etc.), where the CLI
+ * code uses `process.platform` to pick glyphs. On Windows this falls back to
+ * ASCII (`[ok]` instead of `✓`) per the documented invariant in output.ts.
+ */
+const RUNTIME_TTY_STYLE = createStyle({
+  isTty: true,
+  platform: process.platform,
+  noColor: false,
+});
+
 const NOCOLOR_STYLE = createStyle({
   isTty: true,
   platform: "linux",
@@ -383,7 +395,7 @@ describe("status — style snapshot (3yy)", () => {
     fx = await setupTwoProfiles({ activate: "a" });
     const cap = captureOutput(false, { isTty: true });
     await runStatus({ cwd: fx.projectRoot, output: cap.channel });
-    expect(cap.stdout()).toContain("\x1b[32m✓\x1b[0m drift: clean");
+    expect(cap.stdout()).toContain(RUNTIME_TTY_STYLE.ok("drift: clean"));
   });
 });
 
@@ -403,7 +415,9 @@ describe("drift — style snapshot (3yy)", () => {
     });
     expect(cap.stdout()).toContain("[ok] drift: clean");
     expect(cap.stdout()).not.toMatch(/\x1b\[/);
-    // TTY shape: green ✓ wraps the painted glyph.
+    // TTY shape: green-painted glyph wraps the label. Glyph itself is
+    // platform-dependent (✓ on POSIX, [ok] on Windows) so build the expected
+    // string from a host-pinned style instead of hardcoding the unicode form.
     cap = captureOutput(false, { isTty: true });
     await runDrift({
       cwd: fx.projectRoot,
@@ -411,7 +425,7 @@ describe("drift — style snapshot (3yy)", () => {
       preCommitWarn: false,
       verbose: false,
     });
-    expect(cap.stdout()).toContain("\x1b[32m✓\x1b[0m drift: clean");
+    expect(cap.stdout()).toContain(RUNTIME_TTY_STYLE.ok("drift: clean"));
   });
 
   it("modified entry: status word coloured yellow under TTY; dim `(from: …)` provenance", async () => {

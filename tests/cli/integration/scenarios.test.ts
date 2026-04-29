@@ -468,7 +468,11 @@ describe("E7 scenarios S1-S18 (cross-epic CLI gate)", () => {
   // S18: Pre-commit hook exits 0 silently when binary not on PATH (R25a).
   //      Verified by running the hook script with a stripped PATH.
   // ──────────────────────────────────────────────────────────────────────
-  it("S18: pre-commit hook with missing claude-profiles binary — exit 0 silent", async () => {
+  // S18 spawns /bin/sh to run the hook script — Windows runners don't have
+  // POSIX shell available on the runner image. The hook contract itself is
+  // documented as POSIX (R25a, hook script starts with `#!/bin/sh`), so the
+  // test is platform-correctly skipped on Windows.
+  it.skipIf(process.platform === "win32")("S18: pre-commit hook with missing claude-profiles binary — exit 0 silent", async () => {
     await ensureBuilt();
     fx = await makeFixture({});
     await fs.mkdir(path.join(fx.projectRoot, ".git", "hooks"), { recursive: true });
