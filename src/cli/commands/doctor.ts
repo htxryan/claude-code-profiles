@@ -1,6 +1,6 @@
 /**
  * `doctor` command (claude-code-profiles-0zn). Read-only diagnostic that
- * surveys the project's claude-profiles state and reports a per-check
+ * surveys the project's c3p state and reports a per-check
  * status table:
  *   - state.json schema valid? (R42)
  *   - lock present + holder liveness? (R41)
@@ -155,7 +155,7 @@ async function checkProfilesDir(cwd: string): Promise<DoctorCheck> {
         ".claude-profiles/ directory",
         "fail",
         `${paths.profilesDir} exists but is not a directory`,
-        "remove the file and run `claude-profiles init`",
+        "remove the file and run `c3p init`",
       );
     }
     return mkCheck(
@@ -172,7 +172,7 @@ async function checkProfilesDir(cwd: string): Promise<DoctorCheck> {
         ".claude-profiles/ directory",
         "fail",
         `not found at ${paths.profilesDir}`,
-        "run `claude-profiles init` to bootstrap this project",
+        "run `c3p init` to bootstrap this project",
       );
     }
     throw err;
@@ -207,7 +207,7 @@ function stateWarningStatus(w: StateReadWarning): "ok" | "warn" | "skip" {
 function formatStateWarningDetail(w: StateReadWarning): string {
   switch (w.code) {
     case "Missing":
-      return `state file not yet written at ${w.path} (run \`init\` then \`use <profile>\`)`;
+      return `state file not yet written at ${w.path} (run \`c3p init\` then \`c3p use <profile>\`)`;
     case "ParseError":
       return `unparseable: ${w.detail}`;
     case "SchemaMismatch":
@@ -221,7 +221,7 @@ function stateWarningRemediation(w: StateReadWarning): string {
       return "";
     case "ParseError":
     case "SchemaMismatch":
-      return "delete the corrupted state file and re-run `claude-profiles use <profile>` to rebuild it";
+      return "delete the corrupted state file and re-run `c3p use <profile>` to rebuild it";
   }
 }
 
@@ -244,7 +244,7 @@ async function checkLock(cwd: string): Promise<DoctorCheck> {
       "lock file",
       "warn",
       `lock file at ${paths.lockFile} is corrupt (no PID)`,
-      "remove the file if no peer claude-profiles process is running",
+      "remove the file if no peer c3p process is running",
     );
   }
   const pidStr = trimmed.slice(0, space);
@@ -256,7 +256,7 @@ async function checkLock(cwd: string): Promise<DoctorCheck> {
       "lock file",
       "warn",
       `lock file at ${paths.lockFile} contains an invalid PID`,
-      "remove the file if no peer claude-profiles process is running",
+      "remove the file if no peer c3p process is running",
     );
   }
   // Best-effort liveness probe (matches lock.ts isPidAlive). EPERM is treated
@@ -299,7 +299,7 @@ async function checkGitignore(cwd: string): Promise<DoctorCheck> {
         ".gitignore entries",
         "warn",
         `no .gitignore at ${paths.gitignoreFile}`,
-        "run `claude-profiles init` to create it with the needed entries",
+        "run `c3p init` to create it with the needed entries",
       );
     }
     throw err;
@@ -325,7 +325,7 @@ async function checkGitignore(cwd: string): Promise<DoctorCheck> {
     ".gitignore entries",
     "warn",
     `missing: ${missing.join(", ")}`,
-    "run `claude-profiles init` to append the missing entries",
+    "run `c3p init` to append the missing entries",
   );
 }
 
@@ -373,7 +373,7 @@ async function checkHook(cwd: string): Promise<DoctorCheck> {
         "pre-commit hook",
         "warn",
         `no hook at ${hookPath}`,
-        "run `claude-profiles hook install` to install (drift advisory only — fail-open)",
+        "run `c3p hook install` to install (drift advisory only — fail-open)",
       );
     }
     throw err;
@@ -385,8 +385,8 @@ async function checkHook(cwd: string): Promise<DoctorCheck> {
     "hook",
     "pre-commit hook",
     "warn",
-    `pre-existing hook at ${hookPath} is not the canonical claude-profiles script`,
-    "if intentional, leave it; otherwise re-install via `claude-profiles hook install --force`",
+    `pre-existing hook at ${hookPath} is not the canonical c3p script`,
+    "if intentional, leave it; otherwise re-install via `c3p hook install --force`",
   );
 }
 
@@ -454,7 +454,7 @@ async function checkActiveProfile(cwd: string): Promise<DoctorCheck> {
       "active profile resolves",
       "fail",
       `${state.activeProfile}: ${message.split("\n", 1)[0]}`,
-      `run \`claude-profiles validate ${state.activeProfile}\` for the full diagnostic`,
+      `run \`c3p validate ${state.activeProfile}\` for the full diagnostic`,
     );
   }
 }
@@ -565,7 +565,7 @@ async function checkRootClaudeMdMarkers(cwd: string): Promise<DoctorCheck> {
         "project-root CLAUDE.md markers",
         "fail",
         `CLAUDE.md missing at ${paths.rootClaudeMdFile}`,
-        "run `claude-profiles init` to create it with the managed-block markers",
+        "run `c3p init` to create it with the managed-block markers",
       );
     }
     throw err;
@@ -586,7 +586,7 @@ async function checkRootClaudeMdMarkers(cwd: string): Promise<DoctorCheck> {
       "project-root CLAUDE.md markers",
       "fail",
       `markers absent in ${paths.rootClaudeMdFile}`,
-      "run `claude-profiles init` to add them (preserves existing content)",
+      "run `c3p init` to add them (preserves existing content)",
     );
   }
   return mkCheck(
@@ -594,7 +594,7 @@ async function checkRootClaudeMdMarkers(cwd: string): Promise<DoctorCheck> {
     "project-root CLAUDE.md markers",
     "fail",
     `malformed markers in ${paths.rootClaudeMdFile}`,
-    "manually delete the partial marker text and re-run `claude-profiles init`",
+    "manually delete the partial marker text and re-run `c3p init`",
   );
 }
 

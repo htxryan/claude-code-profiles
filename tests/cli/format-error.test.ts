@@ -98,9 +98,9 @@ describe("formatError — AC-17 (always names file/profile/path)", () => {
     expect(out).toContain("/p/.claude-profiles/.meta/lock");
   });
 
-  it("Unknown error: still produces the claude-profiles: prefix", () => {
+  it("Unknown error: still produces the c3p: prefix", () => {
     const out = formatError(new Error("something broke"));
-    expect(out.startsWith("claude-profiles:")).toBe(true);
+    expect(out.startsWith("c3p:")).toBe(true);
     expect(out).toContain("something broke");
   });
 

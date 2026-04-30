@@ -130,7 +130,7 @@ describe("persist: project-root section write-back (cw6/T5 / AC-8 / R46)", () =>
       const profileRootMd = path.join(root, ".claude-profiles", "leaf", "CLAUDE.md");
       const persisted = await fs.readFile(profileRootMd, "utf8");
       expect(persisted).toBe("USER-NEW-SECTION");
-      expect(persisted).not.toContain("<!-- claude-profiles");
+      expect(persisted).not.toContain("<!-- c3p");
     });
 
     it("destination file is at the profile root, NOT under .claude/", async () => {
@@ -215,7 +215,7 @@ describe("persist: project-root section write-back (cw6/T5 / AC-8 / R46)", () =>
       );
       expect(peer).toBe("NEW");
       expect(peer).not.toContain("LIVE-CLAUDE-DIR-CLAUDEMD");
-      expect(peer).not.toContain("<!-- claude-profiles");
+      expect(peer).not.toContain("<!-- c3p");
     });
   });
 
@@ -254,8 +254,8 @@ describe("persist: project-root section write-back (cw6/T5 / AC-8 / R46)", () =>
       // markers as we had in step 1, byte-for-byte (no double newlines, no
       // marker drift, no off-by-one shifts).
       const live2 = await fs.readFile(paths.rootClaudeMdFile, "utf8");
-      const begin = "<!-- claude-profiles:v1:begin";
-      const end = "<!-- claude-profiles:v1:end";
+      const begin = "<!-- c3p:v1:begin";
+      const end = "<!-- c3p:v1:end";
       const startA = tampered.indexOf(begin);
       const startB = live2.indexOf(begin);
       const endA = tampered.indexOf(end);
@@ -323,7 +323,7 @@ describe("persist: project-root section write-back (cw6/T5 / AC-8 / R46)", () =>
         "utf8",
       );
       expect(basePersisted).toBe("BASE-EDITED-SECTION");
-      expect(basePersisted).not.toContain("<!-- claude-profiles");
+      expect(basePersisted).not.toContain("<!-- c3p");
       expect(basePersisted).not.toContain("ABOVE");
       expect(basePersisted).not.toContain("BELOW");
     });
@@ -379,7 +379,7 @@ describe("persist: project-root section write-back (cw6/T5 / AC-8 / R46)", () =>
       if (await pathExists(peer)) {
         const persisted = await fs.readFile(peer, "utf8");
         expect(persisted).not.toContain("Plain content, no markers");
-        expect(persisted).not.toContain("<!-- claude-profiles");
+        expect(persisted).not.toContain("<!-- c3p");
       }
     });
   });

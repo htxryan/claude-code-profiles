@@ -13,7 +13,7 @@
  *       (a peer process holds the project, conceptually a "missing slot")
  *
  * The 'missing profile' case is split: when the user types
- * `claude-profiles use ghst` (typo for `ghost`), the resolver throws
+ * `c3p use ghst` (typo for `ghost`), the resolver throws
  * MissingProfileError with referencedBy === undefined — that's a CLI typo
  * and exits 1. When a manifest declares `extends: "nope"`, the resolver
  * throws the same error class but with referencedBy set — that's a
@@ -105,7 +105,7 @@ export function exitCodeFor(err: unknown): ExitCode {
   }
   if (err instanceof ResolverError) return EXIT_CONFLICT;
   // cw6/T4 (R45): missing/malformed managed-block markers in projectRoot
-  // CLAUDE.md is a user error (the user runs `claude-profiles init` to fix
+  // CLAUDE.md is a user error (the user runs `c3p init` to fix
   // it). Maps to exit 1 per spec §12.4 — not exit 2 (system error) because
   // the remediation is purely a user action, not an infrastructure fault.
   if (err instanceof MaterializeError) return EXIT_USER_ERROR;

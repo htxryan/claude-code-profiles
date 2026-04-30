@@ -118,6 +118,6 @@ File issues at <https://github.com/htxryan/claude-code-config-profiles/issues>.
 Include:
 - Node version (`node --version`)
 - OS + version
-- Output of `claude-profiles status --json` if relevant
+- Output of `c3p status --json` if relevant
 - Minimum reproduction (a `.claude-profiles/<name>/profile.json` is usually
   enough)

@@ -177,7 +177,7 @@ graph TD
 - **Owner archetype**: stream-aligned
 - **Effort**: 1–2 cycles
 - **Critical interface produced**: bootstrap flow, hook installer
-- **Key invariants**: hook script content is verbatim and never edited at install time; `command -v claude-profiles || exit 0` guard always present; init never overwrites existing `.claude-profiles/` without explicit confirmation
+- **Key invariants**: hook script content is verbatim and never edited at install time; `command -v c3p || exit 0` guard always present; init never overwrites existing `.claude-profiles/` without explicit confirmation
 - **Fitness function**: hook script byte-identical to R25a across releases unless explicitly bumped
 
 #### E7 — Integration Verification

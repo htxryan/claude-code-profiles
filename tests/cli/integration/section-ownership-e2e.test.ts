@@ -52,8 +52,8 @@ describe("cw6 P1-C: section ownership end-to-end (init → use → edit → drif
 
     // Project-root CLAUDE.md exists with marker pair.
     const afterInit = await fs.readFile(rootClaudeMd, "utf8");
-    expect(afterInit).toContain("<!-- claude-profiles:v1:begin");
-    expect(afterInit).toContain("<!-- claude-profiles:v1:end");
+    expect(afterInit).toContain("<!-- c3p:v1:begin");
+    expect(afterInit).toContain("<!-- c3p:v1:end");
 
     // ────────────────────────────────────────────────────────────────────
     // STEP 2: stand up a profile with a profile-root CLAUDE.md.
@@ -68,8 +68,8 @@ describe("cw6 P1-C: section ownership end-to-end (init → use → edit → drif
 
     // Capture bytes outside the markers BEFORE `use` so we can prove they
     // survive the splice byte-for-byte.
-    const beginIdxBefore = afterInit.indexOf("<!-- claude-profiles:v1:begin");
-    const endMarkerIdxBefore = afterInit.indexOf("<!-- claude-profiles:v1:end");
+    const beginIdxBefore = afterInit.indexOf("<!-- c3p:v1:begin");
+    const endMarkerIdxBefore = afterInit.indexOf("<!-- c3p:v1:end");
     const endLineEndBefore = afterInit.indexOf("\n", endMarkerIdxBefore) + 1;
     const aboveBefore = afterInit.slice(0, beginIdxBefore);
     const belowBefore = afterInit.slice(endLineEndBefore);
@@ -89,11 +89,11 @@ describe("cw6 P1-C: section ownership end-to-end (init → use → edit → drif
     expect(afterUse).toContain("Use strict types.");
     expect(afterUse).toContain("# Devmode rules");
     // Markers still present + on the same lines (well-formed).
-    expect(afterUse).toContain("<!-- claude-profiles:v1:begin");
-    expect(afterUse).toContain("<!-- claude-profiles:v1:end");
+    expect(afterUse).toContain("<!-- c3p:v1:begin");
+    expect(afterUse).toContain("<!-- c3p:v1:end");
     // Bytes outside the markers preserved exactly.
-    const beginIdxAfter = afterUse.indexOf("<!-- claude-profiles:v1:begin");
-    const endMarkerIdxAfter = afterUse.indexOf("<!-- claude-profiles:v1:end");
+    const beginIdxAfter = afterUse.indexOf("<!-- c3p:v1:begin");
+    const endMarkerIdxAfter = afterUse.indexOf("<!-- c3p:v1:end");
     const endLineEndAfter = afterUse.indexOf("\n", endMarkerIdxAfter) + 1;
     expect(afterUse.slice(0, beginIdxAfter)).toBe(aboveBefore);
     expect(afterUse.slice(endLineEndAfter)).toBe(belowBefore);

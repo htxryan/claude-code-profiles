@@ -20,9 +20,9 @@ import {
 
 describe("MARKER_REGEX (spec §12.3)", () => {
   it("matches the canonical begin/end pair around a non-greedy body", () => {
-    const text = `<!-- claude-profiles:v1:begin -->
+    const text = `<!-- c3p:v1:begin -->
 body
-<!-- claude-profiles:v1:end -->`;
+<!-- c3p:v1:end -->`;
     const m = text.match(MARKER_REGEX);
     expect(m).not.toBeNull();
     expect(m?.[1]).toBe("1");
@@ -33,13 +33,13 @@ body
   it("body is non-greedy: the first :end terminates the match", () => {
     // Two managed blocks in one document — the regex must not collapse them.
     const text = [
-      "<!-- claude-profiles:v1:begin -->",
+      "<!-- c3p:v1:begin -->",
       "first",
-      "<!-- claude-profiles:v1:end -->",
+      "<!-- c3p:v1:end -->",
       "between",
-      "<!-- claude-profiles:v1:begin -->",
+      "<!-- c3p:v1:begin -->",
       "second",
-      "<!-- claude-profiles:v1:end -->",
+      "<!-- c3p:v1:end -->",
     ].join("\n");
     const m = text.match(MARKER_REGEX);
     // First match must be the FIRST block only.
@@ -53,11 +53,11 @@ describe("parseMarkers", () => {
   it("happy path: returns before/section/after split + version", () => {
     const content = [
       "user header",
-      "<!-- claude-profiles:v1:begin -->",
+      "<!-- c3p:v1:begin -->",
       "<!-- Managed block. -->",
       "",
       "managed body line",
-      "<!-- claude-profiles:v1:end -->",
+      "<!-- c3p:v1:end -->",
       "user footer",
       "",
     ].join("\n");
@@ -80,14 +80,14 @@ describe("parseMarkers", () => {
   });
 
   it("returns malformed when only :begin is present", () => {
-    const r = parseMarkers("<!-- claude-profiles:v1:begin -->\nno end\n");
+    const r = parseMarkers("<!-- c3p:v1:begin -->\nno end\n");
     expect(r.found).toBe(false);
     if (r.found) return;
     expect(r.reason).toBe("malformed");
   });
 
   it("returns malformed when only :end is present", () => {
-    const r = parseMarkers("no begin\n<!-- claude-profiles:v1:end -->\n");
+    const r = parseMarkers("no begin\n<!-- c3p:v1:end -->\n");
     expect(r.found).toBe(false);
     if (r.found) return;
     expect(r.reason).toBe("malformed");
@@ -95,9 +95,9 @@ describe("parseMarkers", () => {
 
   it("returns malformed when versions mismatch (begin v1 / end v2)", () => {
     const text = [
-      "<!-- claude-profiles:v1:begin -->",
+      "<!-- c3p:v1:begin -->",
       "body",
-      "<!-- claude-profiles:v2:end -->",
+      "<!-- c3p:v2:end -->",
     ].join("\n");
     const r = parseMarkers(text);
     expect(r.found).toBe(false);
@@ -109,13 +109,13 @@ describe("parseMarkers", () => {
     // Per spec §12.3: "More than one match is reserved and currently rejected;
     // v1 implementations may treat it as malformed."
     const text = [
-      "<!-- claude-profiles:v1:begin -->",
+      "<!-- c3p:v1:begin -->",
       "first",
-      "<!-- claude-profiles:v1:end -->",
+      "<!-- c3p:v1:end -->",
       "",
-      "<!-- claude-profiles:v1:begin -->",
+      "<!-- c3p:v1:begin -->",
       "second",
-      "<!-- claude-profiles:v1:end -->",
+      "<!-- c3p:v1:end -->",
     ].join("\n");
     const r = parseMarkers(text);
     expect(r.found).toBe(false);
@@ -124,7 +124,7 @@ describe("parseMarkers", () => {
   });
 
   it("captures higher version numbers verbatim", () => {
-    const text = `<!-- claude-profiles:v42:begin -->\nbody\n<!-- claude-profiles:v42:end -->`;
+    const text = `<!-- c3p:v42:begin -->\nbody\n<!-- c3p:v42:end -->`;
     const r = parseMarkers(text);
     expect(r.found).toBe(true);
     if (!r.found) return;
@@ -134,8 +134,8 @@ describe("parseMarkers", () => {
   it("supports an empty managed section", () => {
     const text = [
       "before",
-      "<!-- claude-profiles:v1:begin -->",
-      "<!-- claude-profiles:v1:end -->",
+      "<!-- c3p:v1:begin -->",
+      "<!-- c3p:v1:end -->",
       "after",
     ].join("\n");
     const r = parseMarkers(text);
@@ -154,11 +154,11 @@ describe("parseMarkers", () => {
     it("parses a well-formed CRLF file (happy path)", () => {
       const text = [
         "user header",
-        "<!-- claude-profiles:v1:begin -->",
+        "<!-- c3p:v1:begin -->",
         "<!-- Managed block. -->",
         "",
         "managed body line",
-        "<!-- claude-profiles:v1:end -->",
+        "<!-- c3p:v1:end -->",
         "user footer",
         "",
       ].join("\r\n");
@@ -174,7 +174,7 @@ describe("parseMarkers", () => {
 
     it("flags a CRLF file with only :begin as malformed (not absent)", () => {
       const text = [
-        "<!-- claude-profiles:v1:begin -->",
+        "<!-- c3p:v1:begin -->",
         "no end",
         "",
       ].join("\r\n");
@@ -187,7 +187,7 @@ describe("parseMarkers", () => {
     it("flags a CRLF file with only :end as malformed (not absent)", () => {
       const text = [
         "no begin",
-        "<!-- claude-profiles:v1:end -->",
+        "<!-- c3p:v1:end -->",
         "",
       ].join("\r\n");
       const r = parseMarkers(text);
@@ -208,8 +208,8 @@ describe("parseMarkers", () => {
 describe("renderManagedBlock", () => {
   it("emits the canonical v1 block with begin, self-doc comment, body, end", () => {
     const block = renderManagedBlock("hello world\n");
-    expect(block).toContain("<!-- claude-profiles:v1:begin -->");
-    expect(block).toContain("<!-- claude-profiles:v1:end -->");
+    expect(block).toContain("<!-- c3p:v1:begin -->");
+    expect(block).toContain("<!-- c3p:v1:end -->");
     expect(block).toContain("Managed block");
     expect(block).toContain("hello world");
   });
@@ -241,8 +241,8 @@ describe("injectMarkersIntoFile", () => {
     // Original content present, byte-for-byte, at the start of the new file.
     expect(out.startsWith(original)).toBe(true);
     // Markers appended after.
-    expect(out).toContain("<!-- claude-profiles:v1:begin -->");
-    expect(out).toContain("<!-- claude-profiles:v1:end -->");
+    expect(out).toContain("<!-- c3p:v1:begin -->");
+    expect(out).toContain("<!-- c3p:v1:end -->");
     // The result parses cleanly.
     const parsed = parseMarkers(out);
     expect(parsed.found).toBe(true);
@@ -252,9 +252,9 @@ describe("injectMarkersIntoFile", () => {
     const original = [
       "# Project",
       "",
-      "<!-- claude-profiles:v1:begin -->",
+      "<!-- c3p:v1:begin -->",
       "managed body",
-      "<!-- claude-profiles:v1:end -->",
+      "<!-- c3p:v1:end -->",
       "",
       "footer",
     ].join("\n");
@@ -280,20 +280,20 @@ describe("injectMarkersIntoFile", () => {
   // cw6.3 followup: malformed input must fail closed rather than silently
   // appending a second fresh block on top of partial markers.
   it("throws MalformedMarkersError when input has a lone :begin (not appended-to)", () => {
-    const original = "<!-- claude-profiles:v1:begin -->\nno end\n";
+    const original = "<!-- c3p:v1:begin -->\nno end\n";
     expect(() => injectMarkersIntoFile(original)).toThrow(MalformedMarkersError);
   });
 
   it("throws MalformedMarkersError when input has a lone :end", () => {
-    const original = "no begin\n<!-- claude-profiles:v1:end -->\n";
+    const original = "no begin\n<!-- c3p:v1:end -->\n";
     expect(() => injectMarkersIntoFile(original)).toThrow(MalformedMarkersError);
   });
 
   it("throws MalformedMarkersError when input has version-mismatched markers", () => {
     const original = [
-      "<!-- claude-profiles:v1:begin -->",
+      "<!-- c3p:v1:begin -->",
       "body",
-      "<!-- claude-profiles:v2:end -->",
+      "<!-- c3p:v2:end -->",
       "",
     ].join("\n");
     expect(() => injectMarkersIntoFile(original)).toThrow(MalformedMarkersError);
@@ -301,13 +301,13 @@ describe("injectMarkersIntoFile", () => {
 
   it("throws MalformedMarkersError when input has multiple well-formed blocks", () => {
     const original = [
-      "<!-- claude-profiles:v1:begin -->",
+      "<!-- c3p:v1:begin -->",
       "first",
-      "<!-- claude-profiles:v1:end -->",
+      "<!-- c3p:v1:end -->",
       "",
-      "<!-- claude-profiles:v1:begin -->",
+      "<!-- c3p:v1:begin -->",
       "second",
-      "<!-- claude-profiles:v1:end -->",
+      "<!-- c3p:v1:end -->",
       "",
     ].join("\n");
     expect(() => injectMarkersIntoFile(original)).toThrow(MalformedMarkersError);

@@ -91,7 +91,7 @@ describe("status integration (R31, R40, R42, R43)", () => {
     expect(r.exitCode).toBe(0);
     expect(r.stdout.toLowerCase()).toContain("no active profile");
     // First-time nudge points at `new`, not `use`, when no profiles exist.
-    expect(r.stdout).toContain("claude-profiles new");
+    expect(r.stdout).toContain("c3p new");
   });
 
   // ──────────────────────────────────────────────────────────────────────
@@ -188,7 +188,7 @@ describe("status integration (R31, R40, R42, R43)", () => {
     const human = await runCli({ args: ["--cwd", fx.projectRoot, "status"] });
     expect(human.exitCode).toBe(0);
     expect(human.stdout).toContain("source: updated since last materialize");
-    expect(human.stdout).toContain("claude-profiles sync");
+    expect(human.stdout).toContain("c3p sync");
 
     const json = await runCli({
       args: ["--cwd", fx.projectRoot, "--json", "status"],

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * `claude-profiles` CLI binary entry. Wires:
+ * `c3p` CLI binary entry. Wires:
  *   argv → parseArgs → dispatch → exit code
  *
  * Top-level concerns OWNED HERE (and nowhere else):
@@ -131,7 +131,7 @@ if (isDirect) {
       // Defense-in-depth: dispatch's central catch handles app errors; this
       // catch only fires for unexpected failures (e.g. parser bugs). Stderr
       // bypasses OutputChannel here because we can't trust it post-failure.
-      process.stderr.write(`claude-profiles: internal error: ${String(err)}\n`);
+      process.stderr.write(`c3p: internal error: ${String(err)}\n`);
       process.exit(2);
     },
   );

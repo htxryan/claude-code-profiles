@@ -33,7 +33,7 @@ describe("dispatch — top-level routes", () => {
     const { cap, ctx } = ctxFor();
     const code = await dispatch({ kind: "version" }, global(), ctx);
     expect(code).toBe(0);
-    expect(cap.stdout()).toContain("claude-profiles 9.9.9");
+    expect(cap.stdout()).toContain("c3p 9.9.9");
   });
 
   it("version under --json → emits {version} payload (not silenced)", async () => {

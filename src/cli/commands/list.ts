@@ -78,7 +78,7 @@ export async function runList(opts: ListOptions): Promise<number> {
   }
 
   if (entries.length === 0) {
-    opts.output.print("(no profiles — run `claude-profiles new <name>` to create one)");
+    opts.output.print("(no profiles — run `c3p new <name>` to create one)");
   } else {
     const style = createStyle({
       isTty: opts.output.isTty,

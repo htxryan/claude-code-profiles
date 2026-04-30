@@ -10,7 +10,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "claude-profiles": "dist/cli/bin.js"
+    "c3p": "dist/cli/bin.js"
   },
   "files": [
     "dist",

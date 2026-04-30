@@ -2,7 +2,7 @@
  * Pre-commit hook entry point (R25, R25a). The verbatim hook script
  * (installed by E6) invokes:
  *
- *   claude-profiles drift --pre-commit-warn
+ *   c3p drift --pre-commit-warn
  *
  * which lands in this module. Fail-open invariant: this function NEVER
  * throws and always indicates exit code 0. If detection fails for any
@@ -36,10 +36,10 @@ export interface PreCommitWarnResult {
  * Output discipline (non-blocking quality bar §7):
  *   - When no drift: silent (no output). The hook should be invisible in
  *     the happy path.
- *   - When drift: a header line ("claude-profiles: <N> drifted file(s) in
+ *   - When drift: a header line ("c3p: <N> drifted file(s) in
  *     .claude/ vs active profile <name>") plus up to 10 entries (truncated
  *     with "...and N more" if longer) so the commit terminal isn't flooded.
- *   - When detection failed: a single line "claude-profiles: drift check
+ *   - When detection failed: a single line "c3p: drift check
  *     skipped: <reason>". Never two lines, never a stack trace.
  */
 export async function preCommitWarn(paths: StatePaths): Promise<PreCommitWarnResult> {
@@ -56,7 +56,7 @@ export async function preCommitWarn(paths: StatePaths): Promise<PreCommitWarnRes
     // commit in those repos.
     if (report.warning && report.warning.code !== "Missing") {
       warnings.push(
-        `claude-profiles: state file degraded (${report.warning.code}): ${report.warning.detail}`,
+        `c3p: state file degraded (${report.warning.code}): ${report.warning.detail}`,
       );
     }
     if (report.fingerprintOk && report.entries.length > 0) {
@@ -64,7 +64,7 @@ export async function preCommitWarn(paths: StatePaths): Promise<PreCommitWarnRes
     }
   } catch (err: unknown) {
     const detail = err instanceof Error ? err.message : String(err);
-    warnings.push(`claude-profiles: drift check skipped: ${detail}`);
+    warnings.push(`c3p: drift check skipped: ${detail}`);
   }
 
   // EPIPE-safe write loop (multi-reviewer P0-2): if stderr is a closed pipe
@@ -89,7 +89,7 @@ function formatWarning(report: DriftReport): string[] {
   const lines: string[] = [];
   const n = report.entries.length;
   lines.push(
-    `claude-profiles: ${n} drifted file(s) in .claude/ vs active profile '${report.active}'`,
+    `c3p: ${n} drifted file(s) in .claude/ vs active profile '${report.active}'`,
   );
   const shown = report.entries.slice(0, MAX_LINES);
   for (const e of shown) {

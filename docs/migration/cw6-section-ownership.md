@@ -14,7 +14,7 @@ anything.
 
 If neither of your active profiles supplies a profile-root `CLAUDE.md`, the
 project-root `CLAUDE.md` file is **never** opened, written, or stat'd by
-`claude-profiles use`. Back-compat is byte-exact.
+`c3p use`. Back-compat is byte-exact.
 
 ## How to opt in
 
@@ -34,15 +34,15 @@ Place the per-profile content where the resolver looks for it:
 The bytes you put in this file become the "managed section" of your
 project-root `CLAUDE.md`.
 
-### 2. Run `claude-profiles init` once
+### 2. Run `c3p init` once
 
 Init guarantees the project-root `CLAUDE.md` exists with the marker pair:
 
 ```markdown
-<!-- claude-profiles:v1:begin -->
-<!-- Managed block. Do not edit between markers — changes are overwritten on next `claude-profiles use`. -->
+<!-- c3p:v1:begin -->
+<!-- Managed block. Do not edit between markers — changes are overwritten on next `c3p use`. -->
 
-<!-- claude-profiles:v1:end -->
+<!-- c3p:v1:end -->
 ```
 
 Init is **idempotent** and **non-destructive**:
@@ -56,7 +56,7 @@ Init is **idempotent** and **non-destructive**:
 
 You only need to run init once per project.
 
-### 3. Run `claude-profiles use <profile>`
+### 3. Run `c3p use <profile>`
 
 `use` splices your profile's `CLAUDE.md` content **between the markers** via
 an atomic temp-file rename. Bytes above `:begin` and below `:end` are
@@ -74,9 +74,9 @@ first; one newline between contributors). This is identical to v1's
 
 ```
 my-project/
-├── CLAUDE.md                 # user-authored, untouched by claude-profiles
+├── CLAUDE.md                 # user-authored, untouched by c3p
 ├── .claude/
-│   └── CLAUDE.md             # materialized by claude-profiles
+│   └── CLAUDE.md             # materialized by c3p
 └── .claude-profiles/
     └── dev/
         ├── profile.json
@@ -106,18 +106,18 @@ into project-root `CLAUDE.md`, and vice versa.
 
 ## Validation and drift
 
-- `claude-profiles validate` reports an actionable error (with a pointer at
+- `c3p validate` reports an actionable error (with a pointer at
   `init`) if a profile is active but the markers are missing or malformed.
-- `claude-profiles drift` and the pre-commit hook only consider the bytes
+- `c3p drift` and the pre-commit hook only consider the bytes
   **between** the markers. Edits above or below the markers are user-owned
   and never register as drift.
-- `claude-profiles use --on-drift=persist` writes the live section bytes
+- `c3p use --on-drift=persist` writes the live section bytes
   back to `.claude-profiles/<active>/CLAUDE.md`, preserving your edits in
   the source profile.
 
 ### Persist + extends: snapshot semantics
 
-When you run `claude-profiles use <child> --on-drift=persist` and `<child>`
+When you run `c3p use <child> --on-drift=persist` and `<child>`
 extends `<parent>` (the active profile), the persisted edits land in
 `<parent>` but the `<child>` you just materialized is built from the
 PRE-persist source of `<parent>`. In other words: the swap target was
@@ -125,7 +125,7 @@ resolved when you typed the command, and that snapshot is what gets
 materialized — `--on-drift=persist` is purely a transactional write-back
 to the previous profile so your edits aren't lost.
 
-To pick up the just-persisted edits in `<child>`, run `claude-profiles use
+To pick up the just-persisted edits in `<child>`, run `c3p use
 <child>` again after the persist completes. That second resolve sees the
 freshly-persisted bytes in `<parent>` and merges them through the extends
 chain.
@@ -158,7 +158,7 @@ here so users can rely on them without reading the test source.
 
 - **BC-1** — A profile that contains *only* `.claude/CLAUDE.md` (no
   profile-root `CLAUDE.md`) leaves project-root `CLAUDE.md` byte-identical
-  through `claude-profiles use`. The file is not opened, written, or even
+  through `c3p use`. The file is not opened, written, or even
   stat'd. This holds whether the user has run `init` or not.
 - **BC-2** — A profile that contains *only* a profile-root `CLAUDE.md` (no
   `.claude/CLAUDE.md`) does not write a `CLAUDE.md` into `.claude/`. The two
@@ -169,7 +169,7 @@ here so users can rely on them without reading the test source.
   root contribution do not appear in `.claude/CLAUDE.md`, and vice versa. No
   cross-destination content leak.
 - **BC-4** — On a legacy project (no profile-root `CLAUDE.md` anywhere),
-  running `claude-profiles init` injects markers into the existing project-
+  running `c3p init` injects markers into the existing project-
   root `CLAUDE.md` (preserving every prior byte). A subsequent `use` of a
   profile that has no profile-root contribution leaves the file at exactly
   what `init` produced — the section between the markers stays empty
@@ -181,17 +181,17 @@ never entered and the user's existing project-root file is untouched.
 
 ## Troubleshooting
 
-**`use` aborts with "project-root CLAUDE.md is missing claude-profiles markers"**
+**`use` aborts with "project-root CLAUDE.md is missing c3p markers"**
 
 A profile in your active resolution graph supplies a profile-root `CLAUDE.md`
 but `init` has not run, or someone deleted the markers. Run
-`claude-profiles init` to add them. Existing user content is preserved.
+`c3p init` to add them. Existing user content is preserved.
 
 **My edits between the markers vanished after `use`**
 
 Working as designed: the bytes between the markers are managed by the
 active profile. To capture in-place edits before swapping, run
-`claude-profiles use <other> --on-drift=persist`.
+`c3p use <other> --on-drift=persist`.
 
 **My edits above/below the markers vanished after `use`**
 

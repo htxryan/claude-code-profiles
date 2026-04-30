@@ -32,7 +32,7 @@ export async function runSync(opts: SyncOptions): Promise<number> {
   const { state } = await readStateFile(paths);
   if (state.activeProfile === null) {
     throw new CliUserError(
-      `sync: no active profile (run "claude-profiles use <name>" first)`,
+      `sync: no active profile (run "c3p use <name>" first)`,
       EXIT_USER_ERROR,
     );
   }

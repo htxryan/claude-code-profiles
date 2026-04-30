@@ -173,8 +173,8 @@ describe("detectDrift: project-root CLAUDE.md section-only fingerprint (cw6/T5 /
       const live = await fs.readFile(paths.rootClaudeMdFile, "utf8");
       // Replace ALL user-owned bytes outside the markers with completely
       // different content. Section bytes between markers are left intact.
-      const beginIdx = live.indexOf("<!-- claude-profiles:v1:begin");
-      const endMarker = "<!-- claude-profiles:v1:end -->";
+      const beginIdx = live.indexOf("<!-- c3p:v1:begin");
+      const endMarker = "<!-- c3p:v1:end -->";
       const endIdx = live.indexOf(endMarker) + endMarker.length;
       const middle = live.slice(beginIdx, endIdx);
       const newAbove = "% Totally different above-content\n\nLorem ipsum.\n\n";
@@ -222,7 +222,7 @@ describe("detectDrift: project-root CLAUDE.md section-only fingerprint (cw6/T5 /
       expect(root_!.status).toBe("unrecoverable");
       expect(root_!.error).toBeDefined();
       // Actionable: reference init and validate.
-      expect(root_!.error).toMatch(/claude-profiles init|validate/i);
+      expect(root_!.error).toMatch(/c3p init|validate/i);
       expect(root_!.error).toContain(paths.rootClaudeMdFile);
     });
 
@@ -230,7 +230,7 @@ describe("detectDrift: project-root CLAUDE.md section-only fingerprint (cw6/T5 /
       const { paths } = await setupWithRootSection(root, "STABLE");
       await fs.writeFile(
         paths.rootClaudeMdFile,
-        "# Broken\n<!-- claude-profiles:v1:begin -->\nincomplete only\n",
+        "# Broken\n<!-- c3p:v1:begin -->\nincomplete only\n",
       );
 
       const report = await detectDrift(paths);

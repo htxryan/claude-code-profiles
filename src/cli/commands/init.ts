@@ -119,7 +119,7 @@ export async function runInit(opts: InitOptions): Promise<number> {
         // on "refusing to overwrite" — they almost always want either
         // `status` (inspect) or `new <name>` (extend) next.
         throw new CliUserError(
-          `init: ".claude-profiles/" is already initialised in this project; refusing to overwrite (run "claude-profiles status" to see current state, or "claude-profiles new <name>" to add a profile)`,
+          `init: ".claude-profiles/" is already initialised in this project; refusing to overwrite (run "c3p status" to see current state, or "c3p new <name>" to add a profile)`,
           EXIT_USER_ERROR,
         );
       }
@@ -393,7 +393,7 @@ function emitOutput(
     noColor: resolveNoColor(noColorFlag),
   });
 
-  output.print(style.banner(`claude-profiles initialised`));
+  output.print(style.banner(`c3p initialised`));
   output.print(style.dim(`  ${projectRoot}`));
   output.print("");
 
@@ -426,10 +426,10 @@ function emitOutput(
   // T6 AC: the "appended" path uses the exact phrase the test asserts so
   // downstream tooling (and our own scenario fixtures) have a stable hook.
   if (result.rootClaudeMd.outcome === "created") {
-    output.print(`  ${style.ok(`Created CLAUDE.md with claude-profiles markers`)}`);
+    output.print(`  ${style.ok(`Created CLAUDE.md with c3p markers`)}`);
   } else if (result.rootClaudeMd.outcome === "appended") {
     output.print(
-      `  ${style.ok(`added claude-profiles markers to existing CLAUDE.md (your content preserved)`)}`,
+      `  ${style.ok(`added c3p markers to existing CLAUDE.md (your content preserved)`)}`,
     );
   } else {
     output.print(`  ${style.skip(`project-root CLAUDE.md markers already present`)}`);
@@ -439,7 +439,7 @@ function emitOutput(
   if (result.hook) {
     if (result.hook.skippedReason === "no-git-dir") {
       output.print(
-        `  ${style.warn(`Pre-commit hook NOT installed`)} ${style.dim(`(not a git project — run "git init" then "claude-profiles hook install")`)}`,
+        `  ${style.warn(`Pre-commit hook NOT installed`)} ${style.dim(`(not a git project — run "git init" then "c3p hook install")`)}`,
       );
     } else if (result.hook.installed) {
       output.print(
@@ -461,12 +461,12 @@ function emitOutput(
   output.print("");
   output.print(`Next:`);
   output.print(
-    `  ${style.dim("claude-profiles new <name>")}     scaffold a profile`,
+    `  ${style.dim("c3p new <name>")}     scaffold a profile`,
   );
   output.print(
-    `  ${style.dim("claude-profiles list")}           see profiles`,
+    `  ${style.dim("c3p list")}           see profiles`,
   );
   output.print(
-    `  ${style.dim("claude-profiles use <name>")}     activate a profile`,
+    `  ${style.dim("c3p use <name>")}     activate a profile`,
   );
 }

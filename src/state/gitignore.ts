@@ -1,7 +1,7 @@
 /**
  * `.gitignore` management for E3-owned artifacts (R15, R23a `.backup/`).
  *
- * After `claude-profiles init` the project root's `.gitignore` must list
+ * After `c3p init` the project root's `.gitignore` must list
  * `.claude/` and `.claude-profiles/.meta/` (the umbrella for state, lock,
  * tmp, pending, prior, backup). The init flow lives in E6 but the WRITER
  * lives here so init and any other caller (e.g. recovery diagnostic that
@@ -27,7 +27,7 @@ export const E3_GITIGNORE_ENTRIES = [
   ".claude-profiles/.meta/",
 ] as const;
 
-const SECTION_HEADER = "# Added by claude-profiles";
+const SECTION_HEADER = "# Added by c3p";
 
 /**
  * Result of an idempotent gitignore update. `added` lists the entries we

@@ -298,11 +298,11 @@ describe("E7 scenarios S1-S18 (cross-epic CLI gate)", () => {
     // The hook contract is: never block the commit. R25.
     expect(r.exitCode).toBe(0);
     // Hook output goes to stderr per R25, with the canonical phrasing from
-    // src/drift/pre-commit.ts: "claude-profiles: <N> drifted file(s)
+    // src/drift/pre-commit.ts: "c3p: <N> drifted file(s)
     // in .claude/ vs active profile '<name>'". Asserting against just
     // "drift" would also pass on the no-drift "drift: clean" output and
     // would mask a regression that flipped the hook to read-only mode.
-    expect(r.stderr).toMatch(/claude-profiles: \d+ drifted file\(s\)/);
+    expect(r.stderr).toMatch(/c3p: \d+ drifted file\(s\)/);
   });
 
   // ──────────────────────────────────────────────────────────────────────
@@ -317,7 +317,7 @@ describe("E7 scenarios S1-S18 (cross-epic CLI gate)", () => {
     // init-managed case explicitly.)
     await fs.writeFile(
       path.join(fx.projectRoot, "CLAUDE.md"),
-      "<!-- claude-profiles:v1:begin -->\n<!-- Managed block. -->\n\n<!-- claude-profiles:v1:end -->\n",
+      "<!-- c3p:v1:begin -->\n<!-- Managed block. -->\n\n<!-- c3p:v1:end -->\n",
     );
     let r = await runCli({
       args: ["--cwd", fx.projectRoot, "validate"],
@@ -472,7 +472,7 @@ describe("E7 scenarios S1-S18 (cross-epic CLI gate)", () => {
   // POSIX shell available on the runner image. The hook contract itself is
   // documented as POSIX (R25a, hook script starts with `#!/bin/sh`), so the
   // test is platform-correctly skipped on Windows.
-  it.skipIf(process.platform === "win32")("S18: pre-commit hook with missing claude-profiles binary — exit 0 silent", async () => {
+  it.skipIf(process.platform === "win32")("S18: pre-commit hook with missing c3p binary — exit 0 silent", async () => {
     await ensureBuilt();
     fx = await makeFixture({});
     await fs.mkdir(path.join(fx.projectRoot, ".git", "hooks"), { recursive: true });
@@ -639,8 +639,8 @@ describe("ppo: error messages name the next step", () => {
     expect(r.exitCode).toBe(1);
     expect(r.stderr).toContain("already initialised");
     // Forward-momentum hint per ppo AC.
-    expect(r.stderr).toContain('claude-profiles status');
-    expect(r.stderr).toContain('claude-profiles new');
+    expect(r.stderr).toContain('c3p status');
+    expect(r.stderr).toContain('c3p new');
   });
 });
 

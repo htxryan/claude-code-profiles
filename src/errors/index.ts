@@ -212,7 +212,7 @@ export class InvalidSettingsJsonError extends MergeError {
  * cw6/T4 (R45): the live project-root `CLAUDE.md` is absent or its managed-
  * block markers are missing or malformed. Materialize aborts with this
  * error BEFORE writing any bytes to either destination (atomic-across-
- * destinations); the user's remediation is `claude-profiles init`.
+ * destinations); the user's remediation is `c3p init`.
  *
  * `filePath` is included so the user can locate the file in their editor.
  * The exit-code mapper (cli/exit.ts) routes this to EXIT_USER_ERROR (1) per
@@ -230,7 +230,7 @@ export class RootClaudeMdMarkersMissingError extends MaterializeError {
       // yd8 / AC-5: append the migration doc path so a user seeing this for
       // the first time has a one-link reference for the section-ownership
       // model rather than blindly running `init` and hoping.
-      `project-root CLAUDE.md is missing claude-profiles markers — run \`claude-profiles init\` to repair (file: ${filePath}; expected: <!-- claude-profiles:v1:begin --> ... <!-- claude-profiles:v1:end -->; see docs/migration/cw6-section-ownership.md)`,
+      `project-root CLAUDE.md is missing c3p markers — run \`c3p init\` to repair (file: ${filePath}; expected: <!-- c3p:v1:begin --> ... <!-- c3p:v1:end -->; see docs/migration/cw6-section-ownership.md)`,
     );
     this.name = "RootClaudeMdMarkersMissingError";
     this.filePath = filePath;

@@ -118,9 +118,9 @@ export async function runStatus(opts: StatusOptions): Promise<number> {
     // active" — the next-step the user needs to take is different.
     const names = await listProfiles({ projectRoot: opts.cwd });
     if (names.length === 0) {
-      opts.output.print("(no active profile — run `claude-profiles new <name>` first)");
+      opts.output.print("(no active profile — run `c3p new <name>` first)");
     } else {
-      opts.output.print("(no active profile — run `claude-profiles use <name>` to activate)");
+      opts.output.print("(no active profile — run `c3p use <name>` to activate)");
     }
   } else {
     opts.output.print(`active: ${state.activeProfile}`);
@@ -153,7 +153,7 @@ export async function runStatus(opts: StatusOptions): Promise<number> {
     // pulling in" — both kinds of staleness are visible at a glance.
     if (freshness.fresh === false) {
       opts.output.print(
-        style.warn(`source: updated since last materialize — run \`claude-profiles sync\``),
+        style.warn(`source: updated since last materialize — run \`c3p sync\``),
       );
     } else if (freshness.error !== undefined) {
       // Resolve failed (e.g. missing include); surface so the user knows

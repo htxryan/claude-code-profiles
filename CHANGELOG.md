@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.3.0](https://github.com/htxryan/claude-code-config-profiles/compare/v0.2.4...v0.3.0) (2026-04-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* **cli:** the CLI binary is renamed from `claude-profiles` to `c3p`. The npm package name (`claude-code-config-profiles`) and the on-disk profile-store directory (`.claude-profiles/`) are unchanged. Five user-visible surfaces rename together — there is no automatic migration:
+  1. **npm bin entry** — `package.json` `bin` is now `{ "c3p": "dist/cli/bin.js" }`. The legacy `claude-profiles` bin key is removed.
+  2. **In-CLI text** — help, errors, and progress hints all hardcode `c3p`.
+  3. **Gitignore section header** — `# Added by claude-profiles` → `# Added by c3p`.
+  4. **CLAUDE.md managed-block markers** — `<!-- claude-profiles:v1:begin -->` / `<!-- claude-profiles:v1:end -->` → `<!-- c3p:v1:begin -->` / `<!-- c3p:v1:end -->`. The marker reader does **not** recognize legacy `claude-profiles:v1` blocks.
+  5. **Pre-commit hook** — the installed hook now invokes `c3p drift --pre-commit-warn` (with `command -v c3p` as the fail-open guard). Existing user hooks reference a binary that no longer exists and will silently fail-open.
+
+### How to upgrade
+
+1. Install the new binary:
+   ```bash
+   npm install -g claude-code-config-profiles@0.3.0
+   ```
+2. In each project that previously ran `claude-profiles init`:
+   - Manually delete the legacy `# Added by claude-profiles` section from `.gitignore`.
+   - Manually delete the legacy `<!-- claude-profiles:v1:begin -->` … `<!-- claude-profiles:v1:end -->` markers (and the bytes between them) from project-root `CLAUDE.md`.
+   - Re-run `c3p init` to write a fresh gitignore section and CLAUDE.md markers.
+   - Run `c3p hook install --force` to overwrite the legacy pre-commit hook.
+3. Re-source shell completions: `c3p completions zsh > …` (and equivalent for `bash`/`fish`).
+
 ## [0.2.4](https://github.com/htxryan/claude-code-config-profiles/compare/v0.2.3...v0.2.4) (2026-04-30)
 
 

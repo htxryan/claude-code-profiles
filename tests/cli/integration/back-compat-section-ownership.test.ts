@@ -131,8 +131,8 @@ describe("cw6/T7 back-compat: section-ownership invariants (AC-10)", () => {
       path.join(fx.projectRoot, "CLAUDE.md"),
       "utf8",
     );
-    expect(rootContent).toContain("<!-- claude-profiles:v1:begin");
-    expect(rootContent).toContain("<!-- claude-profiles:v1:end");
+    expect(rootContent).toContain("<!-- c3p:v1:begin");
+    expect(rootContent).toContain("<!-- c3p:v1:end");
     expect(rootContent).toContain("ROOT-MANAGED-BODY");
 
     // CRITICAL: `.claude/CLAUDE.md` was NOT written. The live `.claude/`
@@ -200,7 +200,7 @@ describe("cw6/T7 back-compat: section-ownership invariants (AC-10)", () => {
       path.join(fx.projectRoot, "CLAUDE.md"),
       "utf8",
     );
-    expect(rootContent).toContain("<!-- claude-profiles:v1:begin");
+    expect(rootContent).toContain("<!-- c3p:v1:begin");
     expect(rootContent).toContain("PROJECT-ROOT-BODY");
     // No leak the other way: the .claude/ bytes never appear in root.
     expect(rootContent).not.toContain("CLAUDE-DIR-BODY");
@@ -251,8 +251,8 @@ describe("cw6/T7 back-compat: section-ownership invariants (AC-10)", () => {
     const rootClaudeMd = path.join(fx.projectRoot, "CLAUDE.md");
     const afterInit = await fs.readFile(rootClaudeMd, "utf8");
     // Sanity: markers present (T6 invariant).
-    expect(afterInit).toContain("<!-- claude-profiles:v1:begin");
-    expect(afterInit).toContain("<!-- claude-profiles:v1:end");
+    expect(afterInit).toContain("<!-- c3p:v1:begin");
+    expect(afterInit).toContain("<!-- c3p:v1:end");
 
     // Now activate the legacy profile. Because it contributes nothing to
     // the projectRoot destination, materialize must NOT run the section

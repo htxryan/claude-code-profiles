@@ -155,7 +155,7 @@ export async function persistLiveIntoProfile(
           const detail =
             restoreErr instanceof Error ? restoreErr.message : String(restoreErr);
           process.stderr.write(
-            `claude-profiles: persist restore failed for ${persist.targetClaudeDir}: ${detail}\n`,
+            `c3p: persist restore failed for ${persist.targetClaudeDir}: ${detail}\n`,
           );
         },
       );

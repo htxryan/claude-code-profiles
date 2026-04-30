@@ -48,7 +48,7 @@ export interface StatePaths {
   gitignoreFile: string;
   /**
    * Project-root `CLAUDE.md` (cw6/T4). Peer of `.claude/`. Partially managed:
-   * the bytes between the `<!-- claude-profiles:vN:begin/end -->` markers are
+   * the bytes between the `<!-- c3p:vN:begin/end -->` markers are
    * owned by materialize; bytes outside the markers are user-owned (R45/R46).
    *
    * Section-splice writes go through a temp file in the same directory (so

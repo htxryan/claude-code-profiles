@@ -138,7 +138,7 @@ describe("list — skimmable output", () => {
     fx = await makeFixture({});
     const cap = captureOutput(false);
     await runList({ cwd: fx.projectRoot, output: cap.channel });
-    expect(cap.stdout()).toContain("run `claude-profiles new <name>`");
+    expect(cap.stdout()).toContain("run `c3p new <name>`");
   });
 
   it("--json: payload SHAPE is stable (key order, field set)", async () => {
@@ -204,7 +204,7 @@ describe("status — skimmable output", () => {
     const cap = captureOutput(false);
     await runStatus({ cwd: fx.projectRoot, output: cap.channel });
     const out = cap.stdout();
-    expect(out).toContain("run `claude-profiles new <name>` first");
+    expect(out).toContain("run `c3p new <name>` first");
     expect(out).not.toContain("use <name>");
   });
 

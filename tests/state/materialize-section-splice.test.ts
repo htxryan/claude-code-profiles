@@ -156,8 +156,8 @@ describe("materialize: projectRoot section splice (cw6/T4 / R45)", () => {
       await materialize(paths, plan, [rootFile("NEW")]);
 
       const result = await fs.readFile(paths.rootClaudeMdFile, "utf8");
-      const beginIdx = result.indexOf("<!-- claude-profiles:v1:begin");
-      const endIdx = result.indexOf("<!-- claude-profiles:v1:end");
+      const beginIdx = result.indexOf("<!-- c3p:v1:begin");
+      const endIdx = result.indexOf("<!-- c3p:v1:end");
       // Slice OUT the markers + body region; head and tail must equal the
       // recorded user content byte-for-byte.
       expect(result.slice(0, beginIdx)).toBe(before);
@@ -270,8 +270,8 @@ describe("materialize: projectRoot section splice (cw6/T4 / R45)", () => {
       expect(afterB.startsWith("# ABOVE\n")).toBe(true);
       expect(afterB.endsWith("\n# BELOW\n")).toBe(true);
       // Markers still present (the empty splice writes a fresh empty block).
-      expect(afterB).toContain("<!-- claude-profiles:v1:begin");
-      expect(afterB).toContain("<!-- claude-profiles:v1:end");
+      expect(afterB).toContain("<!-- c3p:v1:begin");
+      expect(afterB).toContain("<!-- c3p:v1:end");
       // State now reflects "no contribution" — rootClaudeMdSection is null.
       const stateB = await readStateFile(paths);
       expect(stateB.state.rootClaudeMdSection).toBeNull();
@@ -354,7 +354,7 @@ describe("materialize: projectRoot section splice (cw6/T4 / R45)", () => {
     });
 
     it("malformed markers (lone :begin) → throws; file unchanged", async () => {
-      const broken = "Some text\n<!-- claude-profiles:v1:begin -->\nincomplete\n";
+      const broken = "Some text\n<!-- c3p:v1:begin -->\nincomplete\n";
       const filePath = path.join(root, "CLAUDE.md");
       await fs.writeFile(filePath, broken);
 
@@ -373,12 +373,12 @@ describe("materialize: projectRoot section splice (cw6/T4 / R45)", () => {
       } catch (err) {
         expect(err).toBeInstanceOf(RootClaudeMdMarkersMissingError);
         const msg = (err as Error).message;
-        expect(msg).toContain("claude-profiles init");
+        expect(msg).toContain("c3p init");
         expect(msg).toContain(paths.rootClaudeMdFile);
         // ppo: spell out the literal marker pair the user should expect to
         // see, so a user who accidentally deleted them knows what to put back.
-        expect(msg).toContain("<!-- claude-profiles:v1:begin -->");
-        expect(msg).toContain("<!-- claude-profiles:v1:end -->");
+        expect(msg).toContain("<!-- c3p:v1:begin -->");
+        expect(msg).toContain("<!-- c3p:v1:end -->");
       }
     });
   });
@@ -534,7 +534,7 @@ describe("materialize: projectRoot section splice (cw6/T4 / R45)", () => {
       expect(await pathExists(leftover)).toBe(false);
       // Live CLAUDE.md is untouched by the sweep.
       const live = await fs.readFile(paths.rootClaudeMdFile, "utf8");
-      expect(live).toContain("<!-- claude-profiles:v1:begin");
+      expect(live).toContain("<!-- c3p:v1:begin");
     });
 
     it("does NOT sweep unrelated .tmp files in projectRoot (regex anchored to CLAUDE.md prefix)", async () => {
@@ -573,8 +573,8 @@ describe("materialize: projectRoot section splice (cw6/T4 / R45)", () => {
       expect(await pathExists(leftover)).toBe(false);
       const live = await fs.readFile(paths.rootClaudeMdFile, "utf8");
       expect(live).toContain("FRESH");
-      expect(live).toContain("<!-- claude-profiles:v1:begin");
-      expect(live).toContain("<!-- claude-profiles:v1:end");
+      expect(live).toContain("<!-- c3p:v1:begin");
+      expect(live).toContain("<!-- c3p:v1:end");
     });
 
     it("simulated mid-write fault: tmp exists but rename never ran — live file is the OLD content (not garbage)", async () => {

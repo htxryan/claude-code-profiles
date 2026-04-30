@@ -6,7 +6,7 @@
  *
  * cw6/T5 (R46): the project-root `CLAUDE.md` is special-cased. Whole-file
  * fingerprinting (R18/R19) is the wrong scope here — the user owns every
- * byte outside the `<!-- claude-profiles:vN:begin/end -->` markers. We
+ * byte outside the `<!-- c3p:vN:begin/end -->` markers. We
  * fingerprint only the section bytes between the markers and compare
  * against `state.rootClaudeMdSection.contentHash`. Edits OUTSIDE the
  * markers are invisible to drift; the AC-7 invariant.
@@ -151,7 +151,7 @@ async function compareRootClaudeMdSection(
         status: "unrecoverable",
         provenance,
         destination: "projectRoot",
-        error: `project-root CLAUDE.md is missing — run \`claude-profiles init\` to recreate, then \`claude-profiles validate\` to verify (file: ${paths.rootClaudeMdFile}; see docs/migration/cw6-section-ownership.md)`,
+        error: `project-root CLAUDE.md is missing — run \`c3p init\` to recreate, then \`c3p validate\` to verify (file: ${paths.rootClaudeMdFile}; see docs/migration/cw6-section-ownership.md)`,
       };
     }
     // Other IO errors (EACCES, EIO) propagate — those are not user-content
@@ -173,7 +173,7 @@ async function compareRootClaudeMdSection(
       status: "unrecoverable",
       provenance,
       destination: "projectRoot",
-      error: `project-root CLAUDE.md markers are missing or malformed — run \`claude-profiles init\` to repair, then \`claude-profiles validate\` to verify (file: ${paths.rootClaudeMdFile}; see docs/migration/cw6-section-ownership.md)`,
+      error: `project-root CLAUDE.md markers are missing or malformed — run \`c3p init\` to repair, then \`c3p validate\` to verify (file: ${paths.rootClaudeMdFile}; see docs/migration/cw6-section-ownership.md)`,
     };
   }
 

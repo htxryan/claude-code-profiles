@@ -142,7 +142,7 @@ describe("--json round-trip (AC-14)", () => {
     // running init, so seed the markers manually for this happy-path test.
     await fs.writeFile(
       path.join(fx.projectRoot, "CLAUDE.md"),
-      "<!-- claude-profiles:v1:begin -->\n<!-- Managed block. -->\n\n<!-- claude-profiles:v1:end -->\n",
+      "<!-- c3p:v1:begin -->\n<!-- Managed block. -->\n\n<!-- c3p:v1:end -->\n",
     );
     const r = await runCli({
       args: ["--cwd", fx.projectRoot, "--json", "validate"],

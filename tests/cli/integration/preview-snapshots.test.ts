@@ -159,7 +159,7 @@ describe("drift --preview spawn snapshots (azp)", () => {
 
 describe("diff --preview spawn snapshots (azp)", () => {
   it("changed entry: unified-diff body uses (b, a) order so + is the focus", async () => {
-    // The diff command's preview convention: `claude-profiles diff dev ci`
+    // The diff command's preview convention: `c3p diff dev ci`
     // shows the dev side as `+` (focus) and the ci side as `-` (baseline).
     // Pin this convention — a refactor that swapped argument order would
     // silently invert the user's mental model.

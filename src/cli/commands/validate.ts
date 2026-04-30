@@ -124,7 +124,7 @@ export async function runValidate(opts: ValidateOptions): Promise<number> {
   // Phase hints (3yy): per-profile progress emitted on stderr so a 50-profile
   // validate doesn't sit on a stuck cursor. Silenced under --json and --quiet
   // by the OutputChannel; we still emit when stdout is human (TTY or piped)
-  // so a `claude-profiles validate > log.txt` run shows live progress.
+  // so a `c3p validate > log.txt` run shows live progress.
   const phaseStyle = createStyle({
     isTty: opts.output.isTty,
     platform: process.platform,
@@ -204,7 +204,7 @@ export async function runValidate(opts: ValidateOptions): Promise<number> {
  * 1) with the spec-mandated remediation message if either condition fails.
  *
  * Three failure modes, all surfaced with the same actionable message because
- * the user's remediation is identical for every one (`claude-profiles init`):
+ * the user's remediation is identical for every one (`c3p init`):
  *   - File missing entirely.
  *   - File present but no markers (parseMarkers → reason: "absent").
  *   - File present with markers in a partial / multi-block / version-mismatch
@@ -226,7 +226,7 @@ async function assertRootClaudeMdMarkers(projectRoot: string): Promise<void> {
         // yd8 / AC-5: doc link appended for the same reason as the
         // materialize-side message — give a one-stop reference for the
         // section-ownership model.
-        `project-root CLAUDE.md is missing claude-profiles markers — run \`claude-profiles init\` to add them (file: ${claudeMdPath}; expected: <!-- claude-profiles:v1:begin --> ... <!-- claude-profiles:v1:end -->; see docs/migration/cw6-section-ownership.md)`,
+        `project-root CLAUDE.md is missing c3p markers — run \`c3p init\` to add them (file: ${claudeMdPath}; expected: <!-- c3p:v1:begin --> ... <!-- c3p:v1:end -->; see docs/migration/cw6-section-ownership.md)`,
         EXIT_USER_ERROR,
       );
     }
@@ -236,7 +236,7 @@ async function assertRootClaudeMdMarkers(projectRoot: string): Promise<void> {
   if (!parsed.found) {
     throw new CliUserError(
       // yd8 / AC-5: same trailing doc link.
-      `project-root CLAUDE.md is missing claude-profiles markers — run \`claude-profiles init\` to add them (file: ${claudeMdPath}; expected: <!-- claude-profiles:v1:begin --> ... <!-- claude-profiles:v1:end -->; see docs/migration/cw6-section-ownership.md)`,
+      `project-root CLAUDE.md is missing c3p markers — run \`c3p init\` to add them (file: ${claudeMdPath}; expected: <!-- c3p:v1:begin --> ... <!-- c3p:v1:end -->; see docs/migration/cw6-section-ownership.md)`,
       EXIT_USER_ERROR,
     );
   }

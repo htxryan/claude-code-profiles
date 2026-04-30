@@ -34,7 +34,7 @@ export const DRIFT_REPORT_SCHEMA_VERSION = 1 as const;
  * the "modified" (we can't compare bytes) nor the "deleted" (the file may
  * be present, just structurally broken) labels fit. Surface it as a
  * distinct status so the CLI can render an actionable remediation pointing
- * at `claude-profiles init` / `validate` rather than the usual diff. The
+ * at `c3p init` / `validate` rather than the usual diff. The
  * accompanying `DriftEntry.error` field carries the human-readable message.
  *
  * Hard-block invariant preserved: an `unrecoverable` entry counts toward
@@ -82,7 +82,7 @@ export interface DriftEntry {
   /**
    * cw6/T5: human-readable remediation. Set ONLY when `status` is
    * `'unrecoverable'`. The CLI prints this verbatim so the user sees a
-   * single actionable message (e.g. "run `claude-profiles init` to repair").
+   * single actionable message (e.g. "run `c3p init` to repair").
    * Null/absent for the normal modified/added/deleted entries — those are
    * resolvable through the standard discard/persist gate.
    */

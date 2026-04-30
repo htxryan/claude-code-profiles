@@ -2,7 +2,7 @@
 
 Swappable `.claude/` configurations for Claude Code projects.
 
-> **npm package**: `claude-code-config-profiles` &nbsp;·&nbsp; **CLI binary**: `claude-profiles` &nbsp;·&nbsp; **short name**: C3P
+> **npm package**: `claude-code-config-profiles` &nbsp;·&nbsp; **CLI binary**: `c3p`
 
 C3P lets you maintain multiple named `.claude/` configurations in a project —
 for example a `dev` profile with verbose agents and looser permissions, and a
@@ -20,31 +20,42 @@ edits to the active `.claude/` are never lost when switching.
 npm install -g claude-code-config-profiles
 ```
 
-Requires Node 20+. The installed binary is `claude-profiles`.
+Requires Node 20+. The installed binary is `c3p`.
+
+### Upgrading from 0.2.x
+
+0.3.0 renames the CLI binary from `claude-profiles` to `c3p`, along with the
+gitignore section header, CLAUDE.md managed-block markers, and pre-commit hook
+script. The rename is hard — legacy markers and headers in your repo are **not**
+auto-migrated. After upgrading the package, manually remove the old
+`# Added by claude-profiles` gitignore section and
+`<!-- claude-profiles:v1:… -->` markers from project-root `CLAUDE.md`, then
+re-run `c3p init` and `c3p hook install --force`. See the
+[CHANGELOG entry for 0.3.0](./CHANGELOG.md) for full details.
 
 ## Quickstart
 
 ```bash
 # 1. Bootstrap a project (run inside a git repo)
-claude-profiles init
+c3p init
 
 # 2. Scaffold a profile
-claude-profiles new dev --description="local dev with verbose agents"
+c3p new dev --description="local dev with verbose agents"
 
 # 3. Edit the profile
 $EDITOR .claude-profiles/dev/.claude/settings.json
 
 # 4. Activate it (materializes the profile into .claude/)
-claude-profiles use dev
+c3p use dev
 
 # 5. See what's active and whether .claude/ has drifted
-claude-profiles status
+c3p status
 ```
 
-> **`CLAUDE.md` section ownership is opt-in.** By default `claude-profiles` only
+> **`CLAUDE.md` section ownership is opt-in.** By default `c3p` only
 > touches `.claude/`. To *also* let a profile manage a section of your
 > **project-root** `CLAUDE.md`, you need both (a) a `CLAUDE.md` next to the
-> profile's `profile.json`, and (b) `claude-profiles init` (which injects
+> profile's `profile.json`, and (b) `c3p init` (which injects
 > markers into the root `CLAUDE.md`). Skip both, and project-root `CLAUDE.md` is
 > never opened or written. See [profile-managed `CLAUDE.md` sections](#profile-managed-claudemd-sections)
 > below and [docs/migration/cw6-section-ownership.md](docs/migration/cw6-section-ownership.md).
@@ -81,7 +92,7 @@ claude-profiles status
 | `doctor`                    | Read-only health check (state, lock, gitignore, hook, markers, externals)    |
 | `completions <shell>`       | Emit a `bash`/`zsh`/`fish` completion script (eval to install)               |
 
-Run `claude-profiles <verb> --help` for full per-verb help.
+Run `c3p <verb> --help` for full per-verb help.
 
 ## Layout on disk
 
@@ -106,7 +117,7 @@ project-root/
 │       └── strict-perms/
 │           ├── profile.json
 │           └── .claude/
-└── .gitignore                     # claude-profiles appends its entries here
+└── .gitignore                     # c3p appends its entries here
 ```
 
 `.claude/` is in `.gitignore` — it's an output, derived from the active profile.
@@ -115,7 +126,7 @@ Profiles themselves (`.claude-profiles/dev/`, etc.) **are** checked in. The
 
 ## Profile-managed `CLAUDE.md` sections
 
-By default, `claude-profiles` only touches `.claude/`. If you also want a profile
+By default, `c3p` only touches `.claude/`. If you also want a profile
 to manage part of your **project-root** `CLAUDE.md` — Claude Code reads both
 locations — put a `CLAUDE.md` next to the profile's `profile.json`:
 
@@ -128,23 +139,23 @@ locations — put a `CLAUDE.md` next to the profile's `profile.json`:
         └── ...
 ```
 
-Then run `claude-profiles init` once to add a marker pair to your project-root
+Then run `c3p init` once to add a marker pair to your project-root
 `CLAUDE.md` (preserving any existing user content above):
 
 ```markdown
 # Your existing CLAUDE.md content stays here, untouched.
 
-<!-- claude-profiles:v1:begin -->
-<!-- Managed block. Do not edit between markers — changes are overwritten on next `claude-profiles use`. -->
+<!-- c3p:v1:begin -->
+<!-- Managed block. Do not edit between markers — changes are overwritten on next `c3p use`. -->
 
 ...active profile's profile-root CLAUDE.md content lands here...
 
-<!-- claude-profiles:v1:end -->
+<!-- c3p:v1:end -->
 
 # Anything below the end marker is also preserved verbatim.
 ```
 
-On every `claude-profiles use <profile>`:
+On every `c3p use <profile>`:
 
 - Bytes **between** the markers are replaced with the resolved content from
   the active profile's `CLAUDE.md` (and any extends/includes contributors,
@@ -177,7 +188,7 @@ work.
 
 ## Exit codes
 
-Every `claude-profiles` invocation returns one of four codes. CI scripts can
+Every `c3p` invocation returns one of four codes. CI scripts can
 gate on these without parsing stdout/stderr:
 
 | Code | Meaning                  | Examples                                                         |
@@ -189,20 +200,20 @@ gate on these without parsing stdout/stderr:
 
 ```bash
 # Skip the script if the project is unhealthy:
-claude-profiles doctor || exit 0
+c3p doctor || exit 0
 
 # Branch on conflict vs. user error:
-claude-profiles use ci --on-drift=abort
+c3p use ci --on-drift=abort
 case $? in
   0) echo "swapped to ci" ;;
   1) echo "drift abort or typo — fix and retry" ;;
-  3) echo "structural problem — run \`claude-profiles validate\`" ;;
+  3) echo "structural problem — run \`c3p validate\`" ;;
 esac
 ```
 
 ## Power-user affordances
 
-`claude-profiles` is built to be embedded in scripts and pipelines. A few
+`c3p` is built to be embedded in scripts and pipelines. A few
 flags you'll reach for once profiles are part of your workflow:
 
 ### `--quiet` / `-q`
@@ -211,7 +222,7 @@ Silences human output but preserves errors and exit codes. Useful for shell
 chains where the side-effect is what you want, not the chatter:
 
 ```bash
-claude-profiles use ci -q && ./run.sh
+c3p use ci -q && ./run.sh
 ```
 
 `--quiet` is **mutually exclusive** with `--json` (a script that asks for
@@ -224,11 +235,11 @@ the bytes in `.claude/` are now stale relative to the source. `status`
 surfaces this:
 
 ```text
-$ claude-profiles status
+$ c3p status
 active: dev
 materialized: 2026-04-25T09:12:34.567Z (3h ago)
 ✓ drift: clean
-! source: updated since last materialize — run `claude-profiles sync`
+! source: updated since last materialize — run `c3p sync`
 ```
 
 Under `--json`, the same signal is `sourceFresh: false` plus the new
@@ -239,7 +250,7 @@ Under `--json`, the same signal is `sourceFresh: false` plus the new
 By default, `diff` and `drift` show one line per affected path:
 
 ```text
-$ claude-profiles diff dev ci
+$ c3p diff dev ci
 a=dev b=ci: 2 changes (1 added, 0 removed, 1 changed) (+45 -0 ~12 bytes)
   + dev-only.md
   ~ shared.md
@@ -249,7 +260,7 @@ Pass `--preview` to inline a unified diff (capped at 20 lines per file,
 with a `(truncated, N more lines)` footer when over):
 
 ```text
-$ claude-profiles diff dev ci --preview
+$ c3p diff dev ci --preview
 a=dev b=ci: 2 changes (1 added, 0 removed, 1 changed) (+45 -0 ~12 bytes)
   + dev-only.md
   ~ shared.md
@@ -319,7 +330,7 @@ profile's `includes` array. Components compose additively (no inheritance).
 
 **Why does my live edit not appear after I swap profiles?**
 Swap discards drift unless you pre-answer `persist`. Use
-`claude-profiles use <other> --on-drift=persist` (or pick "persist" at the
+`c3p use <other> --on-drift=persist` (or pick "persist" at the
 interactive prompt) to roll the edits into the active profile first.
 
 ## License

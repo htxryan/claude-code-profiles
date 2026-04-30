@@ -1,9 +1,9 @@
 /**
- * Integration tests for `claude-profiles doctor` (claude-code-profiles-0zn).
+ * Integration tests for `c3p doctor` (claude-code-profiles-0zn).
  *
  * Doctor is read-only and surfaces actionable warnings — these tests pin the
  * exit-code contract (0 on healthy, 1 on broken) and the JSON schema shape so
- * CI scripts can rely on `claude-profiles doctor --json`.
+ * CI scripts can rely on `c3p doctor --json`.
  */
 
 import { promises as fs } from "node:fs";

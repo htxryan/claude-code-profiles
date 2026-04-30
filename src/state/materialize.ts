@@ -16,7 +16,7 @@
  * cw6/T4 (R45/R46): MergedFile entries with `destination === 'projectRoot'`
  * are NOT included in the pending/prior whole-tree write. Instead, after
  * step c succeeds, materialize splices the merged section bytes into the
- * project-root `CLAUDE.md` between the `<!-- claude-profiles:vN:begin/end -->`
+ * project-root `CLAUDE.md` between the `<!-- c3p:vN:begin/end -->`
  * markers via temp-file + atomic rename (preserving every byte outside the
  * markers). The marker presence check runs as a PRE-FLIGHT before any
  * side-effects in either destination; missing/malformed markers abort the
@@ -420,7 +420,7 @@ interface RootSplicePlan {
  *
  * Uses `parseMarkers` from src/markers.ts (the single source-of-truth for
  * the regex). The error message names the file path and references
- * `claude-profiles init` as the remediation per spec §12.4.
+ * `c3p init` as the remediation per spec §12.4.
  */
 async function preflightRootSplice(
   paths: StatePaths,
@@ -536,7 +536,7 @@ async function attemptStepCRollback(paths: StatePaths): Promise<void> {
     const detail =
       restoreErr instanceof Error ? restoreErr.message : String(restoreErr);
     process.stderr.write(
-      `claude-profiles: rollback failed restoring ${paths.claudeDir}: ${detail}\n`,
+      `c3p: rollback failed restoring ${paths.claudeDir}: ${detail}\n`,
     );
   }
   await rmrf(paths.pendingDir).catch(() => undefined);

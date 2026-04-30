@@ -1,6 +1,6 @@
 /**
  * Hand-rolled argv parser. Avoids external deps so the CLI is dependency-free
- * (matters for `npx claude-profiles`-style cold starts) and so the parsing
+ * (matters for `npx c3p`-style cold starts) and so the parsing
  * surface is fully reviewable in one file.
  *
  * Conventions:
@@ -79,7 +79,7 @@ export function parseArgs(argv: ReadonlyArray<string>, defaultCwd: string): Pars
   };
 
   // Side-channel for help/version short-circuit. We still want to parse the
-  // verb (so `claude-profiles use --help` shows use-specific help), but we
+  // verb (so `c3p use --help` shows use-specific help), but we
   // surface the request via the Command itself.
   let helpFlagSeen = false;
   let versionFlagSeen = false;
@@ -157,7 +157,7 @@ export function parseArgs(argv: ReadonlyArray<string>, defaultCwd: string): Pars
   // Version short-circuit beats verb dispatch (R29 doesn't list `--version`
   // as a verb but it's a universal CLI affordance). Fires regardless of
   // whether a verb is also present — silently consuming `--version` when a
-  // verb is supplied (`claude-profiles list --version`) hides the user's
+  // verb is supplied (`c3p list --version`) hides the user's
   // intent. The verb form `--help` keeps the verb (renders verb-specific
   // help), but `--version` always means "print version and exit".
   if (versionFlagSeen) {
@@ -168,7 +168,7 @@ export function parseArgs(argv: ReadonlyArray<string>, defaultCwd: string): Pars
   if (verbAndArgs.length === 0) {
     if (helpFlagSeen) return ok({ command: { kind: "help", verb: null }, global });
     return parseError(
-      `missing command; run "claude-profiles --help" for usage`,
+      `missing command; run "c3p --help" for usage`,
       true,
     );
   }
@@ -177,7 +177,7 @@ export function parseArgs(argv: ReadonlyArray<string>, defaultCwd: string): Pars
   const rest = verbAndArgs.slice(1);
 
   if (!VERBS.has(verb)) {
-    return parseError(`unknown command "${verb}"; run "claude-profiles --help" for usage`);
+    return parseError(`unknown command "${verb}"; run "c3p --help" for usage`);
   }
 
   // `help <verb>` is equivalent to `<verb> --help`. Both produce a help

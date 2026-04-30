@@ -3,8 +3,8 @@
  *
  * Invariants (epic fitness function):
  *   - Hook script content is BYTE-IDENTICAL to R25a. Never edited at install.
- *   - `command -v claude-profiles` guard always present (fail-open).
- *   - Hook is fail-open: missing or broken `claude-profiles` binary never
+ *   - `command -v c3p` guard always present (fail-open).
+ *   - Hook is fail-open: missing or broken `c3p` binary never
  *     blocks commits. Drift is reported but never exits non-zero.
  *
  * Install rules:
@@ -56,8 +56,8 @@ export class NotAGitRepoError extends Error {
  * with `\n` and some shells warn otherwise.
  */
 export const HOOK_SCRIPT = `#!/bin/sh
-command -v claude-profiles >/dev/null 2>&1 || exit 0
-claude-profiles drift --pre-commit-warn 2>&1
+command -v c3p >/dev/null 2>&1 || exit 0
+c3p drift --pre-commit-warn 2>&1
 exit 0
 `;
 
