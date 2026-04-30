@@ -1,5 +1,5 @@
 /**
- * Integration tests for `claude-profiles completions <shell>` (claude-code-profiles-0zn).
+ * Integration tests for `c3p completions <shell>` (claude-code-profiles-0zn).
  *
  * The contract: the emitted script must source cleanly in the target shell
  * (bash/zsh always; fish only when the binary is on PATH). Tab-completion

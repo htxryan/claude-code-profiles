@@ -367,6 +367,7 @@ Backward compatibility is preserved:
 - Profiles that contain only `.claude/CLAUDE.md` (the v1 layout) continue to materialize unchanged. Project-root `CLAUDE.md` is touched **only** if at least one contributor in the resolution graph supplies a profile-root `CLAUDE.md` source.
 - Existing `.state.json` files without entries for `projectRoot`-destination files remain valid. The first `use` operation that materializes a profile-root `CLAUDE.md` adds the appropriate entries.
 - `c3p init` is idempotent with respect to markers: running it on a project whose root `CLAUDE.md` already contains a well-formed marker pair is a no-op for that file.
+- **0.3.0 namespace rename**: managed-block markers are now `<!-- c3p:v1:begin -->` / `<!-- c3p:v1:end -->`. The marker reader does **not** auto-migrate legacy `<!-- claude-profiles:v1:… -->` markers — see the CHANGELOG 0.3.0 entry for the manual upgrade steps.
 
 If a `use` operation reports a splice failure for project-root `CLAUDE.md` (R45 mid-write failure mode — typically an IO fault after the `.claude/` swap committed), the user remediation is to simply re-run the same `use` command. The `.claude/` tree is already at the new profile, the markers are still well-formed, and the splice is idempotent: the retry re-applies the section bytes and reconciles state without any other action required.
 
