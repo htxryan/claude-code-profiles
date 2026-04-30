@@ -1,0 +1,24 @@
+--- --cwd points to a different project root ---
+$ pwd
+/var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/c3p-proof-XXXXX.lXbfRHTAE6/altproj
+
+$ claude-profiles --cwd /var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/c3p-proof-XXXXX.lXbfRHTAE6/altproj init
+== claude-profiles initialised ==
+  /var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/c3p-proof-XXXXX.lXbfRHTAE6/altproj
+
+  [ok] Created .claude-profiles/
+  [skip] No .claude/ to seed (skipped)
+  [ok] Wrote .gitignore (2 entries)
+  [ok] Created CLAUDE.md with claude-profiles markers
+  [ok] Installed pre-commit hook (/var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/c3p-proof-XXXXX.lXbfRHTAE6/altproj/.git/hooks/pre-commit)
+
+Next:
+  claude-profiles new <name>     scaffold a profile
+  claude-profiles list           see profiles
+  claude-profiles use <name>     activate a profile
+[exit=0]
+
+$ ls /var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/c3p-proof-XXXXX.lXbfRHTAE6/altproj/.claude-profiles
+
+$ ls /var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/c3p-proof-XXXXX.lXbfRHTAE6/proj/.claude-profiles | grep -q altproj && echo LEAK || echo no-leak
+no leakage into source --cwd

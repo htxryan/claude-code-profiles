@@ -1,0 +1,17 @@
+--- typo within edit distance: dev2 → suggest dev ---
+$ claude-profiles use dev2
+resolving profile…
+claude-profiles: Profile "dev2" does not exist (did you mean: dev?)
+[exit=1]
+
+--- typo within edit distance: derv → suggest dev ---
+$ claude-profiles use derv
+resolving profile…
+claude-profiles: Profile "derv" does not exist (did you mean: dev?)
+[exit=1]
+
+--- distant typo: xyz → no false suggestion ---
+$ claude-profiles use xyz
+resolving profile…
+claude-profiles: Profile "xyz" does not exist
+[exit=1]

@@ -1,0 +1,12 @@
+$ claude-profiles drift --preview
+active: dev
+drift: 3 file(s) (+6 -11 ~1 bytes)
+  deleted       agents/sub/deep.md  (from: dev)
+  added         scratch.md  (from: dev)
+      ADDED
+  modified      settings.json  (from: dev)
+      -{
+      -  "setting": "DEV"
+      -}
+      +{"setting": "EDITED"}
+[exit=0]

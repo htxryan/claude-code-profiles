@@ -1,0 +1,6 @@
+$ claude-profiles status
+active: dev
+  dev profile
+materialized: 2026-04-30T10:29:42.793Z (0s ago)
+[ok] drift: clean
+[exit=0]

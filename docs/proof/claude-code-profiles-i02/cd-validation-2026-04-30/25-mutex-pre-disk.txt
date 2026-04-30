@@ -1,0 +1,6 @@
+--- attempt --json --quiet (mutually exclusive) ---
+$ claude-profiles --json --quiet status
+claude-profiles: --quiet and --json are mutually exclusive
+[exit=1]
+
+state.json mtime unchanged: argv error rejected before any side-effect

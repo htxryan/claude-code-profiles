@@ -1,0 +1,37 @@
+$ npm view claude-code-config-profiles@0.2.4 dist.attestations
+{
+  url: 'https://registry.npmjs.org/-/npm/v1/attestations/claude-code-config-profiles@0.2.4',
+  provenance: { predicateType: 'https://slsa.dev/provenance/v1' }
+}
+
+$ curl provenance
+{
+    "attestations": [
+        {
+            "predicateType": "https://github.com/npm/attestation/tree/main/specs/publish/v0.1",
+            "bundle": {
+                "mediaType": "application/vnd.dev.sigstore.bundle+json;version=0.2",
+                "verificationMaterial": {
+                    "publicKey": {
+                        "hint": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+                    },
+                    "tlogEntries": [
+                        {
+                            "logIndex": "1406650964",
+                            "logId": {
+                                "keyId": "wNI9atQGlz+VWfO6LRygH4QUfY/8W4RFwiT5i5WRgB0="
+                            },
+                            "kindVersion": {
+                                "kind": "dsse",
+                                "version": "0.0.1"
+                            },
+                            "integratedTime": "1777511367",
+                            "inclusionPromise": {
+                                "signedEntryTimestamp": "MEQCICivXZyT71AURzBN04stdp9yS3tJZD0PjPfo5D9TZCxkAiAix3wlsEVkCT27u4NF8Q5UwvSr8NNPvd8QxagBTC0sNQ=="
+                            },
+                            "inclusionProof": {
+                                "logIndex": "1284746702",
+                                "rootHash": "zojhMSgbhqSC6fnt4s2TiGgO/DlRduYsro/i3jzw4dM=",
+                                "treeSize": "1284746733",
+                                "hashes": [
+                                    "1NeipV0+234FWJAGBv0H3zryQHXbiOhqndMZ2/RKt98=",

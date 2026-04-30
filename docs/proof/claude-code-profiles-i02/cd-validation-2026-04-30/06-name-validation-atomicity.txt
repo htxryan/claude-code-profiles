@@ -1,0 +1,15 @@
+--- snapshot before invalid 'new' ---
+$ ls .claude-profiles/
+ci
+dev
+prod
+
+$ claude-profiles new BAD/NAME
+claude-profiles: new: invalid profile name "BAD/NAME" (contains /, \, leading . or _, NUL, trailing dot/space, or a Windows-reserved name like CON/PRN/AUX/NUL/COM1-9/LPT1-9)
+[exit=1]
+
+--- snapshot after invalid 'new' (no leakage) ---
+$ ls .claude-profiles/
+ci
+dev
+prod

@@ -1,0 +1,12 @@
+--- canonical hook contents ---
+$ cat .git/hooks/pre-commit
+#!/bin/sh
+command -v claude-profiles >/dev/null 2>&1 || exit 0
+claude-profiles drift --pre-commit-warn 2>&1
+exit 0
+
+--- run with empty PATH (binary unreachable) ---
+$ PATH=/nonexistent /bin/sh .git/hooks/pre-commit
+[exit=0]
+
+--- expectation: exit 0, no output (R25a fail-open invariant) ---

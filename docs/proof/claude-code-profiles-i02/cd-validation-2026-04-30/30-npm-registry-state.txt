@@ -1,0 +1,31 @@
+===== npm registry state for claude-code-config-profiles =====
+$ npm view claude-code-config-profiles
+
+claude-code-config-profiles@0.2.4 | MIT | deps: none | versions: 3
+Swappable .claude/ configurations for Claude Code projects
+https://github.com/htxryan/claude-code-config-profiles#readme
+
+keywords: claude, claude-code, profiles, configuration, cli
+
+bin: claude-profiles
+
+dist
+.tarball: https://registry.npmjs.org/claude-code-config-profiles/-/claude-code-config-profiles-0.2.4.tgz
+.shasum: 36976ce41fac2084e5c2e416471cdf5bcaa5f1dd
+.integrity: sha512-/or31LwU4UWcRYX+/xZ19yGk8M2DXDoQ5jWODHYcaBve9+izEMu3ImBvONtwVEgqgqPY/CuadVTfOSpG2OwBKw==
+.unpackedSize: 872.6 kB
+
+maintainers:
+- redhale_software <ryanandrewhenderson@gmail.com>
+
+dist-tags:
+latest: 0.2.4
+
+published 9 hours ago by GitHub Actions <npm-oidc-no-reply@github.com>
+
+===== version timeline =====
+  0.2.0      2026-04-29T23:13:54.838Z
+  0.2.3      2026-04-30T01:05:03.987Z
+  0.2.4      2026-04-30T01:09:26.999Z
+  created    2026-04-29T23:13:54.539Z
+  modified   2026-04-30T01:09:27.244Z

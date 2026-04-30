@@ -1,0 +1,15 @@
+$ claude-profiles init
+== claude-profiles initialised ==
+  /private/var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/c3p-proof-XXXXX.lXbfRHTAE6/proj
+
+  [ok] Created .claude-profiles/
+  [skip] No .claude/ to seed (skipped)
+  [skip] .gitignore already up to date
+  [skip] project-root CLAUDE.md markers already present
+  [skip] Pre-commit hook already installed (/private/var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/c3p-proof-XXXXX.lXbfRHTAE6/proj/.git/hooks/pre-commit)
+
+Next:
+  claude-profiles new <name>     scaffold a profile
+  claude-profiles list           see profiles
+  claude-profiles use <name>     activate a profile
+[exit=0]

@@ -1,0 +1,22 @@
+--- backup count before swap: 0 ---
+$ claude-profiles use prod --on-drift=discard
+resolving profile…
+merging files…
+this swap will replace 1, add 1, delete 2 (+35 -38 bytes)
+materializing…
+[ok] Switched to prod (drift discarded).
+  Backup: /private/var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/c3p-proof-XXXXX.lXbfRHTAE6/proj/.claude-profiles/.meta/backup/2026-04-30T10-29-43.251Z
+[exit=0]
+
+--- backup count after swap: 1 (delta=1) ---
+$ ls -la .claude-profiles/.meta/backup/2026-04-30T10-29-43.251Z
+total 16
+drwxr-xr-x@ 5 redhale  staff  160 Apr 30 05:29 .
+drwxr-xr-x@ 3 redhale  staff   96 Apr 30 05:29 ..
+drwxr-xr-x@ 4 redhale  staff  128 Apr 30 05:29 agents
+-rw-r--r--@ 1 redhale  staff    6 Apr 30 05:29 scratch.md
+-rw-r--r--@ 1 redhale  staff   22 Apr 30 05:29 settings.json
+
+--- the discarded scratch.md is recoverable from backup ---
+$ cat .claude-profiles/.meta/backup/2026-04-30T10-29-43.251Z/scratch.md
+ADDED

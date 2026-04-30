@@ -1,0 +1,6 @@
+$ claude-profiles use prod
+resolving profile…
+merging files…
+this swap will replace 1, add 1, delete 2 (+35 -38 bytes)
+claude-profiles: drift detected in .claude/ and session is non-interactive; pass --on-drift=discard|persist|abort
+[exit=1]

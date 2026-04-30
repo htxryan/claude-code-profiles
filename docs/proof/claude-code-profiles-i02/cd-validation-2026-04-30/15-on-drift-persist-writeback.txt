@@ -1,0 +1,32 @@
+--- before persist: source dev/settings.json ---
+$ cat .claude-profiles/dev/.claude/settings.json
+{"setting": "DEV"}
+
+--- live drift in .claude/ ---
+$ claude-profiles drift
+active: dev
+drift: 2 file(s) (+19 -0 ~7 bytes)
+  added         persisted.md  (from: dev)
+  modified      settings.json  (from: dev)
+
+$ claude-profiles use prod --on-drift=persist
+resolving profile…
+merging files…
+this swap will replace 1, add 1, delete 3 (+35 -70 bytes)
+materializing…
+[ok] Switched to prod (drift saved into previous active profile).
+[exit=0]
+
+--- after persist: source dev/settings.json (drift bytes written back) ---
+$ cat .claude-profiles/dev/.claude/settings.json
+{"setting": "DEV-DRIFT-EDIT"}
+
+$ ls .claude-profiles/dev/.claude/persisted.md
+.claude-profiles/dev/.claude/persisted.md
+drifted-added file persisted into source
+
+--- .claude/ now matches prod, NOT old dev ---
+$ cat .claude/settings.json
+{
+  "setting": "PROD"
+}

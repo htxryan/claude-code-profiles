@@ -1,0 +1,17 @@
+$ claude-profiles use dev
+resolving profile…
+merging files…
+this swap will replace 0, add 3, delete 0 (+44 -0 bytes)
+materializing…
+[ok] Switched to dev.
+[exit=0]
+
+--- byte-equality assertion: agents/helper.md ---
+$ diff -q .claude-profiles/dev/.claude/agents/helper.md .claude/agents/helper.md
+byte-identical
+
+--- structural equality assertion: settings.json (json-merge re-emits) ---
+$ python3 -c 'check parsed JSON identical'
+src parsed: {'setting': 'DEV'}
+out parsed: {'setting': 'DEV'}
+structurally equal: True

@@ -1,0 +1,10 @@
+after swap 1 (drift: x.md='drift-1'): backup count = 2
+after swap 2 (drift: x.md='drift-2'): backup count = 3
+after swap 3 (drift: x.md='drift-3'): backup count = 4
+after swap 4 (drift: x.md='drift-4'): backup count = 5
+after swap 5 (drift: x.md='drift-5'): backup count = 5
+after swap 6 (drift: x.md='drift-6'): backup count = 5
+after swap 7 (drift: x.md='drift-7'): backup count = 5
+
+final backup count after 7 swaps: 5
+retention cap holds: 5 ≤ 5

@@ -1,0 +1,30 @@
+--- file-tree hash BEFORE doctor: 83099b862bee0e8797230a7699b35fb6bc7809bc
+--- file-tree hash AFTER  doctor: 83099b862bee0e8797230a7699b35fb6bc7809bc
+doctor is read-only: every file byte-identical
+
+--- doctor (human) ---
+$ claude-profiles doctor
+[ok] .claude-profiles/ directory  /private/var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/c3p-proof-XXXXX.lXbfRHTAE6/proj/.claude-profiles
+[ok] state.json schema  active=dev
+[ok] lock file  no lock held
+[ok] .gitignore entries  .claude/, .claude-profiles/.meta/ present
+[ok] pre-commit hook  installed at /private/var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/c3p-proof-XXXXX.lXbfRHTAE6/proj/.git/hooks/pre-commit
+[ok] discard-backup count  1/5 snapshots retained
+[ok] active profile resolves  dev resolves cleanly
+[skip] external include paths reachable  no external contributors
+[ok] project-root CLAUDE.md markers  well-formed v1 markers at /private/var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/c3p-proof-XXXXX.lXbfRHTAE6/proj/CLAUDE.md
+[ok] 8 ok, 1 skipped
+[exit=0]
+
+--- doctor --json (every documented check id present) ---
+$ claude-profiles doctor --json | jq '.checks[].id'
+pass: True
+  profiles_dir                   ok
+  state_file                     ok
+  lock                           ok
+  gitignore                      ok
+  hook                           ok
+  backups                        ok
+  active_profile                 ok
+  external_paths                 skip
+  root_claude_md_markers         ok

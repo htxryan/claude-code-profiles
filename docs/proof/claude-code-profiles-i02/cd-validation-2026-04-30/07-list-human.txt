@@ -1,0 +1,5 @@
+$ claude-profiles list
+  ci
+  dev   dev profile
+  prod  prod profile
+[exit=0]

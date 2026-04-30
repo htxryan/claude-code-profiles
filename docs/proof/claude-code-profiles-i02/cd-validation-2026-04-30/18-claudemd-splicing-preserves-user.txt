@@ -1,0 +1,22 @@
+--- root CLAUDE.md after swap (USER content above + below preserved; markers spliced) ---
+# USER CONTENT ABOVE — must survive byte-exact
+
+<!-- claude-profiles:v1:begin -->
+<!-- Managed block. Do not edit between markers — changes are overwritten on next `claude-profiles use`. -->
+
+# PROFILE-CONTRIBUTED CLAUDE.md
+
+Line in managed block.
+
+<!-- claude-profiles:v1:end -->
+
+# USER CONTENT BELOW — must survive byte-exact
+
+--- byte-equality of user-owned regions ---
+ABOVE markers — hash before swap: 42d91e2e56e6bab48340c8f4029dce8173b8740a
+ABOVE markers — hash after swap : 42d91e2e56e6bab48340c8f4029dce8173b8740a
+ABOVE: byte-equal
+
+BELOW markers — hash before swap: cd4b08386145c25771c709917ea4f471421097b8
+BELOW markers — hash after swap : cd4b08386145c25771c709917ea4f471421097b8
+BELOW: byte-equal

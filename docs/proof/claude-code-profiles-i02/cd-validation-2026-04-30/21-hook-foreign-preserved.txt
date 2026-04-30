@@ -1,0 +1,24 @@
+--- install our canonical hook ---
+[ok] Installed pre-commit hook
+  /private/var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/c3p-proof-XXXXX.lXbfRHTAE6/proj/.git/hooks/pre-commit
+
+$ shasum .git/hooks/pre-commit (canonical)
+ab4f934a1e835e7fe943e964b3fd2e3d0c1c28aa  .git/hooks/pre-commit
+
+--- replace with a foreign user hook ---
+$ shasum .git/hooks/pre-commit (foreign)
+84484d2c2261913e687d8ace40a30316d7601375  .git/hooks/pre-commit
+
+$ claude-profiles hook uninstall
+[skip] Pre-commit hook contains a different script; left untouched
+  /private/var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/c3p-proof-XXXXX.lXbfRHTAE6/proj/.git/hooks/pre-commit
+[exit=0]
+
+--- foreign hook still present (uninstall refused to delete it) ---
+$ ls -la .git/hooks/pre-commit
+-rwxr-xr-x@ 1 redhale  staff  52 Apr 30 05:30 .git/hooks/pre-commit
+
+$ cat .git/hooks/pre-commit
+#!/bin/sh
+echo "this is a user-written hook"
+exit 0

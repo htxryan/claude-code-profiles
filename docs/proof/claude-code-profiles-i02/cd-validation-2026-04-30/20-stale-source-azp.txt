@@ -1,0 +1,22 @@
+--- modify source AFTER materialize ---
+
+$ claude-profiles status (human — should show [warn] source: updated …) ---
+active: dev
+  dev profile
+materialized: 2026-04-30T10:30:50.850Z (1s ago)
+[ok] drift: clean
+[warn] source: updated since last materialize — run `claude-profiles sync`
+
+$ claude-profiles status --json | jq .sourceFresh
+False
+
+--- run sync to bring .claude/ in line, then re-check ---
+$ claude-profiles sync
+resolving profile…
+merging files…
+this swap will replace 0, add 1, delete 0 (+14 -0 bytes)
+materializing…
+[ok] Synced dev.
+
+$ claude-profiles status --json | jq .sourceFresh
+True

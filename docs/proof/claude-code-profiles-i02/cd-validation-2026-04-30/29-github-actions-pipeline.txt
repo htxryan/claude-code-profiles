@@ -1,0 +1,50 @@
+===== Pipeline stage 1: release-please run on the merge of release PR =====
+$ gh run list --workflow=release-please.yml --limit 5
+  25142115367 [push] completed/success at 04-30T01:08:17 — chore(main): release 0.2.4 (#9)
+  25142094993 [push] completed/success at 04-30T01:07:34 — fix(cli): canonicalise argv[1] before isDirect comparison
+  25141995675 [push] completed/success at 04-30T01:04:05 — chore(main): release 0.2.3 (#8)
+  25141978420 [push] completed/success at 04-30T01:03:27 — fix(ci): use Node 24 (ships npm >= 11.5.1) for OIDC publish
+  25141931902 [push] completed/failure at 04-30T01:01:50 — chore(main): release 0.2.2 (#7)
+
+===== Stage 2: the successful 0.2.4 publish run (chained inline) =====
+$ gh run view 25141995675 --json jobs
+  status=completed conclusion=success
+
+  job: release-please → success; steps: Set up job, Run googleapis/release-please-action@v4, Checkout, Install pnpm, Setup Node 24, Verify npm version (OIDC trusted publishing needs >= 11.5.1), Install dependencies, Build, Test, Publish to npm with provenance, Post Setup Node 24, Post Install pnpm, Post Checkout, Complete job
+
+===== Stage 3: Sigstore provenance for 0.2.4 =====
+Public attestation URL: https://registry.npmjs.org/-/npm/v1/attestations/claude-code-config-profiles@0.2.4
+
+$ curl -s https://registry.npmjs.org/-/npm/v1/attestations/claude-code-config-profiles@0.2.4 | python3 -m json.tool | head -25
+{
+    "attestations": [
+        {
+            "predicateType": "https://github.com/npm/attestation/tree/main/specs/publish/v0.1",
+            "bundle": {
+                "mediaType": "application/vnd.dev.sigstore.bundle+json;version=0.2",
+                "verificationMaterial": {
+                    "publicKey": {
+                        "hint": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+                    },
+                    "tlogEntries": [
+                        {
+                            "logIndex": "1406650964",
+                            "logId": {
+                                "keyId": "wNI9atQGlz+VWfO6LRygH4QUfY/8W4RFwiT5i5WRgB0="
+                            },
+                            "kindVersion": {
+                                "kind": "dsse",
+                                "version": "0.0.1"
+                            },
+                            "integratedTime": "1777511367",
+                            "inclusionPromise": {
+                                "signedEntryTimestamp": "MEQCICivXZyT71AURzBN04stdp9yS3tJZD0PjPfo5D9TZCxkAiAix3wlsEVkCT27u4NF8Q5UwvSr8NNPvd8QxagBTC0sNQ=="
+                            },
+                            "inclusionProof": {
+
+===== Stage 4: GitHub release tagged via release-please =====
+$ gh release view v0.2.4
+  tag: v0.2.4
+  name: v0.2.4
+  published: 2026-04-30T01:08:26Z
+  url: https://github.com/htxryan/claude-code-config-profiles/releases/tag/v0.2.4

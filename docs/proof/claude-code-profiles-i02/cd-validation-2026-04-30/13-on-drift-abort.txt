@@ -1,0 +1,18 @@
+--- snapshot before abort ---
+$ shasum .claude/settings.json
+1c52417b42a9d379961252f8264867bb8c4ae00c  .claude/settings.json
+$ claude-profiles status | head -1
+active: dev
+
+$ claude-profiles use prod --on-drift=abort
+resolving profile…
+merging files…
+this swap will replace 1, add 1, delete 2 (+35 -38 bytes)
+claude-profiles: swap aborted by drift gate
+[exit=1]
+
+--- snapshot after abort (must be unchanged) ---
+$ shasum .claude/settings.json
+1c52417b42a9d379961252f8264867bb8c4ae00c  .claude/settings.json
+$ claude-profiles status | head -1
+active: dev

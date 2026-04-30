@@ -1,0 +1,44 @@
+$ claude-profiles init
+== claude-profiles initialised ==
+  /private/var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/c3p-proof-XXXXX.lXbfRHTAE6/proj
+
+  [ok] Created .claude-profiles/
+  [skip] No .claude/ to seed (skipped)
+  [ok] Wrote .gitignore (2 entries)
+  [ok] Created CLAUDE.md with claude-profiles markers
+  [ok] Installed pre-commit hook (/private/var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/c3p-proof-XXXXX.lXbfRHTAE6/proj/.git/hooks/pre-commit)
+
+Next:
+  claude-profiles new <name>     scaffold a profile
+  claude-profiles list           see profiles
+  claude-profiles use <name>     activate a profile
+[exit=0]
+
+--- post-init disk inventory ---
+$ ls -la .claude-profiles/ .gitignore CLAUDE.md .git/hooks/pre-commit
+-rwxr-xr-x@ 1 redhale  staff  115 Apr 30 05:29 .git/hooks/pre-commit
+-rw-r--r--@ 1 redhale  staff   60 Apr 30 05:29 .gitignore
+-rw-r--r--@ 1 redhale  staff  178 Apr 30 05:29 CLAUDE.md
+
+.claude-profiles/:
+total 0
+drwxr-xr-x@ 3 redhale  staff   96 Apr 30 05:29 .
+drwxr-xr-x@ 6 redhale  staff  192 Apr 30 05:29 ..
+drwxr-xr-x@ 3 redhale  staff   96 Apr 30 05:29 .meta
+
+$ cat .gitignore
+# Added by claude-profiles
+.claude/
+.claude-profiles/.meta/
+
+$ cat CLAUDE.md
+<!-- claude-profiles:v1:begin -->
+<!-- Managed block. Do not edit between markers — changes are overwritten on next `claude-profiles use`. -->
+
+<!-- claude-profiles:v1:end -->
+
+$ head -1 .git/hooks/pre-commit
+#!/bin/sh
+
+$ test -x .git/hooks/pre-commit && echo executable
+executable

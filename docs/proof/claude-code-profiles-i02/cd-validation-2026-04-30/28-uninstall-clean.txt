@@ -1,0 +1,22 @@
+--- before uninstall ---
+$ ls node_modules/.bin/claude-profiles
+lrwxr-xr-x@ 1 redhale  staff  46 Apr 30 05:29 node_modules/.bin/claude-profiles -> ../claude-code-config-profiles/dist/cli/bin.js
+
+$ ls -la node_modules/claude-code-config-profiles | head -5
+total 64
+drwxr-xr-x@  7 redhale  staff    224 Apr 30 05:29 .
+drwxr-xr-x@  5 redhale  staff    160 Apr 30 05:29 ..
+-rw-r--r--@  1 redhale  staff   4913 Apr 30 05:29 CONTRIBUTING.md
+drwxr-xr-x@ 16 redhale  staff    512 Apr 30 05:29 dist
+
+$ npm uninstall claude-code-config-profiles
+removed 1 package, and audited 1 package in 109ms
+
+found 0 vulnerabilities
+
+--- after uninstall ---
+$ ls node_modules/.bin/claude-profiles 2>&1
+ls: node_modules/.bin/claude-profiles: No such file or directory
+
+$ ls node_modules/claude-code-config-profiles 2>&1
+ls: node_modules/claude-code-config-profiles: No such file or directory

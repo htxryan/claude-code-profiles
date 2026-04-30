@@ -1,0 +1,14 @@
+--- clean profile: exit 0 ---
+$ claude-profiles validate dev
+validating dev…
+[ok] dev
+[ok] 1 pass
+[exit=0]
+
+--- structural conflict: exit 3 ---
+$ claude-profiles validate badext
+validating badext…
+[x] badext: [MissingProfile] Profile "nonexistent" does not exist (referenced by "badext")
+[x] 0 pass, 1 fail
+claude-profiles: validation failed for 1 profile(s)
+[exit=3]

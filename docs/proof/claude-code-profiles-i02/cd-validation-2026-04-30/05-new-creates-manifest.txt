@@ -1,0 +1,11 @@
+$ claude-profiles new dev --description=dev profile
+[ok] Created profile "dev" at /private/var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/c3p-proof-XXXXX.lXbfRHTAE6/proj/.claude-profiles/dev
+  edit /private/var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/c3p-proof-XXXXX.lXbfRHTAE6/proj/.claude-profiles/dev/profile.json to set extends/includes
+[exit=0]
+
+--- generated manifest ---
+$ cat .claude-profiles/dev/profile.json
+{
+  "name": "dev",
+  "description": "dev profile"
+}

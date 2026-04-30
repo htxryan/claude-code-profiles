@@ -1,0 +1,32 @@
+--- source: dev (parent) settings.json ---
+{"shared": "from-parent", "parent_only": 1}
+
+--- source: dev-strict (child) settings.json ---
+{"shared": "from-child", "child_only": 2}
+
+--- source: dev (parent) agents/helper.md ---
+DEV-AGENT
+--- source: dev-strict (child) agents/helper.md ---
+CHILD-OVERRIDE
+
+$ claude-profiles use dev-strict --on-drift=discard
+resolving profile…
+merging files…
+this swap will replace 2, add 1, delete 0 (+110 -33 bytes)
+materializing…
+[ok] Switched to dev-strict.
+[exit=0]
+
+--- merged: .claude/settings.json (json-merge: child wins on conflict) ---
+{
+  "shared": "from-child",
+  "parent_only": 1,
+  "child_only": 2
+}
+
+--- merged: .claude/agents/helper.md (concat: parent + child) ---
+DEV-AGENT
+CHILD-OVERRIDE
+
+--- merged: .claude/perms.json (from include component) ---
+{"strict": true}

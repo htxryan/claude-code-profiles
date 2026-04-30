@@ -1,0 +1,3 @@
+$ claude-profiles list --json
+{"profiles":[{"name":"ci","active":false,"description":null,"extends":null,"includes":[],"tags":[],"lastMaterialized":null},{"name":"dev","active":false,"description":"dev profile","extends":null,"includes":[],"tags":[],"lastMaterialized":null},{"name":"prod","active":false,"description":"prod profile","extends":null,"includes":[],"tags":[],"lastMaterialized":null}],"stateWarning":null}
+[exit=0]
