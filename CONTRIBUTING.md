@@ -26,7 +26,7 @@ tests/               # mirrors src/; integration suites under tests/cli/integrat
 pnpm install
 pnpm run build         # tsc → dist/
 pnpm run typecheck     # src + tests
-pnpm test              # vitest run (446 tests, ~10s)
+pnpm test              # vitest run (807 tests, ~140s)
 pnpm run test:watch    # iterate
 ```
 
