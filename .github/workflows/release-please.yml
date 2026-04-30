@@ -57,17 +57,24 @@ jobs:
         with:
           version: 9
 
-      - name: Setup Node 22
+      - name: Setup Node 24
         if: ${{ steps.release.outputs.release_created }}
+        # Node 24 LTS ships npm >= 11.5.1, which is the minimum for npm OIDC
+        # trusted publishing. Older runtimes need a manual `npm install -g
+        # npm@latest`, but that command hits a self-upgrade module-resolution
+        # bug on some setup-node tarballs (MODULE_NOT_FOUND promise-retry),
+        # so we just use a runtime that already has the right CLI baked in.
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24"
           cache: "pnpm"
           registry-url: "https://registry.npmjs.org"
 
-      - name: Upgrade npm to >= 11.5.1 (OIDC trusted publishing requirement)
+      - name: Verify npm version (OIDC trusted publishing needs >= 11.5.1)
         if: ${{ steps.release.outputs.release_created }}
-        run: npm install -g npm@latest
+        run: |
+          npm --version
+          node --version
 
       - name: Install dependencies
         if: ${{ steps.release.outputs.release_created }}
