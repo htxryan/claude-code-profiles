@@ -1,0 +1,105 @@
+=== release-please workflow run (the chained-publish job for 0.3.0) ===
+{
+    "conclusion": "success",
+    "jobs": [
+        {
+            "conclusion": "success",
+            "name": "release-please",
+            "status": "completed",
+            "steps": [
+                {
+                    "conclusion": "success",
+                    "name": "Set up job"
+                },
+                {
+                    "conclusion": "success",
+                    "name": "Run googleapis/release-please-action@v4"
+                },
+                {
+                    "conclusion": "success",
+                    "name": "Checkout"
+                },
+                {
+                    "conclusion": "success",
+                    "name": "Install pnpm"
+                },
+                {
+                    "conclusion": "success",
+                    "name": "Setup Node 24"
+                },
+                {
+                    "conclusion": "success",
+                    "name": "Verify npm version (OIDC trusted publishing needs >= 11.5.1)"
+                },
+                {
+                    "conclusion": "success",
+                    "name": "Install dependencies"
+                },
+                {
+                    "conclusion": "success",
+                    "name": "Build"
+                },
+                {
+                    "conclusion": "success",
+                    "name": "Test"
+                },
+                {
+                    "conclusion": "success",
+                    "name": "Publish to npm with provenance"
+                },
+                {
+                    "conclusion": "success",
+                    "name": "Post Setup Node 24"
+                },
+                {
+                    "conclusion": "success",
+                    "name": "Post Install pnpm"
+                },
+                {
+                    "conclusion": "success",
+                    "name": "Post Checkout"
+                },
+                {
+                    "conclusion": "success",
+                    "name": "Complete job"
+                }
+            ]
+        }
+    ],
+    "status": "completed",
+    "workflow": "release-please"
+}
+
+=== gh release for v0.3.0 ===
+{"createdAt":"2026-04-30T12:45:00Z","isDraft":false,"isPrerelease":false,"publishedAt":"2026-04-30T12:45:13Z","tagName":"v0.3.0","url":"https://github.com/htxryan/claude-code-config-profiles/releases/tag/v0.3.0"}
+
+=== npm registry: dist-tags ===
+{
+  "latest": "0.3.0"
+}
+
+=== npm registry: 0.3.0 published version + integrity ===
+version = '0.3.0'
+dist = {
+  integrity: 'sha512-I2CX5iJpPIsg2EPNa8sAkD/YLxiZjO75F7tyyXxzTzAvFNBwk+pBobQfnVIkxEr/umApo0jJB9KLCC9VG20jiA==',
+  shasum: 'd3b17fe9353fd3e8867baf6d2102e562b71ff485',
+  tarball: 'https://registry.npmjs.org/claude-code-config-profiles/-/claude-code-config-profiles-0.3.0.tgz',
+  fileCount: 256,
+  unpackedSize: 870631,
+  attestations: {
+    url: 'https://registry.npmjs.org/-/npm/v1/attestations/claude-code-config-profiles@0.3.0',
+    provenance: { predicateType: 'https://slsa.dev/provenance/v1' }
+  },
+  signatures: [
+    {
+      keyid: 'SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U',
+      sig: 'MEQCIAaJ+Jb4BHtXqtkwN+j4aPpEKUySW1J91joJJSkAgd/AAiBjMBc30Urn6YyZw3ja532J1dumlRS4vM1uGw0yj3UEQw=='
+    }
+  ]
+}
+
+=== sigstore provenance attestation URL ===
+https://registry.npmjs.org/-/npm/v1/attestations/claude-code-config-profiles@0.3.0
+
+=== fetch attestation (head) ===
+{"attestations":[{"predicateType":"https://github.com/npm/attestation/tree/main/specs/publish/v0.1", "bundle":{"mediaType":"application/vnd.dev.sigstore.bundle+json;version=0.2", "verificationMaterial":{"publicKey":{"hint":"SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"}, "tlogEntries":[{"logIndex":"1409657760", "logId":{"keyId":"wNI9atQGlz+VWfO6LRygH4QUfY/8W4RFwiT5i5WRgB0="}, "kindVersion":{"kind":"dsse", "version":"0.0.1"}, "integratedTime":"1777553183", "inclusionPromise":{"signedEntryTi

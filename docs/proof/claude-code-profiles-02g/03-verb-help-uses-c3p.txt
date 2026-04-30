@@ -1,0 +1,128 @@
+=== c3p --version ===
+c3p 0.3.0
+
+=== c3p init --help ===
+c3p init — bootstrap .claude-profiles/ in this project
+
+USAGE
+  c3p init [options]
+
+DESCRIPTION
+  Creates .claude-profiles/, optionally seeds a starter profile from an
+  existing .claude/ tree, updates .gitignore, and installs the pre-commit
+  hook. Also injects c3p markers into project-root CLAUDE.md
+  (preserves existing content) so profiles can manage a section of it.
+  Refuses to overwrite an already-initialised .claude-profiles/.
+
+OPTIONS
+  --starter=<name>   starter profile name (default: "default")
+  --no-seed          skip seeding from .claude/ even if present
+  --no-hook          skip installing the pre-commit hook
+
+GLOBAL OPTIONS
+  --cwd=<path>     project root (default: cwd)
+  --json           machine-readable output (silences human output)
+  --quiet, -q      silence human output (preserves errors + exit codes); incompatible with --json
+
+EXAMPLES
+  c3p init                    # bootstrap with defaults
+  c3p init --no-hook          # skip pre-commit hook (CI / non-git)
+  c3p init --starter=dev      # name the starter profile "dev"
+
+EXIT CODES
+  0  success
+  1  already initialised; bad argv
+  2  IO/permission fault (e.g. unwritable .git/hooks/)
+
+=== c3p use --help ===
+c3p use — switch to profile <name>; runs the drift gate
+
+USAGE
+  c3p use <name> [options]
+
+DESCRIPTION
+  Materializes <name> into .claude/. If <name> (or any contributor) has a
+  profile-root CLAUDE.md, also splices its content between the markers in
+  project-root CLAUDE.md (user content above/below preserved). If .claude/
+  has uncommitted edits (drift), prompts you to discard / persist / abort.
+  Non-TTY sessions MUST pass --on-drift=<choice>; otherwise the command
+  exits 1 immediately so CI scripts never block on a hidden prompt.
+
+GLOBAL OPTIONS
+  --cwd=<path>     project root (default: cwd)
+  --json           machine-readable output (silences human output)
+  --quiet, -q      silence human output (preserves errors + exit codes); incompatible with --json
+  --on-drift=<v>   discard|persist|abort (required in non-TTY when drift exists)
+  --wait[=<sec>]   poll a held lock with backoff instead of failing fast (default 30s)
+
+EXAMPLES
+  c3p use dev                       # interactive (prompts on drift)
+  c3p use ci --on-drift=discard     # CI: drop drifted edits
+  c3p use dev --on-drift=persist    # write drift back to active first
+  c3p use dev --json --on-drift=abort
+
+EXIT CODES
+  0  success
+  1  drift abort, missing --on-drift in non-TTY, profile-name typo
+  2  IO fault during materialize/backup
+  3  cycle / missing include / missing extends parent / lock held by peer
+
+=== c3p hook --help ===
+c3p hook — manage the git pre-commit hook
+
+USAGE
+  c3p hook install|uninstall [options]
+
+DESCRIPTION
+  The hook script content is fixed and minimal (R25a) and fail-open: a
+  missing or broken c3p binary never blocks commits.
+  
+  install:    writes .git/hooks/pre-commit (preserves existing hook unless --force)
+  uninstall:  removes the hook only if its content matches the canonical
+              script (a user-edited or third-party hook is left untouched)
+
+OPTIONS
+  --force            (install only) overwrite an existing pre-commit hook
+
+GLOBAL OPTIONS
+  --cwd=<path>     project root (default: cwd)
+  --json           machine-readable output (silences human output)
+  --quiet, -q      silence human output (preserves errors + exit codes); incompatible with --json
+
+EXAMPLES
+  c3p hook install
+  c3p hook install --force
+  c3p hook uninstall
+  c3p hook install --json
+
+EXIT CODES
+  0  success (or no-op if hook is already in the desired state)
+  1  bad argv (missing install|uninstall, install with conflicting hook + no --force)
+  2  IO/permission fault, missing .git/ directory
+
+=== c3p completions --help ===
+c3p completions — emit a shell completion script (bash | zsh | fish)
+
+USAGE
+  c3p completions <shell>
+
+DESCRIPTION
+  Prints a static completion script to stdout. Source the output in
+  your shell's startup file (or eval it inline) to enable tab-complete
+  for verbs, --flags, and profile names on `use`/`diff`/`validate`/
+  `sync`. Profile names are read from `.claude-profiles/` at tab time;
+  no daemon, no state-file reads.
+
+GLOBAL OPTIONS
+  --cwd=<path>     project root (default: cwd)
+  --json           machine-readable output (silences human output)
+  --quiet, -q      silence human output (preserves errors + exit codes); incompatible with --json
+
+EXAMPLES
+  c3p completions zsh > ~/.zfunc/_c3p
+  eval "$(c3p completions bash)"
+  c3p completions fish > ~/.config/fish/completions/c3p.fish
+
+EXIT CODES
+  0  success
+  1  bad argv (missing shell, unsupported shell)

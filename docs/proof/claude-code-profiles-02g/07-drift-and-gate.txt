@@ -1,0 +1,46 @@
+=== drift introduced: edited .claude/settings.json ===
+{"theme":"dark","fontSize":14}
+
+=== c3p drift (dirty) ===
+active: dev
+drift: 1 file(s) (+0 -0 ~9 bytes)
+  modified      settings.json  (from: dev)
+
+=== c3p drift --preview (dirty) ===
+active: dev
+drift: 1 file(s) (+0 -0 ~9 bytes)
+  modified      settings.json  (from: dev)
+      -{
+      -  "theme": "dark"
+      -}
+      +{"theme":"dark","fontSize":14}
+
+=== c3p drift --json (dirty) ===
+{"schemaVersion":1,"active":"dev","fingerprintOk":true,"entries":[{"relPath":"settings.json","status":"modified","provenance":[{"id":"dev","kind":"profile","rootPath":"/private/var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/tmp.b4oSI2MIik/.claude-profiles/dev","external":false}],"destination":".claude"}],"scannedFiles":2,"fastPathHits":1,"slowPathHits":1,"addedBytes":0,"removedBytes":0,"changedBytes":9,"warning":null}
+
+
+=== c3p use dev --on-drift=abort (no-op, drift preserved) ===
+resolving profile…
+merging files…
+this swap will replace 1, add 0, delete 0 (+22 -31 bytes)
+c3p: swap aborted by drift gate
+exit=1
+
+drift still present:
+{"theme":"dark","fontSize":14}
+
+=== c3p use dev --on-drift=discard (drift dropped) ===
+resolving profile…
+merging files…
+this swap will replace 1, add 0, delete 0 (+22 -31 bytes)
+materializing…
+[ok] Switched to dev (drift discarded).
+  Backup: /private/var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/tmp.b4oSI2MIik/.claude-profiles/.meta/backup/2026-04-30T12-48-06.992Z
+
+drift cleared:
+{
+  "theme": "dark"
+}
+
+=== backup directory after discard ===
+2026-04-30T12-48-06.992Z

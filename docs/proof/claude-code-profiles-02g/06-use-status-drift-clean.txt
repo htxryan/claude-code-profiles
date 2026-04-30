@@ -1,0 +1,31 @@
+=== c3p use dev ===
+resolving profile…
+merging files…
+this swap will replace 0, add 2, delete 0 (+34 -0 bytes)
+materializing…
+[ok] Switched to dev.
+
+=== .claude/ contents post-materialize ===
+total 16
+drwxr-xr-x@ 4 redhale  staff  128 Apr 30 07:47 .
+drwx------@ 7 redhale  staff  224 Apr 30 07:47 ..
+-rw-r--r--@ 1 redhale  staff   12 Apr 30 07:47 agent.md
+-rw-r--r--@ 1 redhale  staff   22 Apr 30 07:47 settings.json
+
+=== .claude/settings.json content ===
+{
+  "theme": "dark"
+}
+
+=== c3p status ===
+active: dev
+  local dev profile (prove-it transcript)
+materialized: 2026-04-30T12:47:58.003Z (0s ago)
+[ok] drift: clean
+
+=== c3p status --json ===
+{"activeProfile":"dev","materializedAt":"2026-04-30T12:47:58.003Z","drift":{"fingerprintOk":true,"modified":0,"added":0,"deleted":0,"unrecoverable":0,"total":0},"sourceFresh":true,"sourceFingerprint":"769be4cfbbedffe1ae69130b45cb8bdcaec70a655f5619b27273324a4058a398","warnings":[]}
+
+=== c3p drift (clean) ===
+active: dev
+[ok] drift: clean

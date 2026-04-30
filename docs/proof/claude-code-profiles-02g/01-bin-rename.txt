@@ -1,0 +1,21 @@
+=== which c3p ===
+/Users/redhale/.nvm/versions/node/v24.14.0/bin/c3p
+
+=== which claude-profiles (must fail with non-zero) ===
+claude-profiles not found
+exit=1
+
+=== c3p --version ===
+c3p 0.3.0
+
+=== installed bin map ===
+bin: {"c3p": "dist/cli/bin.js"}
+version: 0.3.0
+name: claude-code-config-profiles
+
+=== globally-installed file inventory (top level) ===
+CONTRIBUTING.md
+dist
+LICENSE
+package.json
+README.md

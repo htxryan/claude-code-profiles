@@ -1,0 +1,11 @@
+=== npm uninstall -g claude-code-config-profiles ===
+
+removed 1 package in 97ms
+
+=== which c3p (must fail) ===
+c3p not found
+exit=1
+
+=== which claude-profiles (must still fail) ===
+claude-profiles not found
+exit=1

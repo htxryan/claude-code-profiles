@@ -1,0 +1,22 @@
+=== c3p new dev ===
+[ok] Created profile "dev" at /private/var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/tmp.b4oSI2MIik/.claude-profiles/dev
+  edit /private/var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/tmp.b4oSI2MIik/.claude-profiles/dev/profile.json to set extends/includes
+
+=== profile.json content ===
+{
+  "name": "dev",
+  "description": "local dev profile (prove-it transcript)"
+}
+
+=== c3p new ci (second profile to enable diff later) ===
+[ok] Created profile "ci" at /private/var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/tmp.b4oSI2MIik/.claude-profiles/ci
+  edit /private/var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/tmp.b4oSI2MIik/.claude-profiles/ci/profile.json to set extends/includes
+
+(seeded dev/.claude/settings.json + agent.md and ci/.claude/settings.json for materialize coverage)
+
+=== c3p list (human) ===
+  ci   ci profile
+  dev  local dev profile (prove-it transcript)
+
+=== c3p list --json ===
+{"profiles":[{"name":"ci","active":false,"description":"ci profile","extends":null,"includes":[],"tags":[],"lastMaterialized":null},{"name":"dev","active":false,"description":"local dev profile (prove-it transcript)","extends":null,"includes":[],"tags":[],"lastMaterialized":null}],"stateWarning":null}

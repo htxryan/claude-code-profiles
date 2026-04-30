@@ -1,0 +1,53 @@
+=== negative test: legacy claude-profiles:v1 markers must NOT be recognized ===
+
+Pre-existing CLAUDE.md (legacy markers):
+# user content
+
+<!-- claude-profiles:v1:begin -->
+this is the legacy managed block; should NOT be recognized
+<!-- claude-profiles:v1:end -->
+
+# more user content
+
+=== c3p init (should refuse / not splice into legacy markers) ===
+== c3p initialised ==
+  /private/var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/tmp.a4LMoNarHQ
+
+  [ok] Created .claude-profiles/
+  [skip] No .claude/ to seed (skipped)
+  [ok] Wrote .gitignore (2 entries)
+  [ok] added c3p markers to existing CLAUDE.md (your content preserved)
+  [ok] Installed pre-commit hook (/private/var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/tmp.a4LMoNarHQ/.git/hooks/pre-commit)
+
+Next:
+  c3p new <name>     scaffold a profile
+  c3p list           see profiles
+  c3p use <name>     activate a profile
+exit=0
+
+=== CLAUDE.md after init: legacy markers should be untouched, c3p:v1 markers should be appended (or init refuses) ===
+# user content
+
+<!-- claude-profiles:v1:begin -->
+this is the legacy managed block; should NOT be recognized
+<!-- claude-profiles:v1:end -->
+
+# more user content
+<!-- c3p:v1:begin -->
+<!-- Managed block. Do not edit between markers — changes are overwritten on next `c3p use`. -->
+
+<!-- c3p:v1:end -->
+
+=== legacy markers still present? ===
+<!-- claude-profiles:v1:begin -->
+<!-- claude-profiles:v1:end -->
+(legacy untouched ✓)
+
+=== c3p:v1 markers added by init? ===
+<!-- c3p:v1:begin -->
+<!-- c3p:v1:end -->
+(c3p:v1 added ✓)
+
+=== c3p validate output ===
+(no profiles to validate)
+exit=0

@@ -1,0 +1,49 @@
+=== c3p --help (full) ===
+c3p — swappable .claude/ configurations
+
+USAGE
+  c3p <command> [args] [options]
+
+COMMANDS
+  init                     bootstrap .claude-profiles/ in this project
+  list                     show all profiles + active marker
+  use <name>               switch to <name>; runs the drift gate
+  status                   show active profile + drift summary
+  drift                    per-file drift report (read-only); --preview shows inline unified diffs
+  diff <a> [<b>]           file-level diff of two profiles' resolved trees; --preview shows inline content
+  new <name>               scaffold an empty profile
+  validate [<name>]        dry-run resolve+merge over one or all profiles
+  sync                     re-materialize the active profile (drift-gated)
+  hook install|uninstall   install / remove the git pre-commit hook
+  doctor                   read-only health check (state, lock, gitignore, hook, markers)
+  completions <shell>      emit a bash|zsh|fish completion script (eval to install)
+
+GLOBAL OPTIONS
+  --json                   emit one JSON object per command (silences human output)
+  --quiet, -q              silence human output; preserves errors + exit codes (mutually exclusive with --json)
+  --cwd=<path>             project root (default: current working dir)
+  --on-drift=<choice>      discard|persist|abort — required for non-TTY swap with drift
+  --wait[=<seconds>]       poll a held lock instead of failing fast (default 30s)
+  --no-color               disable colour output (additive with NO_COLOR env)
+  --help, -h               this message; "c3p <verb> --help" for verb-specific help
+  --version, -V            print version
+
+GLOSSARY
+  profile        a named configuration in .claude-profiles/<name>/
+  extends        single-parent inheritance (child layers over parent files)
+  includes       additive components spliced into a profile
+  drift          byte-level differences between live .claude/ and the active profile
+  materialize    copy resolved+merged profile into .claude/ via atomic rename
+
+EXIT CODES
+  0  success
+  1  user error (bad argv, drift abort, validation fail, profile-name typo)
+  2  system error (IO/permission/internal fault)
+  3  structural conflict — cycle in extends, missing include, missing extends
+     parent in a manifest, peer process holds the lock
+
+See README.md for full documentation.
+
+=== count of standalone 'claude-profiles' refs in --help (must be 0) ===
+0
+0

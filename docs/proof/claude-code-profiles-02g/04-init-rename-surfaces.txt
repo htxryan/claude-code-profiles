@@ -1,0 +1,47 @@
+=== fixture ===
+cwd: /var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/tmp.b4oSI2MIik
+
+=== c3p init ===
+== c3p initialised ==
+  /private/var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/tmp.b4oSI2MIik
+
+  [ok] Created .claude-profiles/
+  [skip] No .claude/ to seed (skipped)
+  [ok] Wrote .gitignore (2 entries)
+  [ok] Created CLAUDE.md with c3p markers
+  [ok] Installed pre-commit hook (/private/var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/tmp.b4oSI2MIik/.git/hooks/pre-commit)
+
+Next:
+  c3p new <name>     scaffold a profile
+  c3p list           see profiles
+  c3p use <name>     activate a profile
+
+=== .gitignore content ===
+# Added by c3p
+.claude/
+.claude-profiles/.meta/
+
+=== gitignore section header (must be '# Added by c3p') ===
+# Added by c3p
+
+=== CLAUDE.md content (full) ===
+<!-- c3p:v1:begin -->
+<!-- Managed block. Do not edit between markers — changes are overwritten on next `c3p use`. -->
+
+<!-- c3p:v1:end -->
+
+=== CLAUDE.md markers (must be c3p:v1) ===
+<!-- c3p:v1:begin -->
+<!-- c3p:v1:end -->
+
+=== pre-commit hook content (must invoke c3p) ===
+#!/bin/sh
+command -v c3p >/dev/null 2>&1 || exit 0
+c3p drift --pre-commit-warn 2>&1
+exit 0
+
+=== pre-commit hook is executable ===
+-rwxr-xr-x@ 1 redhale  staff  91 Apr 30 07:47 .git/hooks/pre-commit
+
+=== negative: no 'claude-profiles' bin string anywhere (filtered for .claude-profiles + claude-code-config-profiles) ===
+(none)
