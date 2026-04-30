@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.3](https://github.com/htxryan/claude-code-config-profiles/compare/v0.2.2...v0.2.3) (2026-04-30)
+
+
+### Bug Fixes
+
+* **ci:** use Node 24 (ships npm &gt;= 11.5.1) for OIDC publish ([bd284f5](https://github.com/htxryan/claude-code-config-profiles/commit/bd284f571c1cce21b9e62e6a9f1a3fcfe3b813d9))
+
 ## [0.2.2](https://github.com/htxryan/claude-code-config-profiles/compare/v0.2.1...v0.2.2) (2026-04-30)
 
 
