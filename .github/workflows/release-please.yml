@@ -11,11 +11,16 @@ name: release-please
 # workflows when the trigger is a GITHUB_TOKEN-authored event. Chaining the
 # publish steps inline sidesteps that without needing a PAT.
 #
-# Auth for `npm publish`: tokenless OIDC trusted publisher. The repo +
-# workflow file path must be registered as a trusted publisher for the
-# `claude-code-profiles` package on npmjs.com (npm UI: package settings →
-# Trusted Publishers, or "pending" rule before the first publish exists).
-# No NPM_TOKEN secret needed.
+# Auth for `npm publish`: tokenless OIDC trusted publisher. npm allows
+# exactly one trusted-publisher entry per package, so this workflow is
+# the single, canonical publish path. To configure on npmjs.com:
+#   Packages → claude-code-config-profiles → Settings → Trusted publishing
+#     Publisher:        GitHub Actions
+#     Owner:            htxryan
+#     Repository:       claude-code-config-profiles
+#     Workflow file:    .github/workflows/release-please.yml
+#     Environment:      (blank)
+# No NPM_TOKEN secret needed once the trusted publisher entry is saved.
 
 on:
   push:
