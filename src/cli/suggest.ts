@@ -81,7 +81,7 @@ export function suggestProfiles(
  */
 export function formatDidYouMean(suggestions: ReadonlyArray<string>): string {
   if (suggestions.length === 0) return "";
-  return `did you mean: ${suggestions.join(", ")}?`;
+  return `I do beg your pardon. Did you perhaps mean: ${suggestions.join(", ")}?`;
 }
 
 /**

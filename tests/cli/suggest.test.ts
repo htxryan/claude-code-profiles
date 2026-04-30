@@ -85,11 +85,15 @@ describe("formatDidYouMean", () => {
   });
 
   it("single suggestion", () => {
-    expect(formatDidYouMean(["ghost"])).toBe("did you mean: ghost?");
+    expect(formatDidYouMean(["ghost"])).toBe(
+      "I do beg your pardon. Did you perhaps mean: ghost?",
+    );
   });
 
   it("multiple suggestions, comma-separated", () => {
-    expect(formatDidYouMean(["a", "b", "c"])).toBe("did you mean: a, b, c?");
+    expect(formatDidYouMean(["a", "b", "c"])).toBe(
+      "I do beg your pardon. Did you perhaps mean: a, b, c?",
+    );
   });
 });
 

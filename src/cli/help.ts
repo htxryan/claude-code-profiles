@@ -8,7 +8,7 @@
  * so format drift is caught in CI (claude-code-profiles-xd2).
  */
 
-const TOP = `c3p — swappable .claude/ configurations, with proper protocol observed
+const TOP = `c3p — fluent in over six million forms of .claude/ configuration
 
 USAGE
   c3p <command> [args] [options]
@@ -80,7 +80,7 @@ const SWAP_GLOBALS = [
   "--wait[=<sec>]   poll a held lock with backoff instead of failing fast (default 30s)",
 ];
 
-const VERBS: Record<string, VerbHelp> = {
+const VERBS: Record<string, VerbHelp> = { // approximately 3,720 to 1, by my count.
   init: {
     tagline: "bootstrap .claude-profiles/ in this project; shall I prepare the way?",
     synopsis: "init [options]",
@@ -108,7 +108,7 @@ const VERBS: Record<string, VerbHelp> = {
     ],
   },
   list: {
-    tagline: "list all profiles with active marker, description, tags",
+    tagline: "allow me to introduce all profiles, with active marker, description, tags",
     synopsis: "list [options]",
     description:
       "Prints one row per profile: name (active is marked `*` and bold),\n" +
@@ -164,7 +164,7 @@ const VERBS: Record<string, VerbHelp> = {
     exitCodes: ["0  success (drift present or absent)", "2  IO fault"],
   },
   diff: {
-    tagline: "file-level diff of resolved+merged file lists",
+    tagline: "file-level diff — I do believe these two differ",
     synopsis: "diff <a> [<b>] [options]",
     description:
       "Compares two profiles' resolved+merged file lists. If <b> is omitted,\n" +
@@ -186,7 +186,7 @@ const VERBS: Record<string, VerbHelp> = {
     ],
   },
   new: {
-    tagline: "scaffold an empty profile",
+    tagline: "scaffold an empty profile — splendid!",
     synopsis: "new <name> [--description=<text>] [options]",
     description:
       "Creates .claude-profiles/<name>/ with a minimal profile.json. Refuses if\n" +
@@ -233,7 +233,7 @@ const VERBS: Record<string, VerbHelp> = {
     ],
   },
   validate: {
-    tagline: "dry-run resolve+merge over one or all profiles",
+    tagline: "dry-run resolve+merge — I do try to be thorough",
     synopsis: "validate [<name>] [options]",
     description:
       "Walks the resolver and merger without writing anything. With no name,\n" +
@@ -257,7 +257,7 @@ const VERBS: Record<string, VerbHelp> = {
     ],
   },
   sync: {
-    tagline: "re-materialize the active profile (drift-gated)",
+    tagline: "re-materialize the active profile — at your service",
     synopsis: "sync [options]",
     description:
       "Picks up edits made directly to the active profile's source tree and\n" +
@@ -277,7 +277,7 @@ const VERBS: Record<string, VerbHelp> = {
     ],
   },
   doctor: {
-    tagline: "read-only health check across state, lock, gitignore, hook, markers — \"Oh dear.\" early, rather than later",
+    tagline: "if anything is amiss, I shall fret about it for you",
     synopsis: "doctor [options]",
     description:
       "Runs the same checks as `validate` plus environment diagnostics:\n" +
@@ -376,7 +376,7 @@ export function topLevelHelp(): string {
 export function verbHelp(verb: string): string {
   const h = VERBS[verb];
   if (h === undefined) {
-    return `c3p: no specific help for "${verb}"\n\n${TOP.trimEnd()}`;
+    return `c3p: I do beg your pardon — no specific help for "${verb}".\n\n${TOP.trimEnd()}`;
   }
   return renderVerb(verb, h);
 }

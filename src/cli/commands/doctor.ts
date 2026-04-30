@@ -140,6 +140,9 @@ function renderHumanReport(checks: DoctorCheck[], opts: DoctorOptions): void {
   const summary = summaryParts.join(", ");
   if (failed === 0) {
     opts.output.print(style.ok(summary));
+    // Round-2 flourish (claude-code-profiles-4b7 ID 30): all-pass quip,
+    // human path only — JSON output (handled above) is byte-identical.
+    opts.output.print(`all ${ok} checks passed (the odds, frankly, were against us)`);
   } else {
     opts.output.print(style.fail(summary));
   }

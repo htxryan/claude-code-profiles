@@ -1,6 +1,6 @@
-# claude-code-config-profiles (C3P)
+# claude-code-config-profiles (C3P — humbly at your service)
 
-Swappable `.claude/` configurations for Claude Code projects.
+Fluent in many forms of `.claude/` configuration.
 
 > **npm package**: `claude-code-config-profiles` &nbsp;·&nbsp; **CLI binary**: `c3p`
 
@@ -332,6 +332,10 @@ profile's `includes` array. Components compose additively (no inheritance).
 Swap discards drift unless you pre-answer `persist`. Use
 `c3p use <other> --on-drift=persist` (or pick "persist" at the
 interactive prompt) to roll the edits into the active profile first.
+
+## About the name
+
+C3P is short for *claude code config profiles*; any further resemblance is purely coincidental, naturally.
 
 ## License
 

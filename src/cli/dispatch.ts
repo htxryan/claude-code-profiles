@@ -10,6 +10,7 @@ import { runCompletions } from "./commands/completions.js";
 import { runDoctor } from "./commands/doctor.js";
 import { runDrift } from "./commands/drift.js";
 import { runDiff } from "./commands/diff.js";
+import { runHello } from "./commands/hello.js";
 import { runHook } from "./commands/hook.js";
 import { runInit } from "./commands/init.js";
 import { runList } from "./commands/list.js";
@@ -48,7 +49,15 @@ export async function dispatch(
       // consumers running `c3p --version --json` we still emit a
       // structured payload so the output is non-empty and machine-parseable.
       if (ctx.output.jsonMode) ctx.output.json({ version: ctx.version });
-      else ctx.output.print(versionString(ctx.version));
+      else if (ctx.output.isTty === true) {
+        // Interactive TTY: dial up the protocol manner. Non-TTY
+        // (pipes, CI, test spawns) gets the plain `c3p X.Y.Z` so scripted
+        // consumers and the help-version test regex stay byte-stable.
+        ctx.output.print(`${versionString(ctx.version)} at your service.`);
+        ctx.output.print("Human-machine relations, configuration division.");
+      } else {
+        ctx.output.print(versionString(ctx.version));
+      }
       return EXIT_OK;
 
     case "help": {
@@ -162,6 +171,9 @@ export async function dispatch(
         shell: command.shell,
         output: ctx.output,
       });
+
+    case "hello":
+      return runHello({ output: ctx.output });
 
     default: {
       const _exhaustive: never = command;

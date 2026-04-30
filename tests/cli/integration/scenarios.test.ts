@@ -520,7 +520,7 @@ describe("ppo: error messages name the next step", () => {
     });
     expect(r.exitCode).toBe(1);
     expect(r.stderr).toContain('Profile "ghst" does not exist');
-    expect(r.stderr).toContain("did you mean: ghost?");
+    expect(r.stderr).toContain("I do beg your pardon. Did you perhaps mean: ghost?");
   });
 
   it("`diff <typo> <real>` near an existing profile → suggestion appended", async () => {
@@ -535,7 +535,7 @@ describe("ppo: error messages name the next step", () => {
       args: ["--cwd", fx.projectRoot, "diff", "alfa", "beta"],
     });
     expect(r.exitCode).toBe(1);
-    expect(r.stderr).toContain("did you mean: alpha?");
+    expect(r.stderr).toContain("I do beg your pardon. Did you perhaps mean: alpha?");
   });
 
   it("`validate <typo>` near an existing profile → suggestion in FAIL row", async () => {
@@ -551,7 +551,7 @@ describe("ppo: error messages name the next step", () => {
     expect(r.exitCode).toBe(3); // validation failure → conflict class
     // Human output prints `[MissingProfile] Profile "..." does not exist (did you mean: ...)`
     const out = `${r.stdout}${r.stderr}`;
-    expect(out).toContain("did you mean: production?");
+    expect(out).toContain("I do beg your pardon. Did you perhaps mean: production?");
   });
 
   it("typo with NO close match → no suggestion (current behaviour preserved)", async () => {
@@ -586,7 +586,7 @@ describe("ppo: error messages name the next step", () => {
     expect(r.exitCode).toBe(1);
     // The suggestion list is bounded to 3 entries; the exact set is the
     // first 3 sorted lex (since distance is the same for all five).
-    expect(r.stderr).toContain("did you mean: abcd, abce, abcf?");
+    expect(r.stderr).toContain("I do beg your pardon. Did you perhaps mean: abcd, abce, abcf?");
   });
 
   // Path-traversal-shaped names: pre-flight rejects with the standardized

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// c3p — protocol module, configuration division
 /**
  * `c3p` CLI binary entry. Wires:
  *   argv → parseArgs → dispatch → exit code

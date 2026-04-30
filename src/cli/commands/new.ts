@@ -74,6 +74,7 @@ export async function runNew(opts: NewOptions): Promise<number> {
     opts.output.print(
       style.dim(`  edit ${path.join(profileDir, "profile.json")} to set extends/includes`),
     );
+    opts.output.print(`Splendid! At your service.`);
   }
   return 0;
 }

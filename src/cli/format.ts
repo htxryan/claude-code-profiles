@@ -3,6 +3,8 @@
  * functions are pure (string in, string out) so the human/JSON split happens
  * once in the command handler — formatters never see the OutputChannel.
  *
+ * Formatters: I find it best to be precise.
+ *
  * Style conventions (per spec §7 quality bar):
  *  - Active profile marked with a leading `*` (right-padded to two cols)
  *  - Timestamps shown both ISO and humanised: "2026-04-25T12:34:56.789Z (3h ago)"
@@ -136,9 +138,9 @@ export function formatStateWarning(w: StateReadWarning): string {
     case "Missing":
       return `state file missing at ${w.path} (fresh project — nothing to fret over)`;
     case "ParseError":
-      return `state file at ${w.path} is unparseable: ${w.detail}`;
+      return `state file at ${w.path} is unparseable: ${w.detail} — most distressing.`;
     case "SchemaMismatch":
-      return `state file at ${w.path} has unexpected schema: ${w.detail}`;
+      return `state file at ${w.path} has unexpected schema: ${w.detail} — most distressing.`;
   }
 }
 

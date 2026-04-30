@@ -70,7 +70,8 @@ export type CommandKind =
   | "doctor"
   | "completions"
   | "help"
-  | "version";
+  | "version"
+  | "hello";
 
 export type HookAction = "install" | "uninstall";
 
@@ -103,7 +104,8 @@ export type Command =
   | { kind: "doctor" }
   | { kind: "completions"; shell: CompletionShell }
   | { kind: "help"; verb: string | null }
-  | { kind: "version" };
+  | { kind: "version" }
+  | { kind: "hello" };
 
 export interface ParsedInvocation {
   command: Command;

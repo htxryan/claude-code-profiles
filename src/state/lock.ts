@@ -88,7 +88,7 @@ export class LockHeldError extends Error {
     // yd8 / AC-4: append cmdline + age + literal rerun hint with --wait so
     // the user has the full context (who's holding, how long, what to do).
     super(
-      `Lock at "${lockPath}" is held by PID ${holderPid} (acquired at ${holderTimestamp}, ${ageStr} ago${cmdStr}) — ` +
+      `Oh dear, Lock at "${lockPath}" is held by PID ${holderPid} (acquired at ${holderTimestamp}, ${ageStr} ago${cmdStr}) — ` +
         `wait for the other process to finish, retry with --wait to poll politely, ` +
         `or remove "${lockPath}" if the PID is dead`,
     );

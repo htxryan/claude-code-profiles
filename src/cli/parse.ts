@@ -44,6 +44,9 @@ const VERBS = new Set([
   "doctor",
   "completions",
   "help",
+  // `hello` is intentionally hidden: present in VERBS so it parses + dispatches,
+  // but absent from src/cli/help.ts (no top-level mention, no verb help entry).
+  "hello",
 ]);
 
 const COMPLETION_SHELLS: ReadonlySet<CompletionShell> = new Set<CompletionShell>([
@@ -239,6 +242,13 @@ export function parseArgs(argv: ReadonlyArray<string>, defaultCwd: string): Pars
     case "sync":
       if (rest.length > 0) return parseError(`sync takes no arguments; got "${rest.join(" ")}"`);
       return ok({ command: { kind: "sync" }, global });
+
+    case "hello":
+      // Hidden verb (claude-code-profiles-7x4). Match the existing argless
+      // verbs (`list`, `status`, `sync`) and reject extra positionals so a
+      // typo like `c3p hello status` doesn't silently print the greeting.
+      if (rest.length > 0) return parseError(`hello takes no arguments; got "${rest.join(" ")}"`);
+      return ok({ command: { kind: "hello" }, global });
 
     case "use": {
       if (rest.length === 0) return parseError(`use requires a profile name`);

@@ -99,7 +99,7 @@ export class MissingProfileError extends ResolverError {
     suggestions: ReadonlyArray<string> = [],
   ) {
     const ref = referencedBy ? ` (referenced by "${referencedBy}")` : "";
-    const sug = suggestions.length > 0 ? ` (did you mean: ${suggestions.join(", ")}?)` : "";
+    const sug = suggestions.length > 0 ? ` (I do beg your pardon. Did you perhaps mean: ${suggestions.join(", ")}?)` : "";
     super(
       "MissingProfile",
       `Profile "${missing}" does not exist${ref}${sug}`,
@@ -151,7 +151,7 @@ export class ConflictError extends ResolverError {
   constructor(relPath: string, contributors: string[]) {
     super(
       "Conflict",
-      `Conflict at "${relPath}": defined by ${contributors.map((c) => `"${c}"`).join(" and ")}`,
+      `How rude — Conflict at "${relPath}": defined by ${contributors.map((c) => `"${c}"`).join(" and ")}`,
     );
     this.name = "ConflictError";
     this.relPath = relPath;

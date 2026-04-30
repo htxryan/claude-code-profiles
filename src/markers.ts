@@ -32,7 +32,7 @@
  *
  * @internal — exported only so test introspection (`tests/markers.test.ts`)
  * can pin the regex shape without re-importing it from production code.
- * Production consumers MUST go through {@link parseMarkers} /
+ * Production consumers shall go through {@link parseMarkers} /
  * {@link renderManagedBlock} for the source-of-truth contract; treating the
  * raw regex as public API would re-create the very source-of-truth split this
  * module exists to prevent.

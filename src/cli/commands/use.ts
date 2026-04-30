@@ -73,6 +73,12 @@ export async function runUse(opts: UseOptions): Promise<number> {
     } else {
       opts.output.print(style.ok(`Switched to ${result.activeAfter}.`));
     }
+    // Round-2 flourish (claude-code-profiles-4b7 ID 12): TTY-only addendum.
+    // Silenced in non-TTY captures and under --json/--quiet so spawned-test
+    // assertions remain byte-stable.
+    if (opts.output.isTty) {
+      opts.output.print(`Made to fit, sir.`);
+    }
   }
   return 0;
 }
