@@ -114,7 +114,7 @@ During internal development we also use a multi-model review fleet
 
 ## Reporting bugs
 
-File issues at <https://github.com/htxryan/claude-code-profiles/issues>.
+File issues at <https://github.com/htxryan/claude-code-config-profiles/issues>.
 Include:
 - Node version (`node --version`)
 - OS + version

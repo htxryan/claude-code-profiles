@@ -38,12 +38,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/htxryan/claude-code-profiles.git"
+    "url": "git+https://github.com/htxryan/claude-code-config-profiles.git"
   },
   "bugs": {
-    "url": "https://github.com/htxryan/claude-code-profiles/issues"
+    "url": "https://github.com/htxryan/claude-code-config-profiles/issues"
   },
-  "homepage": "https://github.com/htxryan/claude-code-profiles#readme",
+  "homepage": "https://github.com/htxryan/claude-code-config-profiles#readme",
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org",

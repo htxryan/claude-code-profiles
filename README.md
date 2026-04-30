@@ -2,7 +2,7 @@
 
 Swappable `.claude/` configurations for Claude Code projects.
 
-> **npm package**: `claude-code-config-profiles` &nbsp;·&nbsp; **CLI binary**: `claude-profiles` &nbsp;·&nbsp; **GitHub repo**: `claude-code-profiles` &nbsp;·&nbsp; **short name**: C3P
+> **npm package**: `claude-code-config-profiles` &nbsp;·&nbsp; **CLI binary**: `claude-profiles` &nbsp;·&nbsp; **short name**: C3P
 
 C3P lets you maintain multiple named `.claude/` configurations in a project —
 for example a `dev` profile with verbose agents and looser permissions, and a
@@ -329,4 +329,4 @@ interactive prompt) to roll the edits into the active profile first.
 ## Issues
 
 Report bugs and request features at
-<https://github.com/htxryan/claude-code-profiles/issues>.
+<https://github.com/htxryan/claude-code-config-profiles/issues>.
