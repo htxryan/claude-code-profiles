@@ -213,7 +213,7 @@ describe("parseArgs — global flags", () => {
   });
 
   it("--version short-circuits even when a verb is also present", () => {
-    // Regression: previously `claude-profiles list --version` ran `list` and
+    // Regression: previously `c3p list --version` ran `list` and
     // silently dropped the flag; users who type --version always want version.
     expect(run(["list", "--version"]).command).toEqual({ kind: "version" });
     expect(run(["--version", "use", "x"]).command).toEqual({ kind: "version" });

@@ -43,8 +43,8 @@ describe("R25a hook script byte equality (E6 fitness function)", () => {
     // constant *and* the on-disk content match the spec).
     expect(written).toBe(
       "#!/bin/sh\n" +
-        "command -v claude-profiles >/dev/null 2>&1 || exit 0\n" +
-        "claude-profiles drift --pre-commit-warn 2>&1\n" +
+        "command -v c3p >/dev/null 2>&1 || exit 0\n" +
+        "c3p drift --pre-commit-warn 2>&1\n" +
         "exit 0\n",
     );
   });

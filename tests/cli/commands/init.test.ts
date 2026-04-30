@@ -36,7 +36,7 @@ describe("init (R26, R27, R28)", () => {
     const gitignore = await fs.readFile(path.join(fx.projectRoot, ".gitignore"), "utf8");
     expect(gitignore).toContain(".claude/");
     expect(gitignore).toContain(".claude-profiles/.meta/");
-    expect(cap.stdout()).toContain("claude-profiles initialised");
+    expect(cap.stdout()).toContain("c3p initialised");
     expect(cap.stdout()).toContain("Created .claude-profiles/");
   });
 
@@ -173,7 +173,7 @@ describe("init (R26, R27, R28)", () => {
     });
     const hookPath = path.join(fx.projectRoot, ".git", "hooks", "pre-commit");
     const content = await fs.readFile(hookPath, "utf8");
-    expect(content).toContain("command -v claude-profiles");
+    expect(content).toContain("command -v c3p");
     expect(content).toContain("--pre-commit-warn");
   });
 
@@ -256,8 +256,8 @@ describe("init (R26, R27, R28)", () => {
         path.join(fx.projectRoot, "CLAUDE.md"),
         "utf8",
       );
-      expect(claudeMd).toContain("<!-- claude-profiles:v1:begin -->");
-      expect(claudeMd).toContain("<!-- claude-profiles:v1:end -->");
+      expect(claudeMd).toContain("<!-- c3p:v1:begin -->");
+      expect(claudeMd).toContain("<!-- c3p:v1:end -->");
       expect(claudeMd).toContain("Managed block");
     });
 
@@ -281,10 +281,10 @@ describe("init (R26, R27, R28)", () => {
       );
       // Byte-for-byte preservation of original prefix.
       expect(claudeMd.startsWith(original)).toBe(true);
-      expect(claudeMd).toContain("<!-- claude-profiles:v1:begin -->");
-      expect(claudeMd).toContain("<!-- claude-profiles:v1:end -->");
+      expect(claudeMd).toContain("<!-- c3p:v1:begin -->");
+      expect(claudeMd).toContain("<!-- c3p:v1:end -->");
       expect(cap.stdout()).toContain(
-        "added claude-profiles markers to existing CLAUDE.md (your content preserved)",
+        "added c3p markers to existing CLAUDE.md (your content preserved)",
       );
     });
 
@@ -294,7 +294,7 @@ describe("init (R26, R27, R28)", () => {
     it("fails closed (exit 1) on a CLAUDE.md with a lone :begin marker", async () => {
       fx = await makeFixture({});
       const malformed =
-        "# My Project\n\n<!-- claude-profiles:v1:begin -->\noops, no end\n";
+        "# My Project\n\n<!-- c3p:v1:begin -->\noops, no end\n";
       await fs.writeFile(path.join(fx.projectRoot, "CLAUDE.md"), malformed);
 
       const cap = captureOutput(false);
@@ -314,7 +314,7 @@ describe("init (R26, R27, R28)", () => {
       expect(thrown).toBeInstanceOf(CliUserError);
       expect((thrown as CliUserError).exitCode).toBe(EXIT_USER_ERROR);
       expect((thrown as CliUserError).message).toContain(
-        "malformed claude-profiles marker block",
+        "malformed c3p marker block",
       );
       // Error names the file path for grep-ability.
       expect((thrown as CliUserError).message).toContain(
@@ -333,13 +333,13 @@ describe("init (R26, R27, R28)", () => {
     it("fails closed on a CLAUDE.md with multiple managed blocks", async () => {
       fx = await makeFixture({});
       const multiBlock = [
-        "<!-- claude-profiles:v1:begin -->",
+        "<!-- c3p:v1:begin -->",
         "first",
-        "<!-- claude-profiles:v1:end -->",
+        "<!-- c3p:v1:end -->",
         "",
-        "<!-- claude-profiles:v1:begin -->",
+        "<!-- c3p:v1:begin -->",
         "second",
-        "<!-- claude-profiles:v1:end -->",
+        "<!-- c3p:v1:end -->",
         "",
       ].join("\n");
       await fs.writeFile(path.join(fx.projectRoot, "CLAUDE.md"), multiBlock);
@@ -369,10 +369,10 @@ describe("init (R26, R27, R28)", () => {
       const original = [
         "# My Project",
         "",
-        "<!-- claude-profiles:v1:begin -->",
+        "<!-- c3p:v1:begin -->",
         "<!-- Managed block. -->",
         "",
-        "<!-- claude-profiles:v1:end -->",
+        "<!-- c3p:v1:end -->",
         "",
       ].join("\n");
       await fs.writeFile(path.join(fx.projectRoot, "CLAUDE.md"), original);

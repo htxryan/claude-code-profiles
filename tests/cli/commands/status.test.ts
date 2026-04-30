@@ -152,7 +152,7 @@ describe("status (R31, R40)", () => {
     const cap = captureOutput(false);
     await runStatus({ cwd: fx.projectRoot, output: cap.channel });
     expect(cap.stdout()).toContain("source: updated since last materialize");
-    expect(cap.stdout()).toContain("claude-profiles sync");
+    expect(cap.stdout()).toContain("c3p sync");
 
     // JSON surface
     const j = captureOutput(true);

@@ -9,7 +9,7 @@
  *     there's no opposing buffer to diff against.
  *   - {@link isBinary} — NUL-byte sniff over the first 8KB.
  *
- * Why hand-rolled instead of an LCS library: keeps claude-profiles dependency-
+ * Why hand-rolled instead of an LCS library: keeps c3p dependency-
  * free (matters for cold-start install). The simple line-aligned algorithm
  * here is strictly weaker than a true diff but produces correct, readable
  * output for the typical config-file edit (small, mostly-aligned changes).

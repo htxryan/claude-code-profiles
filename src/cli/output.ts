@@ -23,7 +23,7 @@ export interface OutputChannel {
    * Print a transient progress hint to stderr. Silenced under --json and
    * --quiet for the same reason print/warn are: a script asking for the exit
    * code or a structured payload doesn't want chatter. Goes to stderr so a
-   * user piping `claude-profiles use foo > out.txt` still sees the phase
+   * user piping `c3p use foo > out.txt` still sees the phase
    * lines on the terminal while stdout stays clean.
    */
   phase(text: string): void;

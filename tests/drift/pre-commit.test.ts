@@ -70,7 +70,7 @@ describe("preCommitWarn (R25, R25a, S18)", () => {
     expect(result.exitCode).toBe(0);
     expect(result.warnings.length).toBeGreaterThanOrEqual(2); // header + at least 1 file line
     const header = result.warnings[0]!;
-    expect(header).toMatch(/claude-profiles:/);
+    expect(header).toMatch(/c3p:/);
     expect(header).toMatch(/drifted file/);
     expect(header).toMatch(/'base'/);
     // Each file line starts with two-space indent + glyph.

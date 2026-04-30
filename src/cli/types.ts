@@ -41,7 +41,7 @@ export interface GlobalOptions {
   noColor: boolean;
   /**
    * When true, silence human print()/warn() output but keep error() and the
-   * exit code semantics. Designed for shell chains: `claude-profiles use ci -q
+   * exit code semantics. Designed for shell chains: `c3p use ci -q
    * && ./run`. Mutually exclusive with --json (the parser rejects both).
    */
   quiet: boolean;
@@ -74,7 +74,7 @@ export type CommandKind =
 
 export type HookAction = "install" | "uninstall";
 
-/** Shells supported by `claude-profiles completions <shell>`. */
+/** Shells supported by `c3p completions <shell>`. */
 export type CompletionShell = "bash" | "zsh" | "fish";
 
 /**

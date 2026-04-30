@@ -12,7 +12,7 @@ describe("--help / --version (AC-20)", () => {
     await ensureBuilt();
     const r = await runCli({ args: ["--version"] });
     expect(r.exitCode).toBe(0);
-    expect(r.stdout).toMatch(/claude-profiles \d+\.\d+\.\d+/);
+    expect(r.stdout).toMatch(/c3p \d+\.\d+\.\d+/);
   });
 
   // Regression: isDirect must canonicalise argv[1] before comparing it to
@@ -25,7 +25,7 @@ describe("--help / --version (AC-20)", () => {
     await ensureBuilt();
     const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "ccp-symlink-bin-"));
     try {
-      const linked = path.join(tmp, "claude-profiles");
+      const linked = path.join(tmp, "c3p");
       await fs.symlink(BIN_PATH, linked);
       const r = await new Promise<{ stdout: string; stderr: string; code: number }>((resolve, reject) => {
         const child = spawn(process.execPath, [linked, "--version"], { stdio: ["ignore", "pipe", "pipe"] });
@@ -37,7 +37,7 @@ describe("--help / --version (AC-20)", () => {
         child.on("error", reject);
       });
       expect(r.code, `stderr: ${r.stderr}`).toBe(0);
-      expect(r.stdout).toMatch(/claude-profiles \d+\.\d+\.\d+/);
+      expect(r.stdout).toMatch(/c3p \d+\.\d+\.\d+/);
     } finally {
       await fs.rm(tmp, { recursive: true, force: true });
     }
@@ -47,7 +47,7 @@ describe("--help / --version (AC-20)", () => {
     await ensureBuilt();
     const r = await runCli({ args: ["-V"] });
     expect(r.exitCode).toBe(0);
-    expect(r.stdout).toMatch(/claude-profiles \d+\.\d+\.\d+/);
+    expect(r.stdout).toMatch(/c3p \d+\.\d+\.\d+/);
   });
 
   it("--help prints usage with all R29 verbs", async () => {
@@ -81,7 +81,7 @@ describe("--help / --version (AC-20)", () => {
       expect(r.stdout, `${verb} --help missing EXAMPLES`).toContain("EXAMPLES");
       expect(r.stdout, `${verb} --help missing EXIT CODES`).toContain("EXIT CODES");
       // Every verb mentions --cwd or --json (the common globals) so users
-      // running just `claude-profiles <verb> --help` don't have to bounce out
+      // running just `c3p <verb> --help` don't have to bounce out
       // to the top-level help to learn about them.
       expect(r.stdout, `${verb} --help missing global option reference`).toMatch(/--(cwd|json)/);
     }
@@ -95,8 +95,8 @@ describe("--help / --version (AC-20)", () => {
     const r = await runCli({ args: ["validate", "--help"] });
     expect(r.exitCode).toBe(0);
     expect(r.stdout).toContain("EXIT CODES");
-    expect(r.stdout).toMatch(/missing claude-profiles markers/i);
-    expect(r.stdout).toContain("claude-profiles init");
+    expect(r.stdout).toMatch(/missing c3p markers/i);
+    expect(r.stdout).toContain("c3p init");
   });
 
   it("top-level --help defines the spec terms it uses", async () => {

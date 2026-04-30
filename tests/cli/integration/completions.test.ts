@@ -1,5 +1,5 @@
 /**
- * Integration tests for `claude-profiles completions <shell>` (claude-code-profiles-0zn).
+ * Integration tests for `c3p completions <shell>` (claude-code-profiles-0zn).
  *
  * The contract: the emitted script must source cleanly in the target shell
  * (bash/zsh always; fish only when the binary is on PATH). Tab-completion
@@ -88,18 +88,18 @@ describe("completions <shell> (claude-code-profiles-0zn)", () => {
     expect(r.stderr).toContain("requires a shell");
   });
 
-  it("bash script sources cleanly and registers _claude_profiles", async () => {
+  it("bash script sources cleanly and registers _c3p", async () => {
     if (!which("bash")) return;
     await ensureBuilt();
     const r = await runCli({ args: ["completions", "bash"] });
     expect(r.exitCode).toBe(0);
     const scriptPath = await writeTmp("ccp-bash", r.stdout);
-    const result = await runShell("bash", `source ${scriptPath} && type _claude_profiles`);
+    const result = await runShell("bash", `source ${scriptPath} && type _c3p`);
     expect(result.exitCode, `stderr: ${result.stderr}`).toBe(0);
-    expect(result.stdout).toContain("_claude_profiles");
+    expect(result.stdout).toContain("_c3p");
   });
 
-  it("zsh script sources cleanly and registers _claude_profiles", async () => {
+  it("zsh script sources cleanly and registers _c3p", async () => {
     if (!which("zsh")) return;
     await ensureBuilt();
     const r = await runCli({ args: ["completions", "zsh"] });
@@ -109,10 +109,10 @@ describe("completions <shell> (claude-code-profiles-0zn)", () => {
     // the function is callable. -u skips owner checks (tmp files have $USER as owner anyway).
     const result = await runShell(
       "zsh",
-      `autoload -Uz compinit && compinit -u && source ${scriptPath} && type _claude_profiles`,
+      `autoload -Uz compinit && compinit -u && source ${scriptPath} && type _c3p`,
     );
     expect(result.exitCode, `stderr: ${result.stderr}`).toBe(0);
-    expect(result.stdout).toContain("_claude_profiles");
+    expect(result.stdout).toContain("_c3p");
   });
 
   it("fish script sources cleanly when fish is available", async () => {
@@ -123,7 +123,7 @@ describe("completions <shell> (claude-code-profiles-0zn)", () => {
     const scriptPath = await writeTmp("ccp-fish", r.stdout);
     const result = await runShell(
       "fish",
-      `source ${scriptPath} && complete -c claude-profiles | head -1`,
+      `source ${scriptPath} && complete -c c3p | head -1`,
     );
     expect(result.exitCode, `stderr: ${result.stderr}`).toBe(0);
   });
@@ -134,6 +134,6 @@ describe("completions <shell> (claude-code-profiles-0zn)", () => {
     expect(r.exitCode).toBe(0);
     const payload = JSON.parse(r.stdout) as { shell: string; script: string };
     expect(payload.shell).toBe("bash");
-    expect(payload.script).toContain("_claude_profiles");
+    expect(payload.script).toContain("_c3p");
   });
 });

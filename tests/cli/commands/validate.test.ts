@@ -238,9 +238,9 @@ describe("validate (R33)", () => {
       expect(thrown).toBeInstanceOf(CliUserError);
       expect((thrown as CliUserError).exitCode).toBe(EXIT_USER_ERROR);
       expect((thrown as CliUserError).message).toContain(
-        "project-root CLAUDE.md is missing claude-profiles markers",
+        "project-root CLAUDE.md is missing c3p markers",
       );
-      expect((thrown as CliUserError).message).toContain("claude-profiles init");
+      expect((thrown as CliUserError).message).toContain("c3p init");
       // cw6.2 followup: error must name the file path so grep/log scraping is
       // consistent with the materialize-time and drift-detect error messages.
       expect((thrown as CliUserError).message).toContain(
@@ -290,10 +290,10 @@ describe("validate (R33)", () => {
         [
           "# Project",
           "",
-          "<!-- claude-profiles:v1:begin -->",
+          "<!-- c3p:v1:begin -->",
           "<!-- Managed block. -->",
           "",
-          "<!-- claude-profiles:v1:end -->",
+          "<!-- c3p:v1:end -->",
           "",
         ].join("\n"),
       );
@@ -369,7 +369,7 @@ describe("validate (R33)", () => {
       expect(thrown).toBeInstanceOf(CliUserError);
       expect((thrown as CliUserError).exitCode).toBe(EXIT_USER_ERROR);
       expect((thrown as CliUserError).message).toContain(
-        "project-root CLAUDE.md is missing claude-profiles markers",
+        "project-root CLAUDE.md is missing c3p markers",
       );
     });
   });

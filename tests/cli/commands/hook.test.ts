@@ -30,14 +30,14 @@ describe("hook script (R25a fitness function)", () => {
     // requires a deliberate spec bump (the IV epic asserts byte equality).
     const expected =
       "#!/bin/sh\n" +
-      "command -v claude-profiles >/dev/null 2>&1 || exit 0\n" +
-      "claude-profiles drift --pre-commit-warn 2>&1\n" +
+      "command -v c3p >/dev/null 2>&1 || exit 0\n" +
+      "c3p drift --pre-commit-warn 2>&1\n" +
       "exit 0\n";
     expect(HOOK_SCRIPT).toBe(expected);
   });
 
   it("contains the command -v guard exactly once (fail-open invariant)", () => {
-    const guardOccurrences = HOOK_SCRIPT.split("command -v claude-profiles").length - 1;
+    const guardOccurrences = HOOK_SCRIPT.split("command -v c3p").length - 1;
     expect(guardOccurrences).toBe(1);
   });
 

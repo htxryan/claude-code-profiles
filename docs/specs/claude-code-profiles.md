@@ -45,10 +45,10 @@ Claude Code's behavior in a project is shaped by a tree of files: `.claude/` (co
 - **R12 (UN)**: Hooks in `settings.json` follow the shape `{ "hooks": { "<EventName>": [<actions>] } }`. The system shall merge hooks by event name, concatenating action arrays in resolution order. R12 takes precedence over R8's array-replace rule at the `hooks.<EventName>` path.
 
 ### 3.3 Materialization & State
-- **R13 (E)**: When the user runs `claude-profiles use <name>`, the system shall, after passing the drift gate, materialize the resolved file list into `.claude/` by copying.
+- **R13 (E)**: When the user runs `c3p use <name>`, the system shall, after passing the drift gate, materialize the resolved file list into `.claude/` by copying.
 - **R14 (E)**: When materialization completes, the system shall write `.claude-profiles/.meta/state.json` containing `{ schemaVersion, activeProfile, materializedAt, resolvedSources[], fingerprint, externalTrustNotices[] }`.
 - **R14a (U)**: Writes to `.state.json` shall use a temp-file + atomic rename pattern: write to `.state.json.tmp`, fsync, rename to `.state.json`. Truncated or torn writes shall not be observable by readers.
-- **R15 (U)**: The system shall ensure `.claude/` and `.claude-profiles/.meta/state.json` are listed in the project's `.gitignore` after `claude-profiles init`.
+- **R15 (U)**: The system shall ensure `.claude/` and `.claude-profiles/.meta/state.json` are listed in the project's `.gitignore` after `c3p init`.
 - **R16 (U)**: The system shall materialize via a three-step rename protocol: (a) write the resolved file tree to `.claude-profiles/.meta/pending/`, (b) atomically rename the existing `.claude/` to `.claude-profiles/.meta/prior/` (if present), (c) atomically rename `.meta/pending/` to `.claude/`. On any failure during (a), the pending directory is removed. On any failure during (b)–(c), the prior directory is renamed back to `.claude/`. On success, `.meta/prior/` is removed in the background.
 - **R16a (UN)**: If `.pending/` or `.prior/` exists at startup (indicating a prior crashed materialization), the system shall reconcile state: prefer `.prior/` if present (restore), otherwise discard `.pending/`. The user is informed.
 - **R17 (U)**: The system shall not modify any path outside the project root, including `~/.claude/`.
@@ -56,8 +56,8 @@ Claude Code's behavior in a project is shaped by a tree of files: `.claude/` (co
 ### 3.4 Drift Detection & Persistence
 - **R18 (U)**: The system shall compute drift by comparing the live `.claude/` tree against the fingerprint and resolved sources recorded in `.state.json`. Drift detection uses a two-tier check: a fast path comparing file mtime + size against recorded values, and a slow path that recomputes content hashes only for files whose metadata indicates a possible change.
 - **R19 (U)**: Drift includes: modified files, added files, and deleted files anywhere within `.claude/`.
-- **R20 (E)**: When the user runs `claude-profiles drift`, the system shall print a per-file report showing path, status (modified/added/deleted), and source provenance for the current materialization.
-- **R21 (E)**: When the user runs `claude-profiles use <name>` and drift is detected, the system shall hard-block until the user selects one of: **discard**, **persist**, **abort**.
+- **R20 (E)**: When the user runs `c3p drift`, the system shall print a per-file report showing path, status (modified/added/deleted), and source provenance for the current materialization.
+- **R21 (E)**: When the user runs `c3p use <name>` and drift is detected, the system shall hard-block until the user selects one of: **discard**, **persist**, **abort**.
 - **R22 (E)**: When the user selects **persist**, the system shall copy the entire current `.claude/` tree (including any added or deleted files relative to the resolved sources) into the active profile's directory, overwriting that profile's existing files. Component and extends-ancestor sources are not modified. Per-file write-back routing is deferred to v2.
 - **R22a (U)**: After persist, the active profile's `.claude/` content reflects the live state at the moment of persist. The user may afterward manually propagate changes from the active profile back to a component or parent profile if desired.
 - **R22b (U)**: Persist + materialize is a transactional pair. The system shall perform persist using the same pending/prior pattern as R16: write the new profile contents to `.claude-profiles/<active>/.pending/`, atomically rename `<active>/.claude/` to `<active>/.prior/`, atomically rename `.pending/` to `.claude/`. If the process is killed between persist completion and subsequent materialization, the next CLI invocation reconciles: persist's `.prior/` rolls back if `.state.json` was not yet updated; persist sticks if it was. The user is informed of any reconciliation taken.
@@ -68,24 +68,24 @@ Claude Code's behavior in a project is shaped by a tree of files: `.claude/` (co
 - **R25a (U)**: The pre-commit hook script content is fixed and minimal:
   ```sh
   #!/bin/sh
-  command -v claude-profiles >/dev/null 2>&1 || exit 0
-  claude-profiles drift --pre-commit-warn 2>&1
+  command -v c3p >/dev/null 2>&1 || exit 0
+  c3p drift --pre-commit-warn 2>&1
   exit 0
   ```
-  The hook is fail-open: missing or broken `claude-profiles` binary never blocks commits. Drift is reported but never exits non-zero from the hook path.
+  The hook is fail-open: missing or broken `c3p` binary never blocks commits. Drift is reported but never exits non-zero from the hook path.
 
 ### 3.5 Initialization & Migration
-- **R26 (E)**: When the user runs `claude-profiles init` in a project with no `.claude-profiles/` folder, the system shall create the folder and offer to seed a starter profile from the existing `.claude/` (if present).
+- **R26 (E)**: When the user runs `c3p init` in a project with no `.claude-profiles/` folder, the system shall create the folder and offer to seed a starter profile from the existing `.claude/` (if present).
 - **R27 (E)**: When seeding from existing `.claude/`, the system shall copy the contents into `.claude-profiles/<chosen-name>/.claude/` and write a minimal `profile.json`.
 - **R28 (U)**: After init, the system shall add `.claude/` and `.claude-profiles/.meta/` to `.gitignore` (creating the file if absent), and shall offer to install the pre-commit hook.
 
 ### 3.6 CLI Surface (Public Verbs)
 - **R29 (U)**: The system shall expose the following commands: `init`, `list`, `use <name>`, `status`, `drift`, `diff <a> [<b>]`, `new <name>`, `validate [<name>]`, `sync`, `hook install|uninstall`.
-- **R30 (E)**: When the user runs `claude-profiles list`, the system shall print all profiles with active marker, extends parent, includes list, and last-materialized timestamp.
-- **R31 (E)**: When the user runs `claude-profiles status`, the system shall print active profile, drift summary, and any unresolved warnings.
-- **R32 (E)**: When the user runs `claude-profiles diff <a> [<b>]`, the system shall show the file-level differences between the resolved file lists of `<a>` and `<b>` (or `<a>` and the active profile).
-- **R33 (E)**: When the user runs `claude-profiles validate`, the system shall verify all profiles and components: parse manifests, resolve graphs, detect conflicts, check external paths exist, and print a pass/fail report.
-- **R34 (E)**: When the user runs `claude-profiles sync`, the system shall re-materialize the active profile (after passing the drift gate) without changing which profile is active.
+- **R30 (E)**: When the user runs `c3p list`, the system shall print all profiles with active marker, extends parent, includes list, and last-materialized timestamp.
+- **R31 (E)**: When the user runs `c3p status`, the system shall print active profile, drift summary, and any unresolved warnings.
+- **R32 (E)**: When the user runs `c3p diff <a> [<b>]`, the system shall show the file-level differences between the resolved file lists of `<a>` and `<b>` (or `<a>` and the active profile).
+- **R33 (E)**: When the user runs `c3p validate`, the system shall verify all profiles and components: parse manifests, resolve graphs, detect conflicts, check external paths exist, and print a pass/fail report.
+- **R34 (E)**: When the user runs `c3p sync`, the system shall re-materialize the active profile (after passing the drift gate) without changing which profile is active.
 
 ### 3.7 Manifest Schema
 - **R35 (U)**: The system shall accept the following `profile.json` fields: `name` (string, optional, defaults to dir name), `description` (string, optional), `extends` (string, optional), `includes` (array of strings, optional), `tags` (array of strings, optional).
@@ -109,7 +109,7 @@ Claude Code's behavior in a project is shaped by a tree of files: `.claude/` (co
 ### 3.10 Section Ownership in Project-Root `CLAUDE.md`
 See §12 for the full design (marker syntax, parser regex, lifecycle, multi-profile composition, migration). The EARS requirements below pin the contractual surface that materialize, validate, and drift must honor.
 
-- **R44 (E)**: When the user runs `claude-profiles validate` against a project with an active profile, the system shall verify that project-root `CLAUDE.md` exists and contains both a well-formed `<!-- claude-profiles:vN:begin -->` opening marker and a matching `<!-- claude-profiles:vN:end -->` closing marker (same version `N`, same optional namespace tail). The system shall fail validation with a non-zero exit code and an actionable error message naming `claude-profiles init` as the remediation if the file is absent or either marker is missing or malformed.
+- **R44 (E)**: When the user runs `c3p validate` against a project with an active profile, the system shall verify that project-root `CLAUDE.md` exists and contains both a well-formed `<!-- c3p:vN:begin -->` opening marker and a matching `<!-- c3p:vN:end -->` closing marker (same version `N`, same optional namespace tail). The system shall fail validation with a non-zero exit code and an actionable error message naming `c3p init` as the remediation if the file is absent or either marker is missing or malformed.
 - **R45 (UN)**: Materialization of a profile that contributes a project-root `CLAUDE.md` body has two failure modes with distinct guarantees.
   - *Pre-flight failure (strict abort, atomic across destinations)*: If, at pre-flight time, the live project-root `CLAUDE.md` is absent or its markers are missing or malformed, the system shall abort the operation with a non-zero exit code, name the file and the missing/malformed marker, and shall not write any bytes to **either** destination — neither project-root `CLAUDE.md` nor `.claude/` is touched.
   - *Post-pre-flight splice failure (recoverable)*: If pre-flight succeeded and the `.claude/` swap completed, but the subsequent project-root `CLAUDE.md` section splice fails (IO error, full disk, etc.), the system shall report the error and surface a non-zero exit code. The inconsistency (`.claude/` updated, project-root `CLAUDE.md` not) is recoverable on the next `use` invocation, which retries the splice idempotently and reconciles state. The user remediation is simply to re-run `use`. This split is intentional: the pre-flight check is the cross-destination atomicity boundary; mid-write IO faults after the swap are rare and self-healing rather than requiring a multi-destination two-phase commit.
@@ -153,7 +153,7 @@ sequenceDiagram
     participant Materializer
     participant FS as Project FS
 
-    Dev->>CLI: claude-profiles use <name>
+    Dev->>CLI: c3p use <name>
     CLI->>Resolver: resolve(name)
     Resolver->>FS: read profile.json + extends + includes
     Resolver-->>CLI: ResolvedPlan { files, sources }
@@ -190,7 +190,7 @@ sequenceDiagram
 ```mermaid
 stateDiagram-v2
     [*] --> Uninitialized: project has no .claude-profiles/
-    Uninitialized --> Initialized: claude-profiles init
+    Uninitialized --> Initialized: c3p init
     Initialized --> NoActive: state.json absent
     NoActive --> Clean: use <name> succeeds
     Clean --> Drifted: user edits .claude/
@@ -205,7 +205,7 @@ stateDiagram-v2
 
 | ID | Scenario | EARS refs | Trigger | Expected outcome |
 |---|---|---|---|---|
-| S1 | First-time init in project with existing `.claude/` | R26, R27, R28 | `claude-profiles init` | Folder created, starter profile seeded, gitignore updated |
+| S1 | First-time init in project with existing `.claude/` | R26, R27, R28 | `c3p init` | Folder created, starter profile seeded, gitignore updated |
 | S2 | Clean swap (no drift) | R13, R14 | `use <name>` | `.claude/` replaced; `.state.json` updated |
 | S3 | Drift gate — discard | R21, R23 | `use <other>` after edits | Edits lost; new profile materialized |
 | S4 | Drift gate — persist | R21, R22, R22a | `use <other>` after edits | Whole live `.claude/` tree copied into active profile; then swap proceeds |
@@ -222,7 +222,7 @@ stateDiagram-v2
 | S15 | Stale lock recovery | R41b | `use` after a prior process crashed mid-write | Lock auto-released; operation proceeds |
 | S16 | Crash mid-materialization | R16, R16a | Process killed during step (b)/(c) | Next CLI invocation reconciles via `.prior/` rename-back |
 | S17 | Corrupted .state.json | R42 | `status` with malformed state file | Treated as `NoActive`; warning printed; no abort |
-| S18 | Pre-commit hook with missing binary | R25a | `git commit` after `claude-profiles` removed | Hook exits 0 silently; commit proceeds |
+| S18 | Pre-commit hook with missing binary | R25a | `git commit` after `c3p` removed | Hook exits 0 silently; commit proceeds |
 
 ## 6. Out of Scope (v1)
 
@@ -311,21 +311,21 @@ Claude Code reads instructions from both `<project>/CLAUDE.md` and `<project>/.c
 
 ### 12.2 Marker syntax
 
-A managed block is delimited by a versioned, namespaced pair of HTML comments. The recommended form, emitted by `claude-profiles init`, is:
+A managed block is delimited by a versioned, namespaced pair of HTML comments. The recommended form, emitted by `c3p init`, is:
 
 ```markdown
-<!-- claude-profiles:v1:begin -->
-<!-- Managed block. Do not edit between markers — changes are overwritten on next `claude-profiles use`. -->
+<!-- c3p:v1:begin -->
+<!-- Managed block. Do not edit between markers — changes are overwritten on next `c3p use`. -->
 
 ...managed content (resolved CLAUDE.md body, concatenated from contributors)...
 
-<!-- claude-profiles:v1:end -->
+<!-- c3p:v1:end -->
 ```
 
 Properties:
 - HTML comments are invisible in GitHub, VS Code, pandoc, and other common markdown renderers.
 - The version tag (`v1`) enables forward migration; the parser refuses to read or write blocks whose version it does not recognize.
-- The `claude-profiles:` namespace prevents collision with other tools that may also want to own a section.
+- The `c3p:` namespace prevents collision with other tools that may also want to own a section.
 - The self-documenting second line tells the next human what the block is and how to regenerate it.
 - No content hash is embedded in the markers. Drift detection lives in `.state.json` (R46), not in the marker line, to keep the markers stable across formatting-only changes the user might make to surrounding content.
 
@@ -334,12 +334,12 @@ Properties:
 The canonical parser regex used to locate the managed block is:
 
 ```
-<!-- claude-profiles:v(\d+):begin([^>]*)-->([\s\S]*?)<!-- claude-profiles:v\1:end\2-->
+<!-- c3p:v(\d+):begin([^>]*)-->([\s\S]*?)<!-- c3p:v\1:end\2-->
 ```
 
 Capture groups:
 1. Version number (must match between `:begin` and `:end`).
-2. Optional namespace tail (text between the version and `-->`; whitespace-only in the canonical form — a single space, since the canonical marker is `<!-- claude-profiles:v1:begin -->` — and reserved for future namespacing).
+2. Optional namespace tail (text between the version and `-->`; whitespace-only in the canonical form — a single space, since the canonical marker is `<!-- c3p:v1:begin -->` — and reserved for future namespacing).
 3. The managed body — the bytes the tool owns. `[\s\S]*?` is non-greedy so multiple managed blocks within a single file (a future possibility) do not collapse into one.
 
 A well-formed file contains exactly one match. Zero matches means the markers are missing (handled per R44/R45). More than one match is reserved and currently rejected; v1 implementations may treat it as malformed.
@@ -349,9 +349,9 @@ A well-formed file contains exactly one match. Zero matches means the markers ar
 | Phase | Behavior |
 |---|---|
 | `init` | Ensures project-root `CLAUDE.md` exists. If present without markers, appends the `:begin`/`:end` pair at end-of-file (preserving all prior content above). If absent, creates a new file containing only the marker pair (and the self-documenting comment). User content elsewhere in the file is never modified. |
-| `validate` | Per R44: when a profile is active, errors if root `CLAUDE.md` is missing, or if either marker is missing/malformed. Error message points at `claude-profiles init` as remediation. |
+| `validate` | Per R44: when a profile is active, errors if root `CLAUDE.md` is missing, or if either marker is missing/malformed. Error message points at `c3p init` as remediation. |
 | `use` (materialize) | Per R45: splices the resolved managed body between the markers via the same temp-file + atomic-rename pattern used elsewhere (R14a, R16). Bytes outside the markers are preserved byte-for-byte. Two failure modes: (i) **pre-flight failure** — if markers are absent or malformed at pre-flight time, the operation aborts strictly and writes no bytes to either project-root `CLAUDE.md` or `.claude/` (atomic across destinations); (ii) **mid-write splice failure** — if the splice fails after the `.claude/` swap completes (rare; IO fault, full disk), the operation reports the error with a non-zero exit code; the resulting inconsistency is recoverable by re-running `use`, which retries the splice idempotently. |
-| `drift detect` | Per R46: fingerprints only the bytes between the markers. User edits above/below the markers do not register as drift and do not surface in `claude-profiles drift` output. |
+| `drift detect` | Per R46: fingerprints only the bytes between the markers. User edits above/below the markers do not register as drift and do not surface in `c3p drift` output. |
 | `persist` | When the user selects **persist** at the drift gate (R22) and drift exists in the section, the system writes the live section bytes back to `.claude-profiles/<active>/CLAUDE.md` (peer of `profile.json`, not under `.claude/`). The pre-existing `.claude/CLAUDE.md` write-back path is unaffected. |
 
 ### 12.5 Multi-profile composition
@@ -366,7 +366,8 @@ Backward compatibility is preserved:
 
 - Profiles that contain only `.claude/CLAUDE.md` (the v1 layout) continue to materialize unchanged. Project-root `CLAUDE.md` is touched **only** if at least one contributor in the resolution graph supplies a profile-root `CLAUDE.md` source.
 - Existing `.state.json` files without entries for `projectRoot`-destination files remain valid. The first `use` operation that materializes a profile-root `CLAUDE.md` adds the appropriate entries.
-- `claude-profiles init` is idempotent with respect to markers: running it on a project whose root `CLAUDE.md` already contains a well-formed marker pair is a no-op for that file.
+- `c3p init` is idempotent with respect to markers: running it on a project whose root `CLAUDE.md` already contains a well-formed marker pair is a no-op for that file.
+- **0.3.0 namespace rename**: managed-block markers are now `<!-- c3p:v1:begin -->` / `<!-- c3p:v1:end -->`. The marker reader does **not** auto-migrate legacy `<!-- claude-profiles:v1:… -->` markers — see the CHANGELOG 0.3.0 entry for the manual upgrade steps.
 
 If a `use` operation reports a splice failure for project-root `CLAUDE.md` (R45 mid-write failure mode — typically an IO fault after the `.claude/` swap committed), the user remediation is to simply re-run the same `use` command. The `.claude/` tree is already at the new profile, the markers are still well-formed, and the splice is idempotent: the retry re-applies the section bytes and reconciles state without any other action required.
 
@@ -376,7 +377,7 @@ If a `use` operation reports a splice failure for project-root `CLAUDE.md` (R45 
 my-project/
 ├── CLAUDE.md                        # user-authored, untouched by v1
 ├── .claude/
-│   └── CLAUDE.md                    # materialized by claude-profiles
+│   └── CLAUDE.md                    # materialized by c3p
 └── .claude-profiles/
     └── dev/
         ├── profile.json

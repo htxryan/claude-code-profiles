@@ -6,13 +6,13 @@
  *
  * Spec §12.3 canonical regex:
  *
- *     <!-- claude-profiles:v(\d+):begin([^>]*)-->([\s\S]*?)<!-- claude-profiles:v\1:end\2-->
+ *     <!-- c3p:v(\d+):begin([^>]*)-->([\s\S]*?)<!-- c3p:v\1:end\2-->
  *
  * Capture groups:
  *   1. Version number (must match between :begin and :end via backref).
  *   2. Optional namespace tail (text between version and `-->`; whitespace-
  *      only in the canonical form — a single space, since the canonical
- *      marker is `<!-- claude-profiles:v1:begin -->`; reserved for future
+ *      marker is `<!-- c3p:v1:begin -->`; reserved for future
  *      namespacing).
  *   3. The managed body — bytes the tool owns. Non-greedy so multiple managed
  *      blocks in a single file (a future possibility) do not collapse into
@@ -38,7 +38,7 @@
  * module exists to prevent.
  */
 export const MARKER_REGEX =
-  /<!-- claude-profiles:v(\d+):begin([^>]*)-->([\s\S]*?)<!-- claude-profiles:v\1:end\2-->/;
+  /<!-- c3p:v(\d+):begin([^>]*)-->([\s\S]*?)<!-- c3p:v\1:end\2-->/;
 
 /**
  * Successful parse: the file contained exactly one well-formed marker pair.
@@ -91,7 +91,7 @@ export type ParseResult = ParseFound | ParseFailed;
  * parses identically to the LF form. The `before`/`section`/`after` slices
  * are returned with their on-disk bytes intact (CRLF preserved as CRLF, LF
  * as LF). The lone-marker malformed-check below also works on CRLF because
- * its regex anchors only on `<!-- claude-profiles:v\d+:(begin|end)`.
+ * its regex anchors only on `<!-- c3p:v\d+:(begin|end)`.
  *
  * Round-trip caveat: {@link renderManagedBlock} emits LF only. A user whose
  * pre-existing CLAUDE.md is CRLF will end up with LF *inside* the managed
@@ -111,7 +111,7 @@ export function parseMarkers(content: string): ParseResult {
     // user (or a buggy tool) wrote a partial block — we should not silently
     // treat that as "absent" because re-running init would happily append a
     // second block, producing a malformed multi-block file.
-    if (/<!-- claude-profiles:v\d+:(begin|end)/.test(content)) {
+    if (/<!-- c3p:v\d+:(begin|end)/.test(content)) {
       return { found: false, reason: "malformed" };
     }
     return { found: false, reason: "absent" };
@@ -160,10 +160,10 @@ export function parseMarkers(content: string): ParseResult {
  * checks this round-trip).
  */
 export function renderManagedBlock(sectionBytes: string, version = 1): string {
-  const begin = `<!-- claude-profiles:v${version}:begin -->`;
-  const end = `<!-- claude-profiles:v${version}:end -->`;
+  const begin = `<!-- c3p:v${version}:begin -->`;
+  const end = `<!-- c3p:v${version}:end -->`;
   const selfDoc =
-    "<!-- Managed block. Do not edit between markers — changes are overwritten on next `claude-profiles use`. -->";
+    "<!-- Managed block. Do not edit between markers — changes are overwritten on next `c3p use`. -->";
   // Always emit a leading + trailing newline around the body so the markers
   // sit on their own lines regardless of whether sectionBytes is empty,
   // newline-prefixed, etc.
@@ -219,7 +219,7 @@ export function extractSectionBody(section: string): string {
 
 /**
  * Thrown by {@link injectMarkersIntoFile} when the input file already
- * contains a malformed claude-profiles block (lone `:begin`, lone `:end`,
+ * contains a malformed c3p block (lone `:begin`, lone `:end`,
  * version mismatch, or multiple blocks). Init refuses to append a second
  * fresh block on top of the broken bytes — that would leave the file
  * STILL malformed (now with two block fragments) and trip subsequent
@@ -264,7 +264,7 @@ export function injectMarkersIntoFile(content: string): string {
   }
   if (parsed.reason === "malformed") {
     throw new MalformedMarkersError(
-      "CLAUDE.md contains a malformed claude-profiles marker block (lone `:begin`, lone `:end`, version mismatch, or multiple blocks). Refusing to append a second block on top of broken markers — please delete the partial marker text manually and re-run `claude-profiles init`.",
+      "CLAUDE.md contains a malformed c3p marker block (lone `:begin`, lone `:end`, version mismatch, or multiple blocks). Refusing to append a second block on top of broken markers — please delete the partial marker text manually and re-run `c3p init`.",
     );
   }
   // Append a fresh empty managed block. Preserve the exact trailing-newline

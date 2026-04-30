@@ -97,7 +97,7 @@ describePosix("SIGINT releases lock (AC-15)", () => {
 
   // yd8 / AC-4: when a peer holds the lock, the CLI must surface a single
   // actionable message naming PID, age, and a literal --wait remediation.
-  // We spawn the lock-holder, then run `claude-profiles use` against the
+  // We spawn the lock-holder, then run `c3p use` against the
   // same project to assert exit 3 + the enriched stderr message.
   it("yd8 AC-4: lock-held UX names PID, age, and the --wait remediation", async () => {
     await ensureBuilt();

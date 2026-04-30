@@ -47,7 +47,7 @@ describe("exitCodeFor — exit-code matrix", () => {
 
   it("MissingProfileError split: CLI typo → 1, structural extends-miss → 3", () => {
     // No referencedBy → user typed a name on the CLI that doesn't exist
-    // (e.g. `claude-profiles use ghst` instead of `ghost`). Fixable by
+    // (e.g. `c3p use ghst` instead of `ghost`). Fixable by
     // editing the invocation, so exit 1.
     expect(exitCodeFor(new MissingProfileError("ghst"))).toBe(EXIT_USER_ERROR);
     // referencedBy set → some manifest's extends chain points at a profile

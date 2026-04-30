@@ -9,7 +9,7 @@
  *   - Exit code 1 (user error class — see src/cli/exit.ts:exitCodeFor;
  *     MaterializeError → EXIT_USER_ERROR with the "run init" remediation).
  *   - The error message names the file path AND references
- *     `claude-profiles init` so the user has actionable wording.
+ *     `c3p init` so the user has actionable wording.
  *   - Both destinations are byte-identical to their pre-state on abort:
  *     project-root CLAUDE.md AND `.claude/` (R45
  *     atomic-across-destinations).
@@ -97,7 +97,7 @@ describe("R45 pre-flight — strict abort with malformed root CLAUDE.md (cw6/T4)
     // Exit code: MaterializeError → EXIT_USER_ERROR (1) per exit.ts.
     expect(r.exitCode).toBe(1);
     // Actionable wording.
-    expect(r.stderr).toContain("claude-profiles init");
+    expect(r.stderr).toContain("c3p init");
     expect(r.stderr).toContain("CLAUDE.md");
 
     // Both destinations untouched (R45 atomic-across-destinations).
@@ -128,14 +128,14 @@ describe("R45 pre-flight — strict abort with malformed root CLAUDE.md (cw6/T4)
     const rootClaudeMd = path.join(fx.projectRoot, "CLAUDE.md");
 
     // Plain CLAUDE.md without markers — user has not run `init`.
-    const original = "# Project README\n\nNo claude-profiles markers here yet.\n";
+    const original = "# Project README\n\nNo c3p markers here yet.\n";
     await fs.writeFile(rootClaudeMd, original);
 
     const preClaude = await readTree(claudeDir);
 
     const r = await runCli({ args: ["--cwd", fx.projectRoot, "use", "b"] });
     expect(r.exitCode).toBe(1);
-    expect(r.stderr).toContain("claude-profiles init");
+    expect(r.stderr).toContain("c3p init");
 
     // R45: BOTH destinations byte-identical.
     expect(await readTree(claudeDir)).toEqual(preClaude);
@@ -149,7 +149,7 @@ describe("R45 pre-flight — strict abort with malformed root CLAUDE.md (cw6/T4)
     const claudeDir = path.join(fx.projectRoot, ".claude");
 
     // Lone :begin with no :end. parseMarkers reports "not found" → R45 abort.
-    const broken = "intro\n<!-- claude-profiles:v1:begin -->\nstuff but no end\n";
+    const broken = "intro\n<!-- c3p:v1:begin -->\nstuff but no end\n";
     await fs.writeFile(rootClaudeMd, broken);
 
     const preClaude = await readTree(claudeDir);
@@ -167,7 +167,7 @@ describe("R45 pre-flight — strict abort with malformed root CLAUDE.md (cw6/T4)
     // .pending/.prior/.tmp cleanup needed.
     //
     // Note: in this fixture .claude-profiles/ is already populated, so
-    // `claude-profiles init` would refuse ("already initialised"). The
+    // `c3p init` would refuse ("already initialised"). The
     // user's real remediation is to add the marker pair themselves (the
     // error message documents the exact bytes). Here we do that to prove
     // the abort left no other obstacle to recovery.
@@ -187,7 +187,7 @@ describe("R45 pre-flight — strict abort with malformed root CLAUDE.md (cw6/T4)
     // the recovery the error message asks the user to perform.
     await fs.writeFile(
       rootClaudeMd,
-      "# Pre-existing notes.\n\n<!-- claude-profiles:v1:begin -->\n<!-- Managed block. -->\n\n<!-- claude-profiles:v1:end -->\n",
+      "# Pre-existing notes.\n\n<!-- c3p:v1:begin -->\n<!-- Managed block. -->\n\n<!-- c3p:v1:end -->\n",
     );
 
     // Now `use b` lands the splice cleanly.
@@ -215,9 +215,9 @@ describe("R45 pre-flight — strict abort with malformed root CLAUDE.md (cw6/T4)
 
     const dual =
       "intro\n" +
-      "<!-- claude-profiles:v1:begin -->\nblock 1\n<!-- claude-profiles:v1:end -->\n" +
+      "<!-- c3p:v1:begin -->\nblock 1\n<!-- c3p:v1:end -->\n" +
       "between\n" +
-      "<!-- claude-profiles:v1:begin -->\nblock 2\n<!-- claude-profiles:v1:end -->\n" +
+      "<!-- c3p:v1:begin -->\nblock 2\n<!-- c3p:v1:end -->\n" +
       "tail\n";
     await fs.writeFile(rootClaudeMd, dual);
 

@@ -45,7 +45,7 @@ export async function dispatch(
   switch (command.kind) {
     case "version":
       // print() is silenced under --json (per the OutputChannel contract). For
-      // consumers running `claude-profiles --version --json` we still emit a
+      // consumers running `c3p --version --json` we still emit a
       // structured payload so the output is non-empty and machine-parseable.
       if (ctx.output.jsonMode) ctx.output.json({ version: ctx.version });
       else ctx.output.print(versionString(ctx.version));

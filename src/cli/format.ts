@@ -163,7 +163,7 @@ export function formatError(err: unknown): string {
     // Subclass-specific fields are already baked into the message by the
     // PipelineError ctors (e.g. ConflictError mentions both contributors).
     // We just need a stable prefix.
-    return `claude-profiles: ${err.message}`;
+    return `c3p: ${err.message}`;
   }
-  return `claude-profiles: ${String(err)}`;
+  return `c3p: ${String(err)}`;
 }

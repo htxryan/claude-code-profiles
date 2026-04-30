@@ -8,10 +8,10 @@
  * so format drift is caught in CI (claude-code-profiles-xd2).
  */
 
-const TOP = `claude-profiles — swappable .claude/ configurations
+const TOP = `c3p — swappable .claude/ configurations
 
 USAGE
-  claude-profiles <command> [args] [options]
+  c3p <command> [args] [options]
 
 COMMANDS
   init                     bootstrap .claude-profiles/ in this project
@@ -34,7 +34,7 @@ GLOBAL OPTIONS
   --on-drift=<choice>      discard|persist|abort — required for non-TTY swap with drift
   --wait[=<seconds>]       poll a held lock instead of failing fast (default 30s)
   --no-color               disable colour output (additive with NO_COLOR env)
-  --help, -h               this message; "claude-profiles <verb> --help" for verb-specific help
+  --help, -h               this message; "c3p <verb> --help" for verb-specific help
   --version, -V            print version
 
 GLOSSARY
@@ -56,14 +56,14 @@ See README.md for full documentation.
 
 interface VerbHelp {
   tagline: string;
-  /** Synopsis line (without the leading "claude-profiles "). */
+  /** Synopsis line (without the leading "c3p "). */
   synopsis: string;
   description: string;
   /** Verb-local options (one per line, "--name=<val>  description"). */
   options: string[];
   /** Global options visible in this verb's help (subset of top-level globals). */
   globals: string[];
-  /** Examples ("  claude-profiles ...  # purpose"). */
+  /** Examples ("  c3p ...  # purpose"). */
   examples: string[];
   /** Exit codes a successful run of this verb may produce. */
   exitCodes: string[];
@@ -87,7 +87,7 @@ const VERBS: Record<string, VerbHelp> = {
     description:
       "Creates .claude-profiles/, optionally seeds a starter profile from an\n" +
       "existing .claude/ tree, updates .gitignore, and installs the pre-commit\n" +
-      "hook. Also injects claude-profiles markers into project-root CLAUDE.md\n" +
+      "hook. Also injects c3p markers into project-root CLAUDE.md\n" +
       "(preserves existing content) so profiles can manage a section of it.\n" +
       "Refuses to overwrite an already-initialised .claude-profiles/.",
     options: [
@@ -97,9 +97,9 @@ const VERBS: Record<string, VerbHelp> = {
     ],
     globals: COMMON_GLOBALS,
     examples: [
-      "claude-profiles init                    # bootstrap with defaults",
-      "claude-profiles init --no-hook          # skip pre-commit hook (CI / non-git)",
-      "claude-profiles init --starter=dev      # name the starter profile \"dev\"",
+      "c3p init                    # bootstrap with defaults",
+      "c3p init --no-hook          # skip pre-commit hook (CI / non-git)",
+      "c3p init --starter=dev      # name the starter profile \"dev\"",
     ],
     exitCodes: [
       "0  success",
@@ -118,8 +118,8 @@ const VERBS: Record<string, VerbHelp> = {
     options: [],
     globals: COMMON_GLOBALS,
     examples: [
-      "claude-profiles list",
-      "claude-profiles list --json | jq '.profiles[].name'",
+      "c3p list",
+      "c3p list --json | jq '.profiles[].name'",
     ],
     exitCodes: ["0  success", "2  IO fault reading .claude-profiles/"],
   },
@@ -132,12 +132,12 @@ const VERBS: Record<string, VerbHelp> = {
       "warnings carried over from the last swap, AND a stale-source signal\n" +
       "when the active profile's source files have changed since the last\n" +
       "materialize (a teammate's `git pull` brings in new bytes that .claude/\n" +
-      "hasn't picked up yet — run `claude-profiles sync` to apply them).",
+      "hasn't picked up yet — run `c3p sync` to apply them).",
     options: [],
     globals: COMMON_GLOBALS,
     examples: [
-      "claude-profiles status",
-      "claude-profiles status --json",
+      "c3p status",
+      "c3p status --json",
     ],
     exitCodes: ["0  success", "2  IO fault"],
   },
@@ -156,10 +156,10 @@ const VERBS: Record<string, VerbHelp> = {
     ],
     globals: COMMON_GLOBALS,
     examples: [
-      "claude-profiles drift",
-      "claude-profiles drift --json",
-      "claude-profiles drift --preview            # show what changed inside each drifted file",
-      "claude-profiles drift --pre-commit-warn   # used by the git hook; never blocks",
+      "c3p drift",
+      "c3p drift --json",
+      "c3p drift --preview            # show what changed inside each drifted file",
+      "c3p drift --pre-commit-warn   # used by the git hook; never blocks",
     ],
     exitCodes: ["0  success (drift present or absent)", "2  IO fault"],
   },
@@ -175,9 +175,9 @@ const VERBS: Record<string, VerbHelp> = {
     ],
     globals: COMMON_GLOBALS,
     examples: [
-      "claude-profiles diff dev ci          # compare two profiles",
-      "claude-profiles diff dev             # compare dev to the active profile",
-      "claude-profiles diff dev ci --preview # also show what changed inside each file",
+      "c3p diff dev ci          # compare two profiles",
+      "c3p diff dev             # compare dev to the active profile",
+      "c3p diff dev ci --preview # also show what changed inside each file",
     ],
     exitCodes: [
       "0  success",
@@ -197,9 +197,9 @@ const VERBS: Record<string, VerbHelp> = {
     ],
     globals: COMMON_GLOBALS,
     examples: [
-      "claude-profiles new dev",
-      "claude-profiles new dev --description=\"local dev with verbose agents\"",
-      "claude-profiles new ci --json",
+      "c3p new dev",
+      "c3p new dev --description=\"local dev with verbose agents\"",
+      "c3p new ci --json",
     ],
     exitCodes: [
       "0  success",
@@ -220,10 +220,10 @@ const VERBS: Record<string, VerbHelp> = {
     options: [],
     globals: SWAP_GLOBALS,
     examples: [
-      "claude-profiles use dev                       # interactive (prompts on drift)",
-      "claude-profiles use ci --on-drift=discard     # CI: drop drifted edits",
-      "claude-profiles use dev --on-drift=persist    # write drift back to active first",
-      "claude-profiles use dev --json --on-drift=abort",
+      "c3p use dev                       # interactive (prompts on drift)",
+      "c3p use ci --on-drift=discard     # CI: drop drifted edits",
+      "c3p use dev --on-drift=persist    # write drift back to active first",
+      "c3p use dev --json --on-drift=abort",
     ],
     exitCodes: [
       "0  success",
@@ -239,20 +239,20 @@ const VERBS: Record<string, VerbHelp> = {
       "Walks the resolver and merger without writing anything. With no name,\n" +
       "validates every profile in the project and reports pass/fail per profile.\n" +
       "When a profile is active, also checks that project-root CLAUDE.md has the\n" +
-      "claude-profiles markers (run `init` to add them).",
+      "c3p markers (run `init` to add them).",
     options: [
       "--brief            collapse FAIL rows to one line each (CI-friendly)",
     ],
     globals: COMMON_GLOBALS,
     examples: [
-      "claude-profiles validate              # validate all profiles (full error per FAIL)",
-      "claude-profiles validate dev          # validate just dev",
-      "claude-profiles validate --brief      # one-line FAIL rows (CI scripts)",
-      "claude-profiles validate --json",
+      "c3p validate              # validate all profiles (full error per FAIL)",
+      "c3p validate dev          # validate just dev",
+      "c3p validate --brief      # one-line FAIL rows (CI scripts)",
+      "c3p validate --json",
     ],
     exitCodes: [
       "0  all profiles validated cleanly",
-      "1  unparseable profile.json (invalid manifest); project-root CLAUDE.md is missing claude-profiles markers (run `claude-profiles init`)",
+      "1  unparseable profile.json (invalid manifest); project-root CLAUDE.md is missing c3p markers (run `c3p init`)",
       "3  any profile failed (cycle, missing include, missing extends parent, conflict)",
     ],
   },
@@ -266,8 +266,8 @@ const VERBS: Record<string, VerbHelp> = {
     options: [],
     globals: SWAP_GLOBALS,
     examples: [
-      "claude-profiles sync",
-      "claude-profiles sync --on-drift=discard",
+      "c3p sync",
+      "c3p sync --on-drift=discard",
     ],
     exitCodes: [
       "0  success",
@@ -286,13 +286,13 @@ const VERBS: Record<string, VerbHelp> = {
       "(R23a), external-path reachability (R37a), and managed-block markers\n" +
       "in project-root CLAUDE.md (R44/R45). Read-only — never writes.\n" +
       "Returns 0 when every check passes and 1 on any actionable warning so\n" +
-      "CI scripts can `claude-profiles doctor || exit 0` for soft checks.",
+      "CI scripts can `c3p doctor || exit 0` for soft checks.",
     options: [],
     globals: COMMON_GLOBALS,
     examples: [
-      "claude-profiles doctor                # human-readable status table",
-      "claude-profiles doctor --json         # machine-readable summary for CI",
-      "claude-profiles doctor || echo \"check failed\"  # gate a script on health",
+      "c3p doctor                # human-readable status table",
+      "c3p doctor --json         # machine-readable summary for CI",
+      "c3p doctor || echo \"check failed\"  # gate a script on health",
     ],
     exitCodes: [
       "0  all checks passed",
@@ -312,9 +312,9 @@ const VERBS: Record<string, VerbHelp> = {
     options: [],
     globals: COMMON_GLOBALS,
     examples: [
-      "claude-profiles completions zsh > ~/.zfunc/_claude-profiles",
-      "eval \"$(claude-profiles completions bash)\"",
-      "claude-profiles completions fish > ~/.config/fish/completions/claude-profiles.fish",
+      "c3p completions zsh > ~/.zfunc/_c3p",
+      "eval \"$(c3p completions bash)\"",
+      "c3p completions fish > ~/.config/fish/completions/c3p.fish",
     ],
     exitCodes: [
       "0  success",
@@ -326,7 +326,7 @@ const VERBS: Record<string, VerbHelp> = {
     synopsis: "hook install|uninstall [options]",
     description:
       "The hook script content is fixed and minimal (R25a) and fail-open: a\n" +
-      "missing or broken claude-profiles binary never blocks commits.\n" +
+      "missing or broken c3p binary never blocks commits.\n" +
       "\n" +
       "install:    writes .git/hooks/pre-commit (preserves existing hook unless --force)\n" +
       "uninstall:  removes the hook only if its content matches the canonical\n" +
@@ -336,10 +336,10 @@ const VERBS: Record<string, VerbHelp> = {
     ],
     globals: COMMON_GLOBALS,
     examples: [
-      "claude-profiles hook install",
-      "claude-profiles hook install --force",
-      "claude-profiles hook uninstall",
-      "claude-profiles hook install --json",
+      "c3p hook install",
+      "c3p hook install --force",
+      "c3p hook uninstall",
+      "c3p hook install --json",
     ],
     exitCodes: [
       "0  success (or no-op if hook is already in the desired state)",
@@ -351,8 +351,8 @@ const VERBS: Record<string, VerbHelp> = {
 
 function renderVerb(verb: string, h: VerbHelp): string {
   const sections: string[] = [];
-  sections.push(`claude-profiles ${verb} — ${h.tagline}`);
-  sections.push(`USAGE\n  claude-profiles ${h.synopsis}`);
+  sections.push(`c3p ${verb} — ${h.tagline}`);
+  sections.push(`USAGE\n  c3p ${h.synopsis}`);
   sections.push(`DESCRIPTION\n  ${h.description.replace(/\n/g, "\n  ")}`);
   if (h.options.length > 0) {
     sections.push(`OPTIONS\n  ${h.options.join("\n  ")}`);
@@ -376,11 +376,11 @@ export function topLevelHelp(): string {
 export function verbHelp(verb: string): string {
   const h = VERBS[verb];
   if (h === undefined) {
-    return `claude-profiles: no specific help for "${verb}"\n\n${TOP.trimEnd()}`;
+    return `c3p: no specific help for "${verb}"\n\n${TOP.trimEnd()}`;
   }
   return renderVerb(verb, h);
 }
 
 export function versionString(version: string): string {
-  return `claude-profiles ${version}`;
+  return `c3p ${version}`;
 }
