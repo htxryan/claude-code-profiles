@@ -24,6 +24,7 @@ import * as path from "node:path";
 // surfaces internals like `_events` but loses prototype methods.
 import process from "node:process";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { realpathSync } from "node:fs";
 
 import { dispatch } from "./dispatch.js";
 import { exitCodeFor } from "./exit.js";
@@ -100,11 +101,24 @@ export async function main(argv: ReadonlyArray<string>): Promise<number> {
 // drop the basename `endsWith("bin.js")` fallback — that fallback used to
 // fire on any importer file ending in `bin.js`/`bin.ts`, which would auto-
 // run main() inside an embedder named e.g. `mybin.js`.
+//
+// realpathSync canonicalises the argv path so symlinked installs (npm's
+// node_modules/.bin shims, Homebrew prefixes, macOS `/var → /private/var`
+// in tmp dirs) compare equal. import.meta.url is already the canonical
+// real-path file URL, so the two only match after realpath resolution.
+// Falls back to the un-canonicalised path if the file is unreadable —
+// that's the embedder/test case where argv1 is something we don't own.
 const isDirect = (() => {
   const argv1 = process.argv[1];
   if (typeof argv1 !== "string" || argv1 === "") return false;
   try {
-    return import.meta.url === pathToFileURL(argv1).href;
+    let resolved: string;
+    try {
+      resolved = realpathSync(argv1);
+    } catch {
+      resolved = argv1;
+    }
+    return import.meta.url === pathToFileURL(resolved).href;
   } catch {
     return false;
   }

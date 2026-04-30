@@ -1,6 +1,11 @@
+import { spawn } from "node:child_process";
+import { promises as fs } from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+
 import { describe, expect, it } from "vitest";
 
-import { ensureBuilt, runCli } from "./spawn.js";
+import { BIN_PATH, ensureBuilt, runCli } from "./spawn.js";
 
 describe("--help / --version (AC-20)", () => {
   it("--version prints package version + exits 0", async () => {
@@ -8,6 +13,34 @@ describe("--help / --version (AC-20)", () => {
     const r = await runCli({ args: ["--version"] });
     expect(r.exitCode).toBe(0);
     expect(r.stdout).toMatch(/claude-profiles \d+\.\d+\.\d+/);
+  });
+
+  // Regression: isDirect must canonicalise argv[1] before comparing it to
+  // import.meta.url. Without realpathSync, a symlinked bin path (npm's
+  // node_modules/.bin shim, macOS /var→/private/var, Homebrew prefixes,
+  // /usr/local/bin → /opt/homebrew/...) compares unequal so main() never
+  // runs and the binary silently exits 0 with no output. Found via
+  // post-publish install validation of 0.2.3.
+  it("--version works when invoked through a symlink (real npm install path)", async () => {
+    await ensureBuilt();
+    const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "ccp-symlink-bin-"));
+    try {
+      const linked = path.join(tmp, "claude-profiles");
+      await fs.symlink(BIN_PATH, linked);
+      const r = await new Promise<{ stdout: string; stderr: string; code: number }>((resolve, reject) => {
+        const child = spawn(process.execPath, [linked, "--version"], { stdio: ["ignore", "pipe", "pipe"] });
+        let stdout = "";
+        let stderr = "";
+        child.stdout.on("data", (d) => (stdout += d.toString()));
+        child.stderr.on("data", (d) => (stderr += d.toString()));
+        child.on("close", (code) => resolve({ stdout, stderr, code: code ?? -1 }));
+        child.on("error", reject);
+      });
+      expect(r.code, `stderr: ${r.stderr}`).toBe(0);
+      expect(r.stdout).toMatch(/claude-profiles \d+\.\d+\.\d+/);
+    } finally {
+      await fs.rm(tmp, { recursive: true, force: true });
+    }
   });
 
   it("-V short form also works", async () => {
