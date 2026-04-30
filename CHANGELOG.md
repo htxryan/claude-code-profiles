@@ -5,6 +5,17 @@
 
 ### ⚠ BREAKING CHANGES
 
+* CLI binary `claude-profiles` is renamed to `c3p`. The old binary is no longer installed. Existing pre-commit hooks, gitignore sections, and CLAUDE.md markers in user repos are not auto-recognized.
+
+### Features
+
+* rename CLI bin from claude-profiles to c3p ([#10](https://github.com/htxryan/claude-code-config-profiles/issues/10)) ([c163d08](https://github.com/htxryan/claude-code-config-profiles/commit/c163d08748c4251416f6132b988846a77b453441))
+
+## [0.3.0](https://github.com/htxryan/claude-code-config-profiles/compare/v0.2.4...v0.3.0) (2026-04-30)
+
+
+### ⚠ BREAKING CHANGES
+
 * **cli:** the CLI binary is renamed from `claude-profiles` to `c3p`. The npm package name (`claude-code-config-profiles`) and the on-disk profile-store directory (`.claude-profiles/`) are unchanged. Five user-visible surfaces rename together — there is no automatic migration:
   1. **npm bin entry** — `package.json` `bin` is now `{ "c3p": "dist/cli/bin.js" }`. The legacy `claude-profiles` bin key is removed.
   2. **In-CLI text** — help, errors, and progress hints all hardcode `c3p`.
