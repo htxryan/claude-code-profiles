@@ -8,7 +8,7 @@
  * so format drift is caught in CI (claude-code-profiles-xd2).
  */
 
-const TOP = `c3p — swappable .claude/ configurations
+const TOP = `c3p — swappable .claude/ configurations, with proper protocol observed
 
 USAGE
   c3p <command> [args] [options]
@@ -82,7 +82,7 @@ const SWAP_GLOBALS = [
 
 const VERBS: Record<string, VerbHelp> = {
   init: {
-    tagline: "bootstrap .claude-profiles/ in this project",
+    tagline: "bootstrap .claude-profiles/ in this project; shall I prepare the way?",
     synopsis: "init [options]",
     description:
       "Creates .claude-profiles/, optionally seeds a starter profile from an\n" +
@@ -208,7 +208,7 @@ const VERBS: Record<string, VerbHelp> = {
     ],
   },
   use: {
-    tagline: "switch to profile <name>; runs the drift gate",
+    tagline: "switch to profile <name>; do mind the drift gate, if I may",
     synopsis: "use <name> [options]",
     description:
       "Materializes <name> into .claude/. If <name> (or any contributor) has a\n" +
@@ -277,7 +277,7 @@ const VERBS: Record<string, VerbHelp> = {
     ],
   },
   doctor: {
-    tagline: "read-only health check across state, lock, gitignore, hook, markers",
+    tagline: "read-only health check across state, lock, gitignore, hook, markers — \"Oh dear.\" early, rather than later",
     synopsis: "doctor [options]",
     description:
       "Runs the same checks as `validate` plus environment diagnostics:\n" +

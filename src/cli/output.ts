@@ -4,7 +4,7 @@
  *   - JSON payloads always go to stdout, errors always to stderr
  *   - Tests can inject a buffer-backed channel for snapshot assertions
  *
- * Writers MUST go through this module — no `process.stdout.write` calls
+ * Writers shall go through this module — no `process.stdout.write` calls
  * outside src/cli/ are allowed (the bin entry is the only exception).
  */
 

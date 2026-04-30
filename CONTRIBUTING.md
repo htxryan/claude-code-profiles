@@ -1,7 +1,8 @@
 # Contributing
 
 Thanks for your interest. This is a small, focused tool — keep PRs small and
-focused too.
+focused too. A brief note on protocol: one change per PR, please, and do mind
+the conventional-commit prefix on the title — reviewers shall thank you.
 
 ## Repo layout
 

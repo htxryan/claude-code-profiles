@@ -8,8 +8,8 @@ C3P lets you maintain multiple named `.claude/` configurations in a project —
 for example a `dev` profile with verbose agents and looser permissions, and a
 `ci` profile with terse output and locked-down permissions — and switch between
 them atomically. Profiles compose via single-parent `extends` and additive
-`includes` (composable components), and a **drift gate** ensures uncommitted
-edits to the active `.claude/` are never lost when switching.
+`includes` (composable components), and a **drift gate** ensures, if I may, that
+uncommitted edits to the active `.claude/` are never lost when switching.
 
 > **Status**: alpha. The CLI surface is stable. Pre-1.0 means the on-disk layout
 > may still change in minor versions.

@@ -459,9 +459,9 @@ function emitOutput(
   // Next steps footer — small nudge so the user has somewhere to go after a
   // bare `init`. Suggested verbs cover the 90% first-run path.
   output.print("");
-  output.print(`Next:`);
+  output.print(`Onwards, if I may:`);
   output.print(
-    `  ${style.dim("c3p new <name>")}     scaffold a profile`,
+    `  ${style.dim("c3p new <name>")}     shall scaffold a profile`,
   );
   output.print(
     `  ${style.dim("c3p list")}           see profiles`,

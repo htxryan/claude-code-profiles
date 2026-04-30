@@ -153,7 +153,7 @@ export async function runStatus(opts: StatusOptions): Promise<number> {
     // pulling in" — both kinds of staleness are visible at a glance.
     if (freshness.fresh === false) {
       opts.output.print(
-        style.warn(`source: updated since last materialize — run \`c3p sync\``),
+        style.warn(`source: updated since last materialize — perhaps run \`c3p sync\``),
       );
     } else if (freshness.error !== undefined) {
       // Resolve failed (e.g. missing include); surface so the user knows

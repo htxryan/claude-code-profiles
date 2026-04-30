@@ -134,7 +134,7 @@ export function meaningfulStateWarning(
 export function formatStateWarning(w: StateReadWarning): string {
   switch (w.code) {
     case "Missing":
-      return `state file missing at ${w.path} (fresh project)`;
+      return `state file missing at ${w.path} (fresh project — nothing to fret over)`;
     case "ParseError":
       return `state file at ${w.path} is unparseable: ${w.detail}`;
     case "SchemaMismatch":
