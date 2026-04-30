@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.4](https://github.com/htxryan/claude-code-config-profiles/compare/v0.2.3...v0.2.4) (2026-04-30)
+
+
+### Bug Fixes
+
+* **cli:** canonicalise argv[1] before isDirect comparison ([2f863c4](https://github.com/htxryan/claude-code-config-profiles/commit/2f863c47a17967d7a7381b965a561bc889ba2edc))
+
 ## [0.2.3](https://github.com/htxryan/claude-code-config-profiles/compare/v0.2.2...v0.2.3) (2026-04-30)
 
 
