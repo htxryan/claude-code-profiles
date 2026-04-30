@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/htxryan/claude-code-config-profiles/compare/v0.2.1...v0.2.2) (2026-04-30)
+
+
+### Bug Fixes
+
+* **ci:** bump publish step to Node 22 + npm@latest for OIDC support ([c76f1f6](https://github.com/htxryan/claude-code-config-profiles/commit/c76f1f64451165c0cd77e6c5d9dae62dce64898a))
+
 ## [0.2.1](https://github.com/htxryan/claude-code-config-profiles/compare/v0.2.0...v0.2.1) (2026-04-30)
 
 
