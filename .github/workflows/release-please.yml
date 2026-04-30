@@ -57,13 +57,17 @@ jobs:
         with:
           version: 9
 
-      - name: Setup Node 20
+      - name: Setup Node 22
         if: ${{ steps.release.outputs.release_created }}
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "pnpm"
           registry-url: "https://registry.npmjs.org"
+
+      - name: Upgrade npm to >= 11.5.1 (OIDC trusted publishing requirement)
+        if: ${{ steps.release.outputs.release_created }}
+        run: npm install -g npm@latest
 
       - name: Install dependencies
         if: ${{ steps.release.outputs.release_created }}
