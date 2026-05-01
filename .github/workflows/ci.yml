@@ -118,6 +118,65 @@ jobs:
       - name: IV (offline)
         run: pnpm iv:offline
 
+  smoke:
+    name: smoke (npm pack + install)
+    runs-on: ubuntu-latest
+    # Source-tree tests verify behaviour against the working copy. They do
+    # NOT verify that the published artifact actually installs and runs —
+    # missing files in the `files` array, broken bin shebang, accidental
+    # ESM/CJS regressions, or a build that produces nothing all sail past
+    # `pnpm test`. This job packs the tarball with `pnpm pack`, installs it
+    # into a clean tmp project via npm (most consumers are on npm, not
+    # pnpm), and exercises the bin. `c3p --help` is a deliberately
+    # side-effect-free smoke: it loads the dispatch tree, parses argv, and
+    # prints help — enough to catch a broken build, no filesystem state to
+    # set up.
+    #
+    # Single OS / single Node: packaging is platform-agnostic JS, and we
+    # run on the engines.node minimum (20) so a smoke pass guarantees the
+    # tarball works on the lowest supported runtime.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 9
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: "pnpm"
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Pack tarball
+        id: pack
+        run: |
+          mkdir -p "$RUNNER_TEMP/pack"
+          pnpm pack --pack-destination="$RUNNER_TEMP/pack"
+          tarball=$(ls "$RUNNER_TEMP/pack"/*.tgz | head -1)
+          echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
+
+      - name: Install tarball into clean consumer project
+        run: |
+          mkdir -p "$RUNNER_TEMP/consumer"
+          cd "$RUNNER_TEMP/consumer"
+          npm init -y > /dev/null
+          npm install "${{ steps.pack.outputs.tarball }}"
+
+      - name: Run c3p --help from installed tarball
+        run: |
+          cd "$RUNNER_TEMP/consumer"
+          ./node_modules/.bin/c3p --help
+
   audit:
     name: pnpm audit (high+critical)
     runs-on: ubuntu-latest

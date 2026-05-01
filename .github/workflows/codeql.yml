@@ -1,0 +1,61 @@
+name: CodeQL
+
+# JS/TS static analysis. Complements `pnpm audit` (which only flags
+# known-vulnerable transitive deps) by scanning our own source for
+# common security issues — injection sinks, prototype pollution, unsafe
+# regex, path traversal, etc. Findings land in the repo's Security tab,
+# not as inline PR comments.
+#
+# `javascript-typescript` is a single CodeQL language pack covering both
+# .js and .ts; no separate analysis pass is needed.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly re-scan on a fixed time picks up advisories added to the
+    # CodeQL query packs without waiting for a code change. Sunday 09:17
+    # UTC — off-peak, deliberately not on the hour to avoid scheduler
+    # contention with every other repo running CodeQL on :00.
+    - cron: "17 9 * * 0"
+
+concurrency:
+  group: codeql-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  security-events: write  # Required to upload CodeQL SARIF results.
+  actions: read
+
+jobs:
+  analyze:
+    name: CodeQL
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          # `security-and-quality` adds maintainability/correctness queries
+          # on top of the default `security-extended` set. Cheap to run
+          # against a small JS/TS codebase; high signal for catching subtle
+          # bugs (e.g. unused variables that mask real intent).
+          queries: security-and-quality
+
+      - name: Autobuild
+        # JS/TS doesn't need a build step for CodeQL — the analyzer reads
+        # source directly. Autobuild is a no-op here but the action
+        # documents it as the canonical path; keeping it in place means a
+        # future move to a compiled language Just Works.
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript-typescript"
