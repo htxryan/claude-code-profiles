@@ -14,3 +14,9 @@ node_modules/
 # Test artifacts
 coverage/
 .vitest/
+
+# site/ (Astro app at site/) — its build output and deps
+site/dist/
+site/node_modules/
+site/.astro/
+site/.claude/

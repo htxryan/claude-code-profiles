@@ -38,3 +38,23 @@ updates:
     labels:
       - dependencies
       - ci
+
+  # site/ has its own package.json + lockfile (independent, not a workspace
+  # member). Tracked separately so Astro / Starlight bumps don't churn the CLI
+  # PR. Same weekly cadence + grouping policy as the CLI.
+  - package-ecosystem: npm
+    directory: /site
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: America/Los_Angeles
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+    labels:
+      - dependencies
+      - site
