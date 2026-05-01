@@ -1,0 +1,68 @@
+version: "3"
+
+set: [pipefail]
+
+tasks:
+  default:
+    desc: List available tasks
+    silent: true
+    cmd: task --list
+
+  install:
+    desc: Install CLI dependencies
+    cmd: pnpm install
+
+  install:site:
+    desc: Install site dependencies
+    dir: site
+    cmd: pnpm install
+
+  # ── build ──────────────────────────────────────────────────────────────────
+
+  build:
+    desc: Build the CLI
+    cmd: pnpm run build
+
+  build:site:
+    desc: Build the docs site (installs playwright, runs astro check + build)
+    dir: site
+    cmd: pnpm build
+
+  # ── typecheck ──────────────────────────────────────────────────────────────
+
+  typecheck:
+    desc: Type-check CLI source and tests
+    cmd: pnpm run typecheck
+
+  # ── test ───────────────────────────────────────────────────────────────────
+
+  test:
+    desc: Run CLI unit tests
+    cmd: pnpm test
+
+  test:site:
+    desc: Run site integration verification (offline mode)
+    dir: site
+    cmd: pnpm iv:offline
+
+  # ── audit ──────────────────────────────────────────────────────────────────
+
+  audit:
+    desc: Dependency security audit (CLI)
+    cmd: pnpm audit --audit-level=high
+
+  audit:site:
+    desc: Dependency security audit (site)
+    dir: site
+    cmd: pnpm audit --audit-level=high
+
+  # ── ci ─────────────────────────────────────────────────────────────────────
+
+  ci:
+    desc: Run full CI suite locally (mirrors GitHub Actions)
+    cmds:
+      - task: typecheck
+      - task: build
+      - task: test
+      - task: audit
+      - task: audit:site
