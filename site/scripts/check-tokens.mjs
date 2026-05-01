@@ -66,12 +66,17 @@ const REQUIRED_STARLIGHT_HOOKS = [
   '--sl-font',
 ];
 
-let cssFile;
+// The CSS chunk name is incidental — Vite picks it from whichever asset
+// happens to lead the chunk. Adding `starlight.logo` changed the leader from
+// `global.css` to `c3p-logo-dark.png`, so the bundle is now
+// `c3p-logo-dark.<hash>.css`. The contract this script enforces is content,
+// not naming: every required token must appear in *some* CSS file shipped
+// from `dist/_astro/`. Concatenate them all and check that.
+let cssFiles;
 try {
-  const entries = readdirSync(ASTRO_DIR);
-  cssFile = entries.find((f) => f.startsWith('global.') && f.endsWith('.css'));
-  if (!cssFile) {
-    console.error('FAIL: no global.*.css found in dist/_astro/. Did you run `pnpm build`?');
+  cssFiles = readdirSync(ASTRO_DIR).filter((f) => f.endsWith('.css'));
+  if (cssFiles.length === 0) {
+    console.error('FAIL: no *.css found in dist/_astro/. Did you run `pnpm build`?');
     process.exit(1);
   }
 } catch (err) {
@@ -80,7 +85,9 @@ try {
   process.exit(1);
 }
 
-const css = readFileSync(join(ASTRO_DIR, cssFile), 'utf8');
+const css = cssFiles
+  .map((f) => readFileSync(join(ASTRO_DIR, f), 'utf8'))
+  .join('\n');
 
 const missing = [];
 for (const name of [...REQUIRED_TOKENS, ...REQUIRED_STARLIGHT_HOOKS]) {
@@ -109,6 +116,6 @@ if (missing.length > 0) {
   process.exit(1);
 }
 
-console.log(`OK: ${REQUIRED_TOKENS.length} tokens + ${REQUIRED_STARLIGHT_HOOKS.length} Starlight hooks present in ${cssFile}`);
+console.log(`OK: ${REQUIRED_TOKENS.length} tokens + ${REQUIRED_STARLIGHT_HOOKS.length} Starlight hooks present across ${cssFiles.length} bundled CSS file(s)`);
 console.log('OK: [data-theme="light"] override block present');
 console.log('OK: prefers-reduced-motion block present');
