@@ -32,7 +32,8 @@
       <span class="drift-demo__title">~/your-project</span>
     </div>
 
-    <pre class="drift-demo__pane"><span class="drift-demo__line drift-demo__line--prompt"
+    <pre class="drift-demo__pane" style="--drift-cmd-len: 11ch"
+><span class="drift-demo__line drift-demo__line--prompt"
 ><span class="drift-demo__sigil">$</span> <span class="drift-demo__type"
 >c3p use dev</span><span class="drift-demo__caret">█</span></span>
 <span class="drift-demo__line drift-demo__line--blank"> </span>
@@ -133,7 +134,10 @@
 
   /* Typewriter effect on the command — animate `width` from 0 to its
      content length, hiding the overflow. `ch` units track monospace
-     character width naturally. */
+     character width naturally. The character count lives in
+     `--drift-cmd-len` on the parent `.drift-demo__pane`. If the
+     displayed command changes, also update the `steps(11, end)` count
+     below — CSS doesn't allow custom properties inside steps(). */
   .drift-demo__type {
     display: inline-block;
     overflow: hidden;
@@ -195,7 +199,7 @@
 
   @keyframes drift-type {
     from { width: 0; }
-    to   { width: 11ch; }
+    to   { width: var(--drift-cmd-len, 11ch); }
   }
 
   @keyframes drift-blink {
@@ -213,7 +217,7 @@
      caret from blinking so the final frame is unambiguously a refusal. */
   @media (prefers-reduced-motion: reduce) {
     .drift-demo__line { opacity: 1; }
-    .drift-demo__type { width: 11ch; }
+    .drift-demo__type { width: var(--drift-cmd-len, 11ch); }
     .drift-demo__caret { animation: none; opacity: 0; }
   }
 </style>

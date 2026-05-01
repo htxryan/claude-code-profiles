@@ -7,6 +7,10 @@
 // JS lives at `/pagefind/pagefind-ui.js` once the docs are indexed; if
 // the asset is missing (preview deploy without docs, dev runs), the
 // search box gracefully degrades to the docs index link.
+//
+// Astro currently emits a `[router]` collision warning because Starlight
+// also ships a `/404` route. Our page wins by priority today, but the
+// warning is on a deprecation path. Tracked: claude-code-profiles-imu.
 
 import '../styles/global.css';
 
@@ -57,10 +61,18 @@ import CtaButton from '../components/marketing/CtaButton.astro';
           placeholder="Search the docs…"
           autocomplete="off"
           spellcheck="false"
+          disabled
+          aria-disabled="true"
         />
-        <button type="submit" class="not-found__submit">Search</button>
+        <button
+          type="submit"
+          class="not-found__submit"
+          disabled
+          aria-disabled="true"
+        >Search</button>
         <p class="not-found__search-hint">
           Live search arrives once the docs are indexed (Pagefind, E4).
+          For now, head to the <a href="/docs/">docs index</a>.
         </p>
       </form>
 
@@ -168,6 +180,15 @@ import CtaButton from '../components/marketing/CtaButton.astro';
 
       .not-found__submit:hover {
         background: var(--color-accent-emphasis);
+      }
+
+      .not-found__search input[type="search"]:disabled,
+      .not-found__submit:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+      .not-found__submit:disabled:hover {
+        background: var(--color-accent);
       }
 
       .not-found__search-hint {

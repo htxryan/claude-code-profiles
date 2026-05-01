@@ -10,21 +10,16 @@ interface Props {
 }
 
 const { command, label = 'Install' } = Astro.props;
-
-// Per-instance id so multiple CopyOnClick instances on the same page
-// don't collide on `aria-describedby`. `crypto.randomUUID` is on every
-// modern Node target (≥ 14.17 / 16.x) and is available at SSR time.
-const cmdId = `copy-cta-cmd-${crypto.randomUUID().slice(0, 8)}`;
 ---
 <div class="copy-cta">
   <button
     type="button"
     class="copy-cta__button"
     data-command={command}
-    aria-describedby={cmdId}
+    aria-label={`${label} (copies ${command} to clipboard)`}
   >
     <span class="copy-cta__label">{label}</span>
-    <code id={cmdId} class="copy-cta__cmd">{command}</code>
+    <code class="copy-cta__cmd" aria-hidden="true">{command}</code>
   </button>
   <p class="copy-cta__status" role="status" aria-live="polite"></p>
 </div>
@@ -57,10 +52,15 @@ const cmdId = `copy-cta-cmd-${crypto.randomUUID().slice(0, 8)}`;
       if (status) {
         status.textContent = ok ? 'Copied to clipboard.' : 'Select and copy manually.';
         button.dataset.copied = ok ? 'true' : 'false';
-        window.setTimeout(() => {
-          status.textContent = '';
-          delete button.dataset.copied;
-        }, 2200);
+        /* Only auto-clear the success message. On the fallback path the
+           browser selection survives, so leaving the cue up tells the
+           user to press ⌘/Ctrl-C while it's still visible. */
+        if (ok) {
+          window.setTimeout(() => {
+            status.textContent = '';
+            delete button.dataset.copied;
+          }, 2200);
+        }
       }
     });
   }
@@ -115,7 +115,11 @@ const cmdId = `copy-cta-cmd-${crypto.randomUUID().slice(0, 8)}`;
     font-size: var(--type-scale-2);
     color: var(--color-text-on-accent);
     /* Tinted overlay derived from the surrounding text color — keeps
-       contrast in both themes without hardcoding a color. */
+       contrast in both themes without hardcoding a color. The rgba()
+       fallback is for engines below Chrome 111 / Firefox 113 / Safari
+       16.2 that don't parse color-mix(); without it the chip would
+       render transparent on the accent button and drop contrast. */
+    background: rgba(255 255 255 / 0.15);
     background: color-mix(in srgb, currentColor 18%, transparent);
     padding: var(--space-1) var(--space-2);
     border-radius: var(--radius-sm);

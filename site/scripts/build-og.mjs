@@ -11,21 +11,27 @@
  */
 
 import { mkdirSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import sharp from 'sharp';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
-const OUT = `${ROOT}public/og.png`;
+const OUT = join(ROOT, 'public', 'og.png');
 
 const W = 1200;
 const H = 630;
 
 // Hand-rolled SVG. Colors mirror the dark-theme tokens (kept in sync
-// manually — the OG art only ships in one mode). Fonts fall back to
-// SVG defaults if the system font isn't available; for v1 that's an
-// acceptable trade against shipping a 100kB+ font file alongside.
+// manually — the OG art only ships in one mode). Fonts: sharp uses
+// resvg/librsvg under the hood, which only resolves *embedded* font
+// data — the `ui-sans-serif`/`system-ui` family stack below is treated
+// as a missing font and silently falls back to whatever sans-serif
+// resvg picks on the build machine. The committed `public/og.png` is
+// therefore NOT typeset in the same family as the live site; it's a
+// fallback render. Acceptable for v1 against shipping a 100kB+ font
+// file alongside; revisit by inlining a `@font-face` with a base64
+// `data:` URL if pixel-perfect typography matters later.
 const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <defs>
