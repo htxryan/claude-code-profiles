@@ -28,8 +28,8 @@ site/
 ├── tsconfig.json
 ├── public/                     # static assets, OG image (later)
 └── src/
+    ├── content.config.ts       # Starlight content collection schema (Astro v6 location)
     ├── content/
-    │   ├── config.ts           # Starlight content collection schema
     │   └── docs/
     │       └── docs/           # ← all Starlight pages live under here so
     │                           #   their URLs resolve under /docs/
