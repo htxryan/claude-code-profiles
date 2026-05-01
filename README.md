@@ -58,7 +58,7 @@ c3p status
 > profile's `profile.json`, and (b) `c3p init` (which injects
 > markers into the root `CLAUDE.md`). Skip both, and project-root `CLAUDE.md` is
 > never opened or written. See [profile-managed `CLAUDE.md` sections](#profile-managed-claudemd-sections)
-> below and [docs/migration/cw6-section-ownership.md](docs/migration/cw6-section-ownership.md).
+> below and the [cw6 migration guide](https://getc3p.dev/docs/guides/migration/cw6-section-ownership/).
 
 ## Concepts
 
@@ -168,7 +168,7 @@ On every `c3p use <profile>`:
 for the projectRoot destination, the project-root `CLAUDE.md` is never opened
 or written — back-compat is byte-exact.
 
-See [docs/migration/cw6-section-ownership.md](docs/migration/cw6-section-ownership.md)
+See the [cw6 migration guide](https://getc3p.dev/docs/guides/migration/cw6-section-ownership/)
 for the full migration story.
 
 ## Drift gate
