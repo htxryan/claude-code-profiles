@@ -91,10 +91,15 @@ async function checkReducedMotion(baseUrl) {
       return v.trim();
     });
 
-    // Accept '0s', '0.01ms', or anything that parses to <= 1ms.
+    // tokens.css collapses every --motion-duration-* to 0.01ms under
+    // prefers-reduced-motion: reduce. Accept 0/0s/0.01ms exactly — a
+    // looser threshold (e.g. ≤1ms) would let a regression to 0.5ms or
+    // 1ms slip through silently.
     const parseToMs = (s) => {
       if (!s) return null;
-      const m = /^([\d.]+)(ms|s)$/.exec(s);
+      const trimmed = s.trim();
+      if (trimmed === '0') return 0;
+      const m = /^([\d.]+)(ms|s)$/.exec(trimmed);
       if (!m) return null;
       const n = parseFloat(m[1]);
       return m[2] === 's' ? n * 1000 : n;
@@ -107,11 +112,11 @@ async function checkReducedMotion(baseUrl) {
         `--motion-duration-md unparseable: "${dur}"`
       );
     }
-    if (ms > 1) {
+    if (ms > 0.05) {
       return fail(
         'reduced-motion',
         'C2',
-        `--motion-duration-md is ${dur} under reduce, expected ≤ 1ms`
+        `--motion-duration-md is ${dur} under reduce, expected ≤ 0.05ms (token value: 0.01ms)`
       );
     }
     return ok(

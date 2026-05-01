@@ -42,14 +42,26 @@ export async function run() {
       continue;
     }
 
-    // The diagrams may be wrapped in different containers across Starlight
-    // versions; assert the inline SVG is present in the page body.
-    if (!/<svg\b/i.test(html)) {
-      results.push(fail(`mermaid:${rel}`, 'C4', 'no <svg> in page output'));
+    // Starlight ships chrome SVGs (theme toggle, search, etc.) on every
+    // page, so a bare `<svg>` regex would always pass. rehype-mermaid
+    // emits `<svg id="mermaid-N" ... aria-roledescription="flowchart-..."`
+    // — match the discriminating attributes so a parser error producing
+    // an empty render still fails this gate.
+    const mermaidSvg =
+      /<svg\b[^>]*\bid=["']mermaid-\d+["'][^>]*>/i.test(html) ||
+      /<svg\b[^>]*\baria-roledescription=["'](?:flowchart|graph|sequence|class|state|er|gantt|journey|pie)/i.test(
+        html
+      );
+    if (!mermaidSvg) {
+      results.push(
+        fail(`mermaid:${rel}`, 'C4', 'no rendered Mermaid <svg> found in page output')
+      );
       continue;
     }
 
-    results.push(ok(`mermaid:${rel}`, 'C4', 'inline <svg> present, no client placeholder'));
+    results.push(
+      ok(`mermaid:${rel}`, 'C4', 'rendered Mermaid <svg> present, no client placeholder')
+    );
   }
   return results;
 }

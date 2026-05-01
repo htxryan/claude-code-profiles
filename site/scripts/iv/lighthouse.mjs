@@ -31,12 +31,14 @@ const CATEGORIES = ['performance', 'accessibility', 'best-practices', 'seo'];
 const THRESHOLD = 90;
 
 async function runOne(lighthouse, port, url) {
+  // chromeFlags is ignored when `port` is provided — lighthouse connects
+  // to the existing chrome from chrome-launcher. Flags belong on the
+  // launch() call below, not here.
   const result = await lighthouse(url, {
     port,
     output: 'json',
     onlyCategories: CATEGORIES,
     logLevel: 'error',
-    chromeFlags: ['--headless=new', '--no-sandbox'],
   });
   const scores = {};
   for (const cat of CATEGORIES) {

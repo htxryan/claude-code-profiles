@@ -13,7 +13,14 @@
 import { chromium } from 'playwright';
 import { mkdir, readFile, writeFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
-import { BASELINE_DIR, fail, ok } from './util.mjs';
+import { BASELINE_DIR, fail, ok, warn } from './util.mjs';
+
+// Mismatches above this byte-delta threshold (uncompressed PNG) surface
+// as `warn` rather than silent `ok`, so meaningful drifts make it into
+// the summary even in non-strict mode. Tuned generously: cross-machine
+// font hinting can shift PNG size by a few KB, but a hundred-KB swing
+// almost always means a real layout change.
+const VISUAL_WARN_DELTA_BYTES = 50_000;
 
 const ROUTES = [
   { name: 'home', path: '/' },
@@ -91,13 +98,28 @@ export async function run(ctx) {
             theme
           );
 
-          if (update || !(await fileExists(file))) {
+          const baselineExists = await fileExists(file);
+          if (update) {
             await writeFile(file, buf);
             results.push(
               ok(
                 `visual:${route.name}:${theme}`,
                 'C2',
-                `baseline ${update ? 'updated' : 'created'} (${buf.length} bytes)`
+                `baseline updated (${buf.length} bytes)`
+              )
+            );
+          } else if (!baselineExists) {
+            // Auto-creating a baseline silently masks a missing-cache or
+            // newly-added-route regression in CI. Write the file so the
+            // operator can commit it, but flag as `warn` so the run
+            // surfaces the gap. Use --update-baselines for an explicit
+            // refresh.
+            await writeFile(file, buf);
+            results.push(
+              warn(
+                `visual:${route.name}:${theme}`,
+                'C2',
+                `no baseline on disk — wrote ${file.replace(BASELINE_DIR + '/', '')} (${buf.length} bytes); commit it or rerun with --update-baselines`
               )
             );
           } else {
@@ -125,13 +147,24 @@ export async function run(ctx) {
               const actualPath = file.replace(/\.png$/, '.actual.png');
               await writeFile(actualPath, buf);
               const delta = Math.abs(existing.length - buf.length);
-              results.push(
-                ok(
-                  `visual:${route.name}:${theme}`,
-                  'C2',
-                  `captured (Δ ${delta} bytes vs baseline; non-strict)`
-                )
-              );
+              const relActual = actualPath.replace(BASELINE_DIR + '/', '');
+              if (delta > VISUAL_WARN_DELTA_BYTES) {
+                results.push(
+                  warn(
+                    `visual:${route.name}:${theme}`,
+                    'C2',
+                    `large drift Δ ${delta} bytes vs baseline (>${VISUAL_WARN_DELTA_BYTES}) — see ${relActual}`
+                  )
+                );
+              } else {
+                results.push(
+                  ok(
+                    `visual:${route.name}:${theme}`,
+                    'C2',
+                    `captured (Δ ${delta} bytes vs baseline; non-strict, see ${relActual})`
+                  )
+                );
+              }
             } else {
               const actualPath = file.replace(/\.png$/, '.actual.png');
               await writeFile(actualPath, buf);

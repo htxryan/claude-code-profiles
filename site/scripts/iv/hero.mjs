@@ -22,47 +22,62 @@ import { fail, ok } from './util.mjs';
 
 export async function run(ctx) {
   const browser = await chromium.launch();
+  const results = [];
   try {
     const page = await browser.newPage();
     await page.goto(`${ctx.localBaseUrl}/`, { waitUntil: 'networkidle' });
 
-    // 1. Hero structural elements.
+    // 1. Hero headline — assert structural shape, not literal copy. The
+    //    h1 is the marketing headline; tying IV to the exact wording
+    //    means every copy edit silently fails the gate.
     const headline = await page.locator('h1#hero-title').first();
     const headlineCount = await headline.count();
     if (headlineCount === 0) {
-      return [fail('hero-structure', 'C3', '<h1#hero-title> missing')];
-    }
-    const headlineText = (await headline.textContent())?.trim() ?? '';
-    if (!/swap claude configs/i.test(headlineText)) {
-      return [
-        fail(
-          'hero-structure',
-          'C3',
-          `headline content unexpected: "${headlineText.slice(0, 60)}"`
-        ),
-      ];
+      results.push(fail('hero-headline', 'C3', '<h1#hero-title> missing'));
+    } else {
+      const headlineText = (await headline.textContent())?.trim() ?? '';
+      if (headlineText.length === 0) {
+        results.push(fail('hero-headline', 'C3', 'h1#hero-title is empty'));
+      } else if (!/c3p|claude/i.test(headlineText)) {
+        results.push(
+          fail(
+            'hero-headline',
+            'C3',
+            `headline missing product reference: "${headlineText.slice(0, 60)}"`
+          )
+        );
+      } else {
+        results.push(
+          ok('hero-headline', 'C3', `h1 present (${headlineText.length} chars)`)
+        );
+      }
     }
 
     // 2. Drift-gate demo present + shows refusal text.
     const demo = page.locator('.drift-demo');
     if ((await demo.count()) === 0) {
-      return [fail('hero-demo', 'C3', '.drift-demo not present')];
-    }
-    const demoText = (await demo.textContent()) ?? '';
-    if (!/refused/i.test(demoText)) {
-      return [
-        fail(
-          'hero-demo',
-          'C3',
-          'drift-demo missing "refused" badge — static SSR broken'
-        ),
-      ];
+      results.push(fail('hero-demo', 'C3', '.drift-demo not present'));
+    } else {
+      const demoText = (await demo.textContent()) ?? '';
+      if (!/refused/i.test(demoText)) {
+        results.push(
+          fail(
+            'hero-demo',
+            'C3',
+            'drift-demo missing "refused" badge — static SSR broken'
+          )
+        );
+      } else {
+        results.push(ok('hero-demo', 'C3', 'drift-demo SSR intact, "refused" present'));
+      }
     }
 
     // 3. Install CTA exists with the canonical command.
     const cta = page.locator('text=npm install -g claude-code-config-profiles');
     if ((await cta.count()) === 0) {
-      return [fail('hero-cta', 'C3', 'install CTA command not found in DOM')];
+      results.push(fail('hero-cta', 'C3', 'install CTA command not found in DOM'));
+    } else {
+      results.push(ok('hero-cta', 'C3', 'install CTA present'));
     }
 
     // 4. Animation declared on at least one demo descendant. We check
@@ -76,24 +91,18 @@ export async function run(ctx) {
       return false;
     });
     if (!hasAnim) {
-      return [
+      results.push(
         fail(
           'hero-demo-animation',
           'C3',
           'no animation-name on any .drift-demo descendant'
-        ),
-      ];
+        )
+      );
+    } else {
+      results.push(ok('hero-demo-animation', 'C3', 'CSS animations declared on demo'));
     }
-
-    return [
-      ok(
-        'hero-structure',
-        'C3',
-        `headline + drift-demo + install CTA all present`
-      ),
-      ok('hero-demo-animation', 'C3', 'CSS animations declared on demo'),
-    ];
   } finally {
     await browser.close();
   }
+  return results;
 }

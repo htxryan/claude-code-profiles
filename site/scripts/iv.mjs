@@ -159,29 +159,33 @@ async function main() {
     // checks last. Lets a fast-fail short-circuit Lighthouse runs when
     // the build is clearly broken.
     const phases = [
-      { name: 'C1 composition', fn: () => composition.run(ctx) },
-      { name: 'C2 token snapshot', fn: () => tokens.run(ctx) },
-      { name: 'C4 mermaid SSR', fn: () => mermaid.run(ctx) },
-      { name: 'C4 link integrity', fn: () => links.run(ctx) },
-      { name: 'C4 pagefind', fn: () => pagefind.run(ctx) },
-      { name: 'C2 theme + reduced-motion', fn: () => theme.run(ctx) },
-      { name: 'C3 hero demo', fn: () => hero.run(ctx) },
-      { name: 'C3 axe-core', fn: () => axe.run(ctx) },
-      { name: 'C2 visual baselines', fn: () => visual.run(ctx) },
-      { name: 'C3/C4 lighthouse', fn: () => lighthouse.run(ctx) },
+      { name: 'C1 composition', contract: 'C1', fn: () => composition.run(ctx) },
+      { name: 'C2 token snapshot', contract: 'C2', fn: () => tokens.run(ctx) },
+      { name: 'C4 mermaid SSR', contract: 'C4', fn: () => mermaid.run(ctx) },
+      { name: 'C4 link integrity', contract: 'C4', fn: () => links.run(ctx) },
+      { name: 'C4 pagefind', contract: 'C4', fn: () => pagefind.run(ctx) },
+      { name: 'C2 theme + reduced-motion', contract: 'C2', fn: () => theme.run(ctx) },
+      { name: 'C3 hero demo', contract: 'C3', fn: () => hero.run(ctx) },
+      { name: 'C3 axe-core', contract: 'C3', fn: () => axe.run(ctx) },
+      { name: 'C2 visual baselines', contract: 'C2', fn: () => visual.run(ctx) },
+      { name: 'C3/C4 lighthouse', contract: 'C3/C4', fn: () => lighthouse.run(ctx) },
     ];
 
     if (!args.skipSmoke) {
       // Smoke runs against the production URL — independent of local
       // server, so we add it first as a parallel-friendly check. We run
       // it sequentially anyway to keep output ordered.
-      phases.unshift({ name: 'C5 production smoke', fn: () => smoke.run(ctx) });
+      phases.unshift({
+        name: 'C5 production smoke',
+        contract: 'C5',
+        fn: () => smoke.run(ctx),
+      });
     }
 
     for (const phase of phases) {
       console.log(`\n→ ${phase.name}`);
       const phaseStart = Date.now();
-      const phaseResults = await safeRun(phase.name, '-', async () => ({
+      const phaseResults = await safeRun(phase.name, phase.contract, async () => ({
         results: await phase.fn(),
       }));
       const elapsed = ((Date.now() - phaseStart) / 1000).toFixed(1);
@@ -194,10 +198,12 @@ async function main() {
           }
         }
       } else {
-        // The phase itself threw outside any sub-result.
+        // The phase itself threw outside any sub-result. Tag with the
+        // phase's expected contract so the coverage table records the
+        // crash as a failure on that contract rather than as "no results".
         const synthetic = {
           name: phase.name,
-          contract: '-',
+          contract: phase.contract,
           ok: false,
           details: phaseResults.details ?? 'phase threw',
           elapsedSec: elapsed,

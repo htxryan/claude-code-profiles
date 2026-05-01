@@ -8,7 +8,7 @@
 
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
-import { join, resolve, normalize } from 'node:path';
+import { join, resolve, normalize, sep } from 'node:path';
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -43,9 +43,10 @@ export async function startServer(rootDir, port = 0) {
     try {
       const urlPath = decodeURIComponent(new URL(req.url, 'http://x').pathname);
       // Prevent path traversal — normalize, then ensure resolved path is
-      // inside `root`. Astro's static output never legitimately escapes.
+      // inside `root`. Use `root + sep` so a sibling like `dist-evil/`
+      // doesn't slip through a textual prefix match.
       const candidate = normalize(join(root, urlPath));
-      if (!candidate.startsWith(root)) {
+      if (candidate !== root && !candidate.startsWith(root + sep)) {
         res.writeHead(403);
         res.end('forbidden');
         return;

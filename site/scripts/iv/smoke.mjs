@@ -9,8 +9,6 @@ async function head(url, opts = {}) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? 10_000);
   try {
-    // CF Pages serves HEAD identically to GET for static assets, but some
-    // proxies strip headers — fall back to GET if HEAD looks unusable.
     const res = await fetch(url, {
       method: 'HEAD',
       redirect: 'manual',
@@ -85,7 +83,15 @@ export async function run() {
     const res = await head('https://www.getc3p.dev', { timeoutMs: 8000 });
     if (res.status === 301 || res.status === 308) {
       const loc = res.headers.get('location') ?? '';
-      if (loc.includes('getc3p.dev')) {
+      // Parse the Location URL and assert host equality, not substring —
+      // `https://evil.example.com/getc3p.dev/x` would slip past `includes`.
+      let host = '';
+      try {
+        host = new URL(loc, 'https://www.getc3p.dev').host;
+      } catch {
+        host = '';
+      }
+      if (host === 'getc3p.dev') {
         results.push(ok('www-redirect', 'C5', `www → ${res.status} ${loc}`));
       } else {
         const r = wwwStrict ? fail : warn;

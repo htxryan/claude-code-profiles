@@ -20,25 +20,16 @@ const THEMES = ['dark', 'light'];
 
 async function runAxeOn(page, baseUrl, route, theme) {
   // Force theme via Starlight's data attribute on <html>; this matches
-  // R-S-1 (dark default) and R-O-1 (theme override).
+  // R-S-1 (dark default) and R-O-1 (theme override). Seed localStorage
+  // before navigation so Starlight's hydration picks it up; then re-apply
+  // post-load as a belt-and-braces guard. No MutationObserver — that
+  // creates a feedback loop where setAttribute itself re-triggers the
+  // callback.
   await page.addInitScript((t) => {
     try {
-      // Run before page navigation so there's no flash.
-      const observer = new MutationObserver(() => {
-        if (document.documentElement) {
-          document.documentElement.setAttribute('data-theme', t);
-        }
-      });
-      observer.observe(document.documentElement || document, {
-        attributes: true,
-      });
-      try {
-        localStorage.setItem('starlight-theme', t);
-      } catch {
-        // localStorage unavailable in some contexts; ignore.
-      }
+      localStorage.setItem('starlight-theme', t);
     } catch {
-      // Best-effort.
+      // localStorage unavailable in some contexts; ignore.
     }
   }, theme);
 
