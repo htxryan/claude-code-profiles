@@ -46,6 +46,15 @@ export default defineConfig({
     starlight({
       title: 'C3P',
       description: 'Profile-based config swaps for Claude Code',
+      // Brand logo replaces the text title in the docs sidebar header.
+      // Light/dark variants follow the user's selected theme (Starlight
+      // toggles `data-theme` on `<html>`, same hook our marketing surface
+      // uses, so the wordmark stays legible on both backgrounds).
+      logo: {
+        light: './src/assets/c3p-logo-light.png',
+        dark: './src/assets/c3p-logo-dark.png',
+        replacesTitle: true,
+      },
       // Disable Starlight's auto-injected /404 route so it doesn't collide
       // with our custom `src/pages/404.astro` (R-U-6). Today our /404.astro
       // wins by Astro's priority resolver, but Astro logs a deprecation

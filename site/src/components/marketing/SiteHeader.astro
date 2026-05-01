@@ -6,6 +6,10 @@
 // source of truth; Astro scopes the `<style>` block to this
 // component so the class names cannot collide with anything else.
 
+import { Image } from 'astro:assets';
+import logoLight from '../../assets/c3p-logo-light.png';
+import logoDark from '../../assets/c3p-logo-dark.png';
+
 interface Props {
   docsHref?: string;
 }
@@ -14,7 +18,23 @@ const { docsHref = '/docs/' } = Astro.props;
 ---
 <header class="site-header">
   <div class="site-header__inner">
-    <a href="/" class="site-header__brand" aria-label="C3P home">C3P</a>
+    <a href="/" class="site-header__brand" aria-label="C3P home">
+      <Image
+        src={logoDark}
+        alt="C3P — Claude Code Config Profiles"
+        class="site-header__logo site-header__logo--dark"
+        height={36}
+        loading="eager"
+      />
+      <Image
+        src={logoLight}
+        alt=""
+        aria-hidden="true"
+        class="site-header__logo site-header__logo--light"
+        height={36}
+        loading="eager"
+      />
+    </a>
     <nav aria-label="Primary">
       <a href={docsHref}>Docs</a>
     </nav>
@@ -38,10 +58,29 @@ const { docsHref = '/docs/' } = Astro.props;
   }
 
   .site-header__brand {
-    font-weight: 700;
-    font-size: var(--type-scale-4);
-    color: var(--color-text-primary);
+    display: inline-flex;
+    align-items: center;
     text-decoration: none;
-    letter-spacing: var(--type-tracking-tight);
+  }
+
+  /* Both variants render; only the one matching the active theme is shown.
+     Default is dark (matches site root); light wins under [data-theme="light"]
+     — same convention as tokens.css so it stays in lockstep with the toggle. */
+  .site-header__logo {
+    display: block;
+    width: auto;
+    height: 36px;
+  }
+
+  .site-header__logo--light {
+    display: none;
+  }
+
+  :root[data-theme='light'] .site-header__logo--dark {
+    display: none;
+  }
+
+  :root[data-theme='light'] .site-header__logo--light {
+    display: block;
   }
 </style>
