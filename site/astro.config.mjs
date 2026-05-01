@@ -1,6 +1,7 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import rehypeMermaid from 'rehype-mermaid';
 
 // Single source of truth for site identity — keeps URLs from drifting if the
 // repo or domain is renamed.
@@ -22,6 +23,14 @@ const SITE = {
 export default defineConfig({
   site: SITE.url,
   output: 'static',
+  // Build-time Mermaid → inline SVG for the inheritance/composition diagrams
+  // on the extends/includes Concepts pages (R-U-16). The `inline-svg` strategy
+  // bakes the SVG into the static HTML at build time so no client JS is
+  // required (R-U-14). Backed by Playwright + chromium — see
+  // `playwright install` step in `pnpm build`.
+  markdown: {
+    rehypePlugins: [[rehypeMermaid, { strategy: 'inline-svg' }]],
+  },
   integrations: [
     starlight({
       title: 'C3P',

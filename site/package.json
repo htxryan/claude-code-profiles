@@ -11,7 +11,7 @@
   "packageManager": "pnpm@10.33.0",
   "scripts": {
     "dev": "astro dev",
-    "build": "astro check && astro build",
+    "build": "playwright install chromium && astro check && astro build",
     "preview": "astro preview",
     "astro": "astro",
     "og": "node scripts/build-og.mjs",
@@ -23,6 +23,9 @@
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.4",
+    "mermaid": "^11.14.0",
+    "playwright": "^1.59.1",
+    "rehype-mermaid": "^3.0.0",
     "sharp": "^0.34.0",
     "typescript": "^5.7.2"
   }
