@@ -1,0 +1,81 @@
+{
+  "skills": [
+    {
+      "name": "Agentic Codebase",
+      "description": "Audit and set up a codebase for agentic AI development using the 16-principle manifesto",
+      "phase": "work",
+      "dir": "agentic"
+    },
+    {
+      "name": "Architect",
+      "description": "Decompose a large system specification into cook-it-ready epic beads via DDD bounded contexts",
+      "phase": "architect",
+      "dir": "architect"
+    },
+    {
+      "name": "Build Great Things",
+      "description": "Comprehensive playbook for building world-class websites, landing pages, web applications, and dashboards. Covers the full build sequence from brand identity and information architecture through layout, typography, color, scroll animations, micro-interactions, hover effects, loading states, empty states, error handling, accessibility, SEO, and conversion optimization. Use this skill whenever building a new website or web app from scratch, redesigning pages (pricing, landing, portfolio), adding polish or animations, fixing generic-looking UI, improving visual hierarchy, or when the user says anything looks \"janky\", \"generic\", \"amateur\", or \"needs more polish\". Also use when adding hover states, scroll effects, page transitions, or doing a design review pass.",
+      "phase": "work",
+      "dir": "build-great-things"
+    },
+    {
+      "name": "Compound",
+      "description": "Reflect on the cycle and capture high-quality lessons for future sessions",
+      "phase": "compound",
+      "dir": "compound"
+    },
+    {
+      "name": "Cook It",
+      "description": "Full-cycle orchestrator chaining all five phases with gates and controls",
+      "dir": "cook-it"
+    },
+    {
+      "name": "Loop Launcher",
+      "description": "Reference for configuring, launching, and monitoring infinity loops and polish loops",
+      "phase": "architect",
+      "dir": "loop-launcher"
+    },
+    {
+      "name": "Plan",
+      "description": "Decompose work into small testable tasks with clear dependencies",
+      "phase": "plan",
+      "dir": "plan"
+    },
+    {
+      "name": "QA Engineer",
+      "description": "Hands-on QA testing of running applications via browser automation. Use whenever the user asks to test a running app, perform exploratory testing, verify UI/UX behavior, check accessibility, test forms and inputs, inspect network requests, do a smoke test, or systematically try to break things. Also use when review needs runtime verification beyond automated tests -- visual checks, boundary inputs, interaction flows, and design review against a live application. Triggers on phrases like \"test this app\", \"QA this\", \"check the UI\", \"try to break it\", \"smoke test\", \"does this look right\", \"test the form\", \"check accessibility\", \"poke at it\", or any request to manually verify a running web application or API.",
+      "phase": "review",
+      "dir": "qa-engineer"
+    },
+    {
+      "name": "Researcher",
+      "description": "Deep research producing structured survey documents for informed decision-making",
+      "phase": "spec-dev",
+      "dir": "researcher"
+    },
+    {
+      "name": "Review",
+      "description": "Multi-agent review with lesson-calibrated reviewers, runtime verification, and severity classification",
+      "phase": "review",
+      "dir": "review"
+    },
+    {
+      "name": "Spec Dev",
+      "description": "Develop precise specifications through Socratic dialogue, EARS notation, and Mermaid diagrams",
+      "phase": "spec-dev",
+      "dir": "spec-dev"
+    },
+    {
+      "name": "Test Cleaner",
+      "description": "Multi-phase test suite optimization with adversarial review",
+      "phase": "review",
+      "dir": "test-cleaner"
+    },
+    {
+      "name": "Work",
+      "description": "Team-based TDD execution with adaptive complexity and agent delegation",
+      "phase": "work",
+      "dir": "work"
+    }
+  ]
+}
