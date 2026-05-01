@@ -51,8 +51,8 @@ export default defineConfig({
       // toggles `data-theme` on `<html>`, same hook our marketing surface
       // uses, so the wordmark stays legible on both backgrounds).
       logo: {
-        light: './src/assets/c3p-logo-light.png',
-        dark: './src/assets/c3p-logo-dark.png',
+        light: './src/assets/c3p-logo-light-compact.png',
+        dark: './src/assets/c3p-logo-dark-compact.png',
         replacesTitle: true,
       },
       // Disable Starlight's auto-injected /404 route so it doesn't collide

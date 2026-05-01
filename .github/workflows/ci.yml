@@ -1,13 +1,6 @@
 name: CI
 
-# Run on every push to main and on every PR. The matrix is intentionally wide
-# (linux/macos/windows × node 20/22) because cross-platform behavior is
-# load-bearing: atomic-rename semantics, lockfile cleanup, signal delivery
-# (SIGINT/SIGTERM/SIGHUP), and tmp-path uniqueness all behave differently on
-# Windows than on POSIX. Linux-only green would mask real bugs.
-#
-# CI cancels in-flight runs for the same ref so a force-push doesn't queue up
-# duplicate runs (concurrency block below).
+# Run on every push to main and on every PR.
 
 on:
   push:
@@ -24,41 +17,60 @@ permissions:
 
 jobs:
   build-test:
-    name: cli ${{ matrix.os }} / node ${{ matrix.node }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        node: ["20", "22"]
+    name: cli
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
 
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install Task
+        uses: arduino/setup-task@v2
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install pnpm
         uses: pnpm/action-setup@v6
         with:
-          version: 9
+          version: 10
 
-      - name: Setup Node ${{ matrix.node }}
+      - name: Setup Node 22
         uses: actions/setup-node@v6
         with:
-          node-version: ${{ matrix.node }}
+          node-version: "22"
           cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Audit CLI dependencies
+        run: task audit
+        continue-on-error: true
+
+      - name: Audit site dependencies
+        run: task audit:site
+        continue-on-error: true
+
       - name: Typecheck (src + tests)
-        run: pnpm run typecheck
+        run: task typecheck
 
       - name: Build
-        run: pnpm run build
+        run: task build
 
       - name: Test
-        run: pnpm test
+        run: task test
+
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   site:
     name: site (build + IV offline)
@@ -72,6 +84,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Install Task
+        uses: arduino/setup-task@v2
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install pnpm
         uses: pnpm/action-setup@v6
@@ -107,7 +125,7 @@ jobs:
       # astro build` (chromium is needed at build time for the rehype-mermaid
       # inline-svg strategy on the extends/includes Concepts pages, R-U-16).
       - name: Build
-        run: pnpm build
+        run: task build:site
 
       # Integration Verification — offline mode skips Lighthouse (network +
       # variance) and the production-URL smoke (we're testing this PR, not
@@ -116,45 +134,4 @@ jobs:
       # visual regression vs committed baselines, pagefind index, link
       # integrity. Keeps PR feedback under ~30s after the build.
       - name: IV (offline)
-        run: pnpm iv:offline
-
-  audit:
-    name: pnpm audit (high+critical)
-    runs-on: ubuntu-latest
-    # Non-blocking advisory check: surfaces known-vulnerable deps without
-    # gating PR merges. A clean pnpm audit run is cheap; flagging is the
-    # whole point. continue-on-error keeps the job green even when an
-    # advisory lands so the rest of CI is still merge-ready.
-    continue-on-error: true
-    strategy:
-      fail-fast: false
-      matrix:
-        # Audit each independent dep tree separately so failures attribute
-        # cleanly to the package that owns the vuln. Site has its own
-        # lockfile (no workspace) so its tree is fully independent.
-        package:
-          - { name: "cli (root)", cwd: "." }
-          - { name: "site", cwd: "site" }
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          version: 10
-
-      - name: Setup Node 20
-        uses: actions/setup-node@v6
-        with:
-          node-version: "20"
-          cache: "pnpm"
-          cache-dependency-path: ${{ matrix.package.cwd }}/pnpm-lock.yaml
-
-      - name: Install dependencies (${{ matrix.package.name }})
-        working-directory: ${{ matrix.package.cwd }}
-        run: pnpm install --frozen-lockfile
-
-      - name: pnpm audit — ${{ matrix.package.name }} (high + critical only)
-        working-directory: ${{ matrix.package.cwd }}
-        run: pnpm audit --audit-level=high
+        run: task test:site
