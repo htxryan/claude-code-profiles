@@ -44,7 +44,7 @@ EXAMPLES
 
 EXIT CODES
   0  success (drift present or absent)
-  2  IO fault
+  2  IO fault (read failure on .claude/ or state file)
 ```
 
 ## Example
@@ -57,7 +57,7 @@ c3p drift
 c3p drift --preview
 
 # In a script: branch on whether anything is drifted
-if [ "$(c3p drift --json | jq '.driftedCount')" -gt 0 ]; then
+if [ "$(c3p drift --json | jq '.entries | length')" -gt 0 ]; then
   echo "Drift present — run 'c3p drift' for details"
 fi
 ```

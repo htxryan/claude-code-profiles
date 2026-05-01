@@ -41,8 +41,9 @@ EXAMPLES
 
 EXIT CODES
   0  all profiles validated cleanly
-  1  unparseable profile.json (invalid manifest); project-root CLAUDE.md is missing c3p markers (run `c3p init`)
-  3  any profile failed (cycle, missing include, missing extends parent, conflict)
+  1  project-root CLAUDE.md is missing/malformed c3p markers (run `c3p init`); bad argv
+  2  IO fault (read failure on profiles dir or CLAUDE.md)
+  3  any profile failed (cycle, missing include, missing extends parent, conflict, unparseable profile.json)
 ```
 
 ## Example

@@ -56,9 +56,9 @@ sources, use [`includes`](/docs/concepts/includes/) instead.
       <line x1="120" y1="184" x2="120" y2="200"
         stroke="currentColor" stroke-opacity="0.6" stroke-width="1.5"
         marker-start="url(#ext-arrow)" />
-      <text x="132" y="196" font-size="11" fill-opacity="0.7">extends</text>
+      <text x="132" y="190" font-size="11" fill-opacity="0.7">extends →</text>
 
-      <line x1="220" y1="180" x2="280" y2="180"
+      <line x1="220" y1="180" x2="288" y2="180"
         stroke="currentColor" stroke-opacity="0.6" stroke-width="1.5"
         marker-end="url(#ext-arrow)" />
 

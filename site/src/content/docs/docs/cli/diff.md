@@ -40,6 +40,7 @@ EXAMPLES
 EXIT CODES
   0  success
   1  bad argv (missing required <a>)
+  2  IO fault (read failure on profiles dir or state file)
   3  cycle / missing include / missing extends parent in either profile
 ```
 

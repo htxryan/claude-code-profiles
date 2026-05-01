@@ -7,7 +7,8 @@ description: Show active profile, drift count, and stale-source warning.
 the live tree compares to its source:
 
 1. **Active profile** — name and (when present) description.
-2. **Drift count** — files in `.claude/` that have been edited directly.
+2. **Drift count** — files in `.claude/` that differ from the resolved
+   profile (modified, added, or deleted).
 3. **Stale source** — set when the active profile's source bytes have
    changed (e.g. after a `git pull`) but `.claude/` hasn't picked them up.
 
@@ -51,7 +52,7 @@ EXIT CODES
 c3p status
 
 # Use --json in shell scripts to inspect specific fields
-c3p status --json | jq '.active, .driftCount, .staleSource'
+c3p status --json | jq '.activeProfile, .drift.total, .sourceFresh'
 ```
 
 ## See also
