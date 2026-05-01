@@ -38,10 +38,10 @@
 <span class="drift-demo__line drift-demo__line--blank"> </span>
 <span class="drift-demo__line drift-demo__line--err"
 ><span class="drift-demo__badge">refused</span> uncommitted edits in <span class="drift-demo__path">.claude/settings.json</span></span>
-<span class="drift-demo__line drift-demo__line--hint"
+<span class="drift-demo__line drift-demo__line--hint drift-demo__line--hint-1"
 >  swapping now would <em>silently</em> overwrite your local changes.</span>
 <span class="drift-demo__line drift-demo__line--blank"> </span>
-<span class="drift-demo__line drift-demo__line--hint"
+<span class="drift-demo__line drift-demo__line--hint drift-demo__line--hint-2"
 >  next: <span class="drift-demo__cmd">c3p drift</span> &middot; <span class="drift-demo__cmd">git status</span></span></pre>
   </div>
 
@@ -118,11 +118,12 @@
       drift-fade-in var(--motion-duration-md) var(--motion-easing-decel) forwards;
   }
 
+  /* Each delay is anchored on its own class so reordering or adding
+     lines never silently shifts the timing. */
   .drift-demo__line--prompt   { animation-delay: 100ms; }
-  /* Skip the blank spacer at index 1 (it animates with no visual effect). */
   .drift-demo__line--err      { animation-delay: 1700ms; }
-  .drift-demo__line--hint:nth-of-type(4) { animation-delay: 1900ms; }
-  .drift-demo__line--hint:nth-of-type(6) { animation-delay: 2200ms; }
+  .drift-demo__line--hint-1   { animation-delay: 1900ms; }
+  .drift-demo__line--hint-2   { animation-delay: 2200ms; }
   .drift-demo__line--blank    { opacity: 1; animation: none; }
 
   .drift-demo__sigil {
@@ -146,7 +147,13 @@
     display: inline-block;
     width: 0.6ch;
     color: var(--color-accent);
-    animation: drift-blink 900ms steps(2, jump-none) infinite 1400ms;
+    /* Caret blinks while the user "thinks" between finishing the
+       command and the gate refusing it (1300ms → 1700ms). After the
+       refusal lands, the caret stays steady so it doesn't compete
+       visually with the error message. */
+    animation:
+      drift-blink 900ms steps(2, jump-none) 1300ms 1 forwards,
+      drift-caret-fade var(--motion-duration-sm) var(--motion-easing-standard) 1700ms forwards;
   }
 
   .drift-demo__badge {
@@ -194,6 +201,11 @@
   @keyframes drift-blink {
     0%, 100% { opacity: 1; }
     50%      { opacity: 0; }
+  }
+
+  @keyframes drift-caret-fade {
+    from { opacity: 1; }
+    to   { opacity: 0; }
   }
 
   /* Reduced motion: belt-and-braces. Globals already collapse durations,
