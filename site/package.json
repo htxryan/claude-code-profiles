@@ -16,9 +16,11 @@
     "astro": "astro"
   },
   "dependencies": {
-    "@astrojs/check": "^0.9.4",
     "@astrojs/starlight": "0.38.4",
-    "astro": "6.2.1",
+    "astro": "6.2.1"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.4",
     "sharp": "^0.34.0",
     "typescript": "^5.7.2"
   }

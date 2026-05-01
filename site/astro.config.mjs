@@ -2,13 +2,20 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 
+// Single source of truth for site identity — keeps URLs from drifting if the
+// repo or domain is renamed.
+const SITE = {
+  url: 'https://getc3p.dev',
+  repo: 'https://github.com/htxryan/claude-code-config-profiles',
+};
+
 // Static-only output (R-U-14). Starlight's catch-all `[...slug]` route serves
 // content from `src/content/docs/`. To mount docs under `/docs/` (R-U-2) while
 // keeping the marketing landing at `/` (R-U-1), all Starlight content lives
 // nested under `src/content/docs/docs/` — its own URL prefix. Explicit
 // `src/pages/index.astro` wins over Starlight's catch-all at `/`.
 export default defineConfig({
-  site: 'https://getc3p.dev',
+  site: SITE.url,
   output: 'static',
   integrations: [
     starlight({
@@ -18,7 +25,7 @@ export default defineConfig({
         {
           icon: 'github',
           label: 'GitHub',
-          href: 'https://github.com/htxryan/claude-code-config-profiles',
+          href: SITE.repo,
         },
       ],
       sidebar: [

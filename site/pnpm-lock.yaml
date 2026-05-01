@@ -8,15 +8,16 @@ importers:
 
   .:
     dependencies:
-      '@astrojs/check':
-        specifier: ^0.9.4
-        version: 0.9.9(prettier@3.8.3)(typescript@5.9.3)
       '@astrojs/starlight':
         specifier: 0.38.4
         version: 0.38.4(astro@6.2.1(@types/node@24.12.2)(rollup@4.60.2)(typescript@5.9.3)(yaml@2.8.3))
       astro:
         specifier: 6.2.1
         version: 6.2.1(@types/node@24.12.2)(rollup@4.60.2)(typescript@5.9.3)(yaml@2.8.3)
+    devDependencies:
+      '@astrojs/check':
+        specifier: ^0.9.4
+        version: 0.9.9(prettier@3.8.3)(typescript@5.9.3)
       sharp:
         specifier: ^0.34.0
         version: 0.34.5
