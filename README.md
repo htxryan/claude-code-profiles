@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/htxryan/claude-code-config-profiles/main/docs/assets/c3p-logo-dark.png">
-    <img alt="C3P — Claude Code Config Profiles" src="https://raw.githubusercontent.com/htxryan/claude-code-config-profiles/main/docs/assets/c3p-logo-light.png" width="420">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/c3p-logo-dark.png">
+    <img alt="C3P — Claude Code Config Profiles" src="docs/assets/c3p-logo-light.png" width="420">
   </picture>
 </p>
 
