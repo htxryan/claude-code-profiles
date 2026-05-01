@@ -70,13 +70,13 @@ files contribute to the resolved tree.
         <text x="14" y="70" font-family="var(--font-mono, monospace)" font-size="11">includes: [py, rs, docs]</text>
       </g>
 
-      <line x1="200" y1="64" x2="220" y2="148"
+      <line x1="200" y1="64" x2="220" y2="156"
         stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5"
         marker-end="url(#inc-arrow)" />
       <line x1="200" y1="164" x2="220" y2="164"
         stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5"
         marker-end="url(#inc-arrow)" />
-      <line x1="200" y1="264" x2="220" y2="180"
+      <line x1="200" y1="264" x2="220" y2="172"
         stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5"
         marker-end="url(#inc-arrow)" />
 

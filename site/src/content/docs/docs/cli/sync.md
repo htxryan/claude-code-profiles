@@ -34,6 +34,12 @@ GLOBAL OPTIONS
 EXAMPLES
   c3p sync
   c3p sync --on-drift=discard
+
+EXIT CODES
+  0  success
+  1  no profile is currently active; drift abort; missing --on-drift in non-TTY
+  2  IO fault
+  3  cycle / missing include / lock held by peer
 ```
 
 ## Example

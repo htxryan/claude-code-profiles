@@ -39,6 +39,11 @@ EXAMPLES
   c3p doctor                # human-readable status table
   c3p doctor --json         # machine-readable summary for CI
   c3p doctor || echo "check failed"  # gate a script on health
+
+EXIT CODES
+  0  all checks passed
+  1  one or more checks reported a warning or failure
+  2  IO/permission fault while running checks
 ```
 
 ## Example

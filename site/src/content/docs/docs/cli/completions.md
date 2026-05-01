@@ -57,3 +57,8 @@ c3p completions fish > ~/.config/fish/completions/c3p.fish
 ## See also
 
 - [Quickstart](/docs/guides/quickstart/) — typical first-time setup
+- [`c3p use`](/docs/cli/use/) / [`c3p diff`](/docs/cli/diff/) /
+  [`c3p validate`](/docs/cli/validate/) / [`c3p sync`](/docs/cli/sync/) —
+  the verbs whose profile-name argument benefits from tab-complete
+- [Profile concept](/docs/concepts/profile/) — what tab-complete
+  enumerates from `.claude-profiles/`
