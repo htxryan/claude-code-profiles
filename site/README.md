@@ -213,6 +213,87 @@ opening a PR; CF Pages comments with the preview URL within ~5 min.
 F-6 is a meta-check: `ls .github/workflows/` should show **no** new
 `deploy-site.yml` (or similar) — deploys live in the CF dashboard, not in CI.
 
+## Integration Verification (E6)
+
+`scripts/iv.mjs` runs the cross-epic IV pass for the site. It validates
+the C1–C5 contracts from the IV epic (`claude-code-profiles-rt8`)
+end-to-end against a fresh build of `dist/`, and (optionally) against
+the live production URL.
+
+### Run it
+
+```bash
+pnpm iv                         # full pass (build + smoke + lighthouse)
+pnpm iv:fast                    # skip Lighthouse — quickest signal
+pnpm iv:offline                 # skip Lighthouse + production smoke
+pnpm iv:update-baselines        # rewrite test-baselines/ from current build
+```
+
+The full pass takes ~30s on an M-series Mac (well under the F-1 budget
+of 5 min). Lighthouse is the dominant cost (~13s for two pages).
+
+### What each phase guarantees
+
+| Phase | Contract | What it asserts |
+|-------|----------|-----------------|
+| C1 composition | scaffold → all downstream | `dist/` contains every expected route artifact (marketing, 404, OG, every Concept / CLI verb spot-check, search index, sitemap) |
+| C2 theme + reduced-motion | tokens → marketing/docs | Body bg differs across `[data-theme="dark"]` / `[data-theme="light"]`; `--motion-duration-md` collapses to ≤1ms under `prefers-reduced-motion: reduce` |
+| C2 visual baselines | tokens → marketing/docs | Pixel-stable screenshots of `/`, `/docs/`, `/docs/concepts/extends/`, `/404` in both themes (baselines under `test-baselines/`) |
+| C3 axe-core | marketing → IV | Zero `impact: critical` violations on the four target routes × both themes |
+| C4 link integrity | docs → IV | Every internal `<a href>` under `dist/docs/**` resolves to a real file |
+| C4 mermaid SSR | docs → IV | `extends`/`includes` Concept pages contain inline `<svg>`, not the `text/x-mermaid` placeholder (R-U-16, R-U-14) |
+| C4 pagefind | docs → IV | `pagefind/` index ships fragments; `?q=drift` returns ≥ 3 results |
+| C5 production smoke | deploy → IV | Apex returns 200 with the C3P headline; `og.png` is `image/png`; `www` redirects (currently warn — see `claude-code-profiles-rsf`) |
+| C3/C4 lighthouse | marketing+docs → IV | Performance / Accessibility / Best-Practices / SEO scores ≥ 90 on landing + `docs/concepts/extends/` |
+
+### Visual baselines
+
+`test-baselines/{light,dark}/*.png` is the snapshot store. By default
+the visual phase only verifies a screenshot was captured and writes
+any mismatch to a sibling `*.actual.png` for inspection — cross-machine
+renders drift by font hinting and GPU compositing, so a pixel-equal
+gate would flake permanently in CI.
+
+Re-record intentionally with `pnpm iv:update-baselines` and review the
+resulting PNGs in the diff. Set `IV_VISUAL_STRICT=1` to enforce
+pixel-equality (only useful on the same machine that captured the
+baseline — typically when iterating on a tokens / layout change).
+
+### Environment variables
+
+| Var | Default | Purpose |
+|-----|---------|---------|
+| `IV_VISUAL_STRICT` | unset | Enforce pixel-equal visual baselines (local dev only) |
+| `SMOKE_WWW_STRICT` | unset | Fail (not warn) when `www.getc3p.dev` doesn't 301 to apex. Flip this to `1` once `claude-code-profiles-rsf` is closed so the contract is locked in. |
+
+### Failure-injection drill (C5)
+
+The contracts table calls for a "push broken commit on a branch →
+production unaffected" drill. Run this once after a deploy-pipeline
+change:
+
+1. Branch off `main`, push a commit that breaks `pnpm build` (e.g.
+   delete `astro.config.mjs`).
+2. Verify CF Pages reports the build as failed in the PR's deployment
+   comment.
+3. Verify `https://getc3p.dev` continues to serve the prior production
+   deployment (`curl -sI https://getc3p.dev | head -1` → `HTTP/2 200`).
+4. Discard the branch.
+
+The drill is documented in detail under [Rollback drill](#rollback-drill)
+above.
+
+### Bug protocol
+
+Per the IV-5 protocol, integration failures spawn bug beads with
+`bd dep add … --type related` to the originating epic. Open bugs at
+the time of writing:
+
+| Bug | Contract | Status |
+|-----|----------|--------|
+| `claude-code-profiles-rsf` | C5 (www-redirect) | open — DNS gap; surfaced as warn |
+| `claude-code-profiles-3jd` | C3 (axe color-contrast) | open — serious-level on install CTA `<code>`; not blocking IV (we gate on critical only) |
+
 ## What this directory does **not** touch
 
 The CLI source tree at the repo root (`src/`, `tests/`, `package.json`,

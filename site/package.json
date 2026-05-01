@@ -15,7 +15,11 @@
     "preview": "astro preview",
     "astro": "astro",
     "og": "node scripts/build-og.mjs",
-    "check:tokens": "astro build && node scripts/check-tokens.mjs"
+    "check:tokens": "astro build && node scripts/check-tokens.mjs",
+    "iv": "node scripts/iv.mjs",
+    "iv:fast": "node scripts/iv.mjs --skip-lighthouse",
+    "iv:offline": "node scripts/iv.mjs --skip-lighthouse --skip-smoke",
+    "iv:update-baselines": "node scripts/iv.mjs --skip-lighthouse --update-baselines"
   },
   "dependencies": {
     "@astrojs/starlight": "0.38.4",
@@ -23,6 +27,9 @@
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.4",
+    "@axe-core/playwright": "^4.11.3",
+    "chrome-launcher": "^1.2.1",
+    "lighthouse": "^13.1.0",
     "mermaid": "^11.14.0",
     "playwright": "^1.59.1",
     "rehype-mermaid": "^3.0.0",

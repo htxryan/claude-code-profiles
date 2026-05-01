@@ -20,3 +20,7 @@ site/dist/
 site/node_modules/
 site/.astro/
 site/.claude/
+
+# IV — diffs captured on a visual mismatch. The baselines themselves
+# (under test-baselines/{light,dark}/*.png) are committed.
+site/test-baselines/**/*.actual.png
