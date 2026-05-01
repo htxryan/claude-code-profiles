@@ -1,0 +1,28 @@
+---
+// Inline theme bootstrap — runs before paint to honor whatever theme
+// the user picked over in /docs/, falling back to the OS setting.
+// Mirrors Starlight's contract: it stores the chosen theme under
+// `localStorage["starlight-theme"]` (values: "auto" | "dark" | "light").
+//
+// `is:inline` is load-bearing: Astro must NOT bundle this script, or
+// it will be deferred and the page will flash before the dark/light
+// switch lands.
+---
+<script is:inline>
+  (function () {
+    try {
+      var stored = localStorage.getItem('starlight-theme');
+      var theme =
+        stored === 'light' || stored === 'dark'
+          ? stored
+          : window.matchMedia('(prefers-color-scheme: light)').matches
+            ? 'light'
+            : 'dark';
+      if (theme === 'light') {
+        document.documentElement.dataset.theme = 'light';
+      }
+    } catch (_) {
+      /* localStorage / matchMedia unavailable — keep dark default. */
+    }
+  })();
+</script>

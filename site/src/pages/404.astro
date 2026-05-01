@@ -11,6 +11,7 @@
 import '../styles/global.css';
 
 import MetaHead from '../components/marketing/MetaHead.astro';
+import ThemeInit from '../components/marketing/ThemeInit.astro';
 import CtaButton from '../components/marketing/CtaButton.astro';
 ---
 <!doctype html>
@@ -20,24 +21,7 @@ import CtaButton from '../components/marketing/CtaButton.astro';
       title="Misplaced — getc3p.dev"
       description="The page you tried to reach has been misplaced. Search the docs or head home."
     />
-    <script is:inline>
-      (function () {
-        try {
-          var stored = localStorage.getItem('starlight-theme');
-          var theme =
-            stored === 'light' || stored === 'dark'
-              ? stored
-              : window.matchMedia('(prefers-color-scheme: light)').matches
-                ? 'light'
-                : 'dark';
-          if (theme === 'light') {
-            document.documentElement.dataset.theme = 'light';
-          }
-        } catch (_) {
-          /* localStorage / matchMedia unavailable — keep dark default. */
-        }
-      })();
-    </script>
+    <ThemeInit />
   </head>
   <body>
     <a href="#main-content" class="skip-link">Skip to content</a>
@@ -87,7 +71,11 @@ import CtaButton from '../components/marketing/CtaButton.astro';
 
     <footer class="site-footer">
       <div class="site-footer__inner">
-        <p class="site-footer__voice">Programmed for etiquette and graceful recovery.</p>
+        <p class="site-footer__links">
+          <a href="/">Home</a>
+          <span aria-hidden="true">&middot;</span>
+          <a href="/docs/">Docs</a>
+        </p>
       </div>
     </footer>
 
@@ -206,11 +194,15 @@ import CtaButton from '../components/marketing/CtaButton.astro';
         text-align: center;
       }
 
-      .site-footer__voice {
+      .site-footer__links {
         margin: 0;
-        color: var(--color-text-subtle);
-        font-size: var(--type-scale-1);
-        font-style: italic;
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-3);
+        align-items: center;
+        justify-content: center;
+        color: var(--color-text-muted);
+        font-size: var(--type-scale-2);
       }
     </style>
   </body>

@@ -8,6 +8,7 @@
 import '../styles/global.css';
 
 import MetaHead from '../components/marketing/MetaHead.astro';
+import ThemeInit from '../components/marketing/ThemeInit.astro';
 import Hero from '../components/marketing/Hero.astro';
 import FeatureCard from '../components/marketing/FeatureCard.astro';
 
@@ -39,28 +40,7 @@ const PERSONAS = [
       title="C3P — Profile-based config swaps for Claude Code"
       description="Swap Claude Code configs across profiles without losing work. C3P refuses unsafe swaps when you have uncommitted edits to .claude/."
     />
-    <script is:inline>
-      // Mirror Starlight's theme contract before paint to avoid a flash.
-      // Starlight stores the chosen theme under
-      // `localStorage["starlight-theme"]` (values: "auto" | "dark" |
-      // "light"); we honor it identically.
-      (function () {
-        try {
-          var stored = localStorage.getItem('starlight-theme');
-          var theme =
-            stored === 'light' || stored === 'dark'
-              ? stored
-              : window.matchMedia('(prefers-color-scheme: light)').matches
-                ? 'light'
-                : 'dark';
-          if (theme === 'light') {
-            document.documentElement.dataset.theme = 'light';
-          }
-        } catch (_) {
-          /* localStorage / matchMedia unavailable — keep dark default. */
-        }
-      })();
-    </script>
+    <ThemeInit />
   </head>
   <body>
     <a href="#main-content" class="skip-link">Skip to content</a>
