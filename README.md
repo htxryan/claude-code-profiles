@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/c3p-logo-dark.png">
+    <img alt="C3P — Claude Code Config Profiles" src="docs/assets/c3p-logo-light.png" width="420">
+  </picture>
+</p>
+
 # claude-code-config-profiles (C3P — humbly at your service)
 
 Fluent in many forms of `.claude/` configuration.
