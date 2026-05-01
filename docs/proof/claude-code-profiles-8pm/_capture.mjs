@@ -55,8 +55,14 @@ for (const s of surfaces) {
 
 // GitHub README on the feat branch — both themes via prefers-color-scheme
 // emulation (the README's <picture> element keys off this).
+//
+// Use the BLOB view (`/blob/.../README.md`), not the tree view. GitHub's tree
+// view renders transparent PNGs with a checkerboard transparency-indicator
+// overlay (handy in file previews, distracting in a brand shot). The blob view
+// shows the README the same way users will see it after merge — the canonical
+// rendering.
 const README_URL =
-  'https://github.com/htxryan/claude-code-config-profiles/tree/feat/brand-logo';
+  'https://github.com/htxryan/claude-code-config-profiles/blob/feat/brand-logo/README.md';
 for (const scheme of ['dark', 'light']) {
   const ctx = await browser.newContext({
     viewport: { width: 1280, height: 1600 },
@@ -64,7 +70,9 @@ for (const scheme of ['dark', 'light']) {
     colorScheme: scheme,
   });
   const p = await ctx.newPage();
-  await p.goto(README_URL, { waitUntil: 'networkidle', timeout: 60_000 });
+  // GitHub's tree page rarely reaches `networkidle` (background telemetry).
+  // `load` is enough — we explicitly waitFor the README image below.
+  await p.goto(README_URL, { waitUntil: 'load', timeout: 60_000 });
   // Wait for the logo image inside the rendered README to load.
   await p
     .locator('article img[alt^="C3P"]')

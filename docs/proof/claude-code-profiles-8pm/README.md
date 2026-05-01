@@ -25,3 +25,11 @@ the C3P site dev server on `127.0.0.1:4329`, then `node _capture.mjs`.
 
 The README screenshots use Playwright's `colorScheme` emulation, which
 GitHub honors via `prefers-color-scheme` for unauthenticated viewers.
+
+**README capture target.** The script captures the **blob view**
+(`/blob/feat/brand-logo/README.md`), not the **tree view**
+(`/tree/feat/brand-logo`). They render the same README with two different
+treatments: the tree view overlays a checkerboard "transparency indicator"
+on transparent PNGs, while the blob view shows the image cleanly over the
+page background. The blob view is what users see when they actually open
+the README; that is the canonical rendering, so that is what we captured.
