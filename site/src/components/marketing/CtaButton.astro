@@ -1,0 +1,58 @@
+---
+// Reusable CTA link styled as a button. `variant` picks the visual
+// weight; `href` is required. Anything else passes through to <a>.
+
+interface Props {
+  href: string;
+  variant?: 'primary' | 'secondary';
+  class?: string;
+}
+
+const { href, variant = 'primary', class: extraClass = '' } = Astro.props;
+const classes = ['cta', `cta--${variant}`, extraClass].filter(Boolean).join(' ');
+---
+<a class={classes} href={href}><slot /></a>
+
+<style>
+  .cta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-5);
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: var(--type-scale-3);
+    line-height: 1.2;
+    border: 1px solid transparent;
+    transition:
+      background var(--motion-duration-sm) var(--motion-easing-standard),
+      color var(--motion-duration-sm) var(--motion-easing-standard),
+      border-color var(--motion-duration-sm) var(--motion-easing-standard),
+      transform var(--motion-duration-xs) var(--motion-easing-standard);
+  }
+
+  .cta--primary {
+    background: var(--color-accent);
+    color: var(--color-text-on-accent);
+  }
+
+  .cta--primary:hover {
+    background: var(--color-accent-emphasis);
+    color: var(--color-text-on-accent);
+    transform: translateY(-1px);
+  }
+
+  .cta--secondary {
+    background: transparent;
+    color: var(--color-text-primary);
+    border-color: var(--color-border-strong);
+  }
+
+  .cta--secondary:hover {
+    color: var(--color-text-primary);
+    border-color: var(--color-accent);
+    background: var(--color-bg-elevated);
+  }
+</style>

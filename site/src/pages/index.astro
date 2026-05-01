@@ -1,24 +1,49 @@
 ---
-// E1 placeholder layout, upgraded by E2 to consume design tokens and meet the
-// accessibility baseline (skip-to-content, semantic landmarks, focus styles
-// inherited from `global.css`). E3 replaces the body content with the real
-// drift-gate hero + persona cards.
-import '../styles/global.css';
----
+// Marketing landing (R-U-1, R-U-4, R-U-5).
+//
+// Composition is intentionally shallow per Ousterhout: each marketing
+// surface is one component, the page wires them together. No parallel
+// design system — every visual value comes from `tokens.css`.
 
+import '../styles/global.css';
+
+import MetaHead from '../components/marketing/MetaHead.astro';
+import Hero from '../components/marketing/Hero.astro';
+import FeatureCard from '../components/marketing/FeatureCard.astro';
+
+const INSTALL_COMMAND = 'npm install -g claude-code-config-profiles';
+const DOCS_HREF = '/docs/';
+const REPO_URL = 'https://github.com/htxryan/claude-code-config-profiles';
+const NPM_URL = 'https://www.npmjs.com/package/claude-code-config-profiles';
+const LICENSE_URL = `${REPO_URL}/blob/main/LICENSE`;
+
+const PERSONAS = [
+  {
+    persona: 'The solo dev',
+    pitch: 'Experimental vs stable profiles without git stash hacks.',
+  },
+  {
+    persona: 'The team lead',
+    pitch: 'One source of truth for .claude/, shared across the team.',
+  },
+  {
+    persona: 'The CI/CD engineer',
+    pitch: 'Atomic, drift-proof swaps for deterministic agent runs.',
+  },
+];
+---
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width" />
-    <title>C3P — getc3p.dev</title>
-    <meta name="description" content="Profile-based config swaps for Claude Code" />
+    <MetaHead
+      title="C3P — Profile-based config swaps for Claude Code"
+      description="Swap Claude Code configs across profiles without losing work. C3P refuses unsafe swaps when you have uncommitted edits to .claude/."
+    />
     <script is:inline>
-      // Mirror Starlight's theme contract so the marketing landing matches
-      // whichever theme the user picked in /docs/, falling back to the OS
-      // setting. Runs before paint to avoid a flash. Starlight stores the
-      // chosen theme under `localStorage["starlight-theme"]` (values:
-      // "auto" | "dark" | "light"); we honor it identically.
+      // Mirror Starlight's theme contract before paint to avoid a flash.
+      // Starlight stores the chosen theme under
+      // `localStorage["starlight-theme"]` (values: "auto" | "dark" |
+      // "light"); we honor it identically.
       (function () {
         try {
           var stored = localStorage.getItem('starlight-theme');
@@ -44,33 +69,38 @@ import '../styles/global.css';
       <div class="site-header__inner">
         <a href="/" class="site-header__brand" aria-label="C3P home">C3P</a>
         <nav aria-label="Primary">
-          <a href="/docs/">Docs</a>
+          <a href={DOCS_HREF}>Docs</a>
         </nav>
       </div>
     </header>
 
     <main id="main-content" tabindex="-1" class="landing">
-      <section class="hero" aria-labelledby="hero-title">
-        <h1 id="hero-title">C3P</h1>
-        <p class="hero__lede">Profile-based config swaps for Claude Code.</p>
-        <p>
-          <a class="cta" href="/docs/">Read the docs &rarr;</a>
-        </p>
+      <Hero installCommand={INSTALL_COMMAND} docsHref={DOCS_HREF} />
+
+      <section class="personas" aria-labelledby="personas-title">
+        <h2 id="personas-title" class="personas__title">Built for the way you ship</h2>
+        <div class="personas__grid">
+          {PERSONAS.map((p) => <FeatureCard persona={p.persona} pitch={p.pitch} />)}
+        </div>
       </section>
     </main>
 
     <footer class="site-footer">
-      <p>
-        <a href="https://github.com/htxryan/claude-code-config-profiles">GitHub</a>
-        &middot;
-        <a href="https://www.npmjs.com/package/claude-code-config-profiles">npm</a>
-      </p>
+      <div class="site-footer__inner">
+        <p class="site-footer__links">
+          <a href={REPO_URL} rel="noopener">GitHub</a>
+          <span aria-hidden="true">&middot;</span>
+          <a href={NPM_URL} rel="noopener">npm</a>
+          <span aria-hidden="true">&middot;</span>
+          <a href={LICENSE_URL} rel="noopener">License</a>
+        </p>
+        <p class="site-footer__voice">
+          Programmed for etiquette and uncommitted-edit refusal.
+        </p>
+      </div>
     </footer>
 
     <style>
-      /* Page-specific layout — consumes tokens from `global.css`. E3 will
-         replace the hero with the drift-gate motion demo. */
-
       .site-header {
         border-bottom: 1px solid var(--color-border);
         background: var(--color-bg-surface);
@@ -97,53 +127,66 @@ import '../styles/global.css';
       .landing {
         max-width: var(--container-max-width);
         margin: 0 auto;
-        padding: var(--space-8) var(--space-5);
+        padding: var(--space-6) var(--space-5) var(--space-8);
       }
 
-      .hero {
-        text-align: center;
+      .personas {
         padding: var(--space-7) 0;
+        border-top: 1px solid var(--color-border);
       }
 
-      .hero h1 {
-        font-size: var(--type-scale-6);
+      .personas__title {
+        margin: 0 0 var(--space-6);
+        font-size: var(--type-scale-5);
         line-height: var(--type-leading-tight);
         letter-spacing: var(--type-tracking-tight);
-        margin: 0 0 var(--space-4);
+        text-align: center;
       }
 
-      .hero__lede {
-        font-size: var(--type-scale-4);
-        color: var(--color-text-muted);
-        margin: 0 0 var(--space-6);
+      .personas__grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: var(--space-5);
       }
 
-      .cta {
-        display: inline-block;
-        padding: var(--space-3) var(--space-5);
-        background: var(--color-accent);
-        color: var(--color-text-on-accent);
-        border-radius: var(--radius-md);
-        text-decoration: none;
-        font-weight: 600;
-        transition:
-          background var(--motion-duration-sm) var(--motion-easing-standard),
-          transform var(--motion-duration-xs) var(--motion-easing-standard);
-      }
-
-      .cta:hover {
-        background: var(--color-accent-emphasis);
-        color: var(--color-text-on-accent);
-        transform: translateY(-1px);
+      @media (min-width: 48rem) {
+        .personas__grid {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
       }
 
       .site-footer {
+        border-top: 1px solid var(--color-border);
+        background: var(--color-bg-surface);
+      }
+
+      .site-footer__inner {
         max-width: var(--container-max-width);
         margin: 0 auto;
         padding: var(--space-6) var(--space-5);
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-2);
+        align-items: center;
+        text-align: center;
+      }
+
+      .site-footer__links {
+        margin: 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-3);
+        align-items: center;
+        justify-content: center;
         color: var(--color-text-muted);
         font-size: var(--type-scale-2);
-        border-top: 1px solid var(--color-border);
+      }
+
+      .site-footer__voice {
+        margin: 0;
+        color: var(--color-text-subtle);
+        font-size: var(--type-scale-1);
+        font-style: italic;
       }
     </style>
   </body>

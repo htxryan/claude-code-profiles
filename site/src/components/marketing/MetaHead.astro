@@ -1,0 +1,41 @@
+---
+// Shared <head> meta — Open Graph + Twitter Card (R-U-5).
+//
+// Renders absolute URLs for og:image / og:url so social previewers
+// resolve correctly regardless of the page they're scraping. The
+// canonical URL is built from `Astro.url` against the configured
+// `site` URL, so this component works under preview deploys too.
+
+interface Props {
+  title: string;
+  description: string;
+  /** Path under the site (e.g. `/og.png`); resolved against `Astro.site`. */
+  image?: string;
+}
+
+const { title, description, image = '/og.png' } = Astro.props;
+
+const siteUrl = Astro.site ?? new URL('https://getc3p.dev');
+const canonical = new URL(Astro.url.pathname, siteUrl).toString();
+const imageUrl = new URL(image, siteUrl).toString();
+---
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="generator" content={Astro.generator} />
+<title>{title}</title>
+<meta name="description" content={description} />
+<link rel="canonical" href={canonical} />
+
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="C3P" />
+<meta property="og:title" content={title} />
+<meta property="og:description" content={description} />
+<meta property="og:url" content={canonical} />
+<meta property="og:image" content={imageUrl} />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content={title} />
+<meta name="twitter:description" content={description} />
+<meta name="twitter:image" content={imageUrl} />

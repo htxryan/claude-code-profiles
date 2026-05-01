@@ -1,0 +1,140 @@
+---
+// Primary install CTA — copies a fixed shell command to the clipboard
+// on click. Visible label looks like a button; the actual command sits
+// in `data-command` so the visible copy can stay short. Confirmation
+// is announced via an `aria-live="polite"` region (F-3).
+
+interface Props {
+  command: string;
+  label?: string;
+}
+
+const { command, label = 'Install' } = Astro.props;
+---
+<div class="copy-cta">
+  <button
+    type="button"
+    class="copy-cta__button"
+    data-command={command}
+    aria-describedby="copy-cta-cmd"
+  >
+    <span class="copy-cta__label">{label}</span>
+    <code id="copy-cta-cmd" class="copy-cta__cmd">{command}</code>
+  </button>
+  <p class="copy-cta__status" role="status" aria-live="polite"></p>
+</div>
+
+<script>
+  /* Wired up here (not via inline `is:client`) so it ships once for the
+     page and works without any framework runtime. The handler is
+     idempotent — multiple clicks just re-confirm. */
+  const buttons = document.querySelectorAll<HTMLButtonElement>('.copy-cta__button');
+  for (const button of buttons) {
+    const status = button.parentElement?.querySelector<HTMLElement>('.copy-cta__status');
+    button.addEventListener('click', async () => {
+      const cmd = button.dataset.command ?? '';
+      let ok = false;
+      try {
+        await navigator.clipboard.writeText(cmd);
+        ok = true;
+      } catch {
+        /* Clipboard blocked (Safari permissions, http://, etc.) — fall
+           back to a select-and-prompt path so the user can still copy. */
+        const range = document.createRange();
+        const codeEl = button.querySelector('code');
+        if (codeEl) {
+          range.selectNodeContents(codeEl);
+          const sel = window.getSelection();
+          sel?.removeAllRanges();
+          sel?.addRange(range);
+        }
+      }
+      if (status) {
+        status.textContent = ok ? 'Copied to clipboard.' : 'Select and copy manually.';
+        button.dataset.copied = ok ? 'true' : 'false';
+        window.setTimeout(() => {
+          status.textContent = '';
+          delete button.dataset.copied;
+        }, 2200);
+      }
+    });
+  }
+</script>
+
+<style>
+  .copy-cta {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-2);
+    /* Keep the button from collapsing to text width when the parent is
+       a flex/grid container with `align-items: stretch`. */
+    min-width: 0;
+  }
+
+  .copy-cta__button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    padding: var(--space-3) var(--space-5);
+    background: var(--color-accent);
+    color: var(--color-text-on-accent);
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+      background var(--motion-duration-sm) var(--motion-easing-standard),
+      transform var(--motion-duration-xs) var(--motion-easing-standard);
+  }
+
+  .copy-cta__button:hover {
+    background: var(--color-accent-emphasis);
+    transform: translateY(-1px);
+  }
+
+  .copy-cta__button[data-copied="true"] {
+    background: var(--color-success);
+    color: var(--color-bg-primary);
+  }
+
+  .copy-cta__label {
+    font-size: var(--type-scale-3);
+    line-height: 1.2;
+  }
+
+  .copy-cta__cmd {
+    font-family: var(--font-mono);
+    font-size: var(--type-scale-2);
+    color: var(--color-text-on-accent);
+    background: rgba(15, 23, 42, 0.18);
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-sm);
+    /* Truncate gracefully on narrow viewports rather than wrapping
+       and breaking the button height. */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 28rem;
+  }
+
+  .copy-cta__status {
+    margin: 0;
+    min-height: 1.25em; /* reserve space so the layout doesn't shift */
+    color: var(--color-text-muted);
+    font-size: var(--type-scale-2);
+  }
+
+  @media (max-width: 32rem) {
+    .copy-cta__button {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--space-2);
+    }
+    .copy-cta__cmd {
+      max-width: 100%;
+    }
+  }
+</style>

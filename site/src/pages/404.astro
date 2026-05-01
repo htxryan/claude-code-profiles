@@ -1,0 +1,217 @@
+---
+// Custom 404 (R-U-6).
+//
+// Three things, in order of importance: a one-line voice line so
+// visitors know the page is intentional, a search box that becomes
+// live once Pagefind ships in E4, and a link back to `/`. Pagefind's
+// JS lives at `/pagefind/pagefind-ui.js` once the docs are indexed; if
+// the asset is missing (preview deploy without docs, dev runs), the
+// search box gracefully degrades to the docs index link.
+
+import '../styles/global.css';
+
+import MetaHead from '../components/marketing/MetaHead.astro';
+import CtaButton from '../components/marketing/CtaButton.astro';
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <MetaHead
+      title="Misplaced — getc3p.dev"
+      description="The page you tried to reach has been misplaced. Search the docs or head home."
+    />
+    <script is:inline>
+      (function () {
+        try {
+          var stored = localStorage.getItem('starlight-theme');
+          var theme =
+            stored === 'light' || stored === 'dark'
+              ? stored
+              : window.matchMedia('(prefers-color-scheme: light)').matches
+                ? 'light'
+                : 'dark';
+          if (theme === 'light') {
+            document.documentElement.dataset.theme = 'light';
+          }
+        } catch (_) {
+          /* localStorage / matchMedia unavailable — keep dark default. */
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <a href="#main-content" class="skip-link">Skip to content</a>
+
+    <header class="site-header">
+      <div class="site-header__inner">
+        <a href="/" class="site-header__brand" aria-label="C3P home">C3P</a>
+        <nav aria-label="Primary">
+          <a href="/docs/">Docs</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main-content" tabindex="-1" class="not-found">
+      <p class="not-found__code" aria-hidden="true">404</p>
+      <h1 class="not-found__title">I appear to have misplaced this page.</h1>
+      <p class="not-found__voice">
+        How very distressing. Try the search below, or return to safer ground.
+      </p>
+
+      <form
+        class="not-found__search"
+        role="search"
+        action="/docs/"
+        method="get"
+        aria-label="Search the docs"
+      >
+        <label for="not-found-q" class="sr-only">Search the docs</label>
+        <input
+          id="not-found-q"
+          name="q"
+          type="search"
+          placeholder="Search the docs…"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <button type="submit" class="not-found__submit">Search</button>
+        <p class="not-found__search-hint">
+          Live search arrives once the docs are indexed (Pagefind, E4).
+        </p>
+      </form>
+
+      <p class="not-found__home">
+        <CtaButton href="/" variant="primary">Take me home</CtaButton>
+      </p>
+    </main>
+
+    <footer class="site-footer">
+      <div class="site-footer__inner">
+        <p class="site-footer__voice">Programmed for etiquette and graceful recovery.</p>
+      </div>
+    </footer>
+
+    <style>
+      .site-header {
+        border-bottom: 1px solid var(--color-border);
+        background: var(--color-bg-surface);
+      }
+
+      .site-header__inner {
+        max-width: var(--container-max-width);
+        margin: 0 auto;
+        padding: var(--space-4) var(--space-5);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-5);
+      }
+
+      .site-header__brand {
+        font-weight: 700;
+        font-size: var(--type-scale-4);
+        color: var(--color-text-primary);
+        text-decoration: none;
+        letter-spacing: var(--type-tracking-tight);
+      }
+
+      .not-found {
+        max-width: 36rem;
+        margin: 0 auto;
+        padding: var(--space-8) var(--space-5);
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-5);
+      }
+
+      .not-found__code {
+        margin: 0;
+        font-family: var(--font-mono);
+        font-size: var(--type-scale-6);
+        color: var(--color-text-subtle);
+        letter-spacing: var(--type-tracking-wide);
+      }
+
+      .not-found__title {
+        margin: 0;
+        font-size: var(--type-scale-5);
+        line-height: var(--type-leading-tight);
+        letter-spacing: var(--type-tracking-tight);
+      }
+
+      .not-found__voice {
+        margin: 0;
+        color: var(--color-text-muted);
+      }
+
+      .not-found__search {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: var(--space-2);
+        align-items: stretch;
+        margin: var(--space-4) 0 0;
+      }
+
+      .not-found__search input[type="search"] {
+        font: inherit;
+        padding: var(--space-3) var(--space-4);
+        background: var(--color-bg-surface);
+        color: var(--color-text-primary);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md);
+      }
+
+      .not-found__search input[type="search"]::placeholder {
+        color: var(--color-text-subtle);
+      }
+
+      .not-found__submit {
+        font: inherit;
+        font-weight: 600;
+        padding: 0 var(--space-5);
+        background: var(--color-accent);
+        color: var(--color-text-on-accent);
+        border: 1px solid transparent;
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        transition: background var(--motion-duration-sm) var(--motion-easing-standard);
+      }
+
+      .not-found__submit:hover {
+        background: var(--color-accent-emphasis);
+      }
+
+      .not-found__search-hint {
+        grid-column: 1 / -1;
+        margin: 0;
+        color: var(--color-text-subtle);
+        font-size: var(--type-scale-1);
+        text-align: left;
+      }
+
+      .not-found__home {
+        margin: var(--space-2) 0 0;
+      }
+
+      .site-footer {
+        border-top: 1px solid var(--color-border);
+        background: var(--color-bg-surface);
+      }
+
+      .site-footer__inner {
+        max-width: var(--container-max-width);
+        margin: 0 auto;
+        padding: var(--space-5);
+        text-align: center;
+      }
+
+      .site-footer__voice {
+        margin: 0;
+        color: var(--color-text-subtle);
+        font-size: var(--type-scale-1);
+        font-style: italic;
+      }
+    </style>
+  </body>
+</html>

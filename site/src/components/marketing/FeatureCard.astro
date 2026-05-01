@@ -1,0 +1,50 @@
+---
+// Persona-shaped feature card used in the landing's "who is this for"
+// row. Three of these render in a 3-column grid (collapses to 1 col
+// under ~48rem). Heading semantics are `<h3>` because the section
+// uses `<h2>` for the row label.
+
+interface Props {
+  persona: string;
+  pitch: string;
+}
+
+const { persona, pitch } = Astro.props;
+---
+<article class="feature-card">
+  <h3 class="feature-card__persona">{persona}</h3>
+  <p class="feature-card__pitch">{pitch}</p>
+</article>
+
+<style>
+  .feature-card {
+    background: var(--color-bg-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    transition:
+      border-color var(--motion-duration-sm) var(--motion-easing-standard),
+      transform var(--motion-duration-sm) var(--motion-easing-standard);
+  }
+
+  .feature-card:hover {
+    border-color: var(--color-border-strong);
+    transform: translateY(-2px);
+  }
+
+  .feature-card__persona {
+    margin: 0;
+    font-size: var(--type-scale-4);
+    color: var(--color-text-primary);
+    letter-spacing: var(--type-tracking-tight);
+  }
+
+  .feature-card__pitch {
+    margin: 0;
+    color: var(--color-text-muted);
+    line-height: var(--type-leading-normal);
+  }
+</style>

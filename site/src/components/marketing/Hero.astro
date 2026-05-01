@@ -1,0 +1,99 @@
+---
+// Marketing hero — drift-gate demo, headline, subhead, primary +
+// secondary CTAs. Headline ≤ 7 words (R-U-4); subhead names the
+// product. CTAs sit below the demo on narrow viewports and to the
+// right on wide viewports.
+
+import CopyOnClick from './CopyOnClick.astro';
+import CtaButton from './CtaButton.astro';
+import DriftGateDemo from './DriftGateDemo.astro';
+
+interface Props {
+  /** Single source of truth so the install copy stays in lockstep with docs. */
+  installCommand: string;
+  docsHref: string;
+}
+
+const { installCommand, docsHref } = Astro.props;
+---
+<section class="hero" aria-labelledby="hero-title">
+  <div class="hero__copy">
+    <h1 id="hero-title" class="hero__title">
+      Swap Claude configs without losing work.
+    </h1>
+    <p class="hero__lede">
+      C3P — profile-based config swaps for Claude Code that refuse to overwrite
+      your uncommitted edits.
+    </p>
+    <div class="hero__ctas">
+      <CopyOnClick command={installCommand} label="Install" />
+      <CtaButton href={docsHref} variant="secondary">Read the docs &rarr;</CtaButton>
+    </div>
+  </div>
+
+  <div class="hero__demo">
+    <DriftGateDemo />
+  </div>
+</section>
+
+<style>
+  .hero {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-7);
+    padding: var(--space-7) 0 var(--space-8);
+    align-items: center;
+  }
+
+  @media (min-width: 60rem) {
+    .hero {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+      gap: var(--space-8);
+    }
+  }
+
+  .hero__copy {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+    /* Constrain measure for readability — Bringhurst's 45-75ch rule. */
+    max-width: 36rem;
+  }
+
+  .hero__title {
+    margin: 0;
+    font-size: var(--type-scale-6);
+    line-height: var(--type-leading-tight);
+    letter-spacing: var(--type-tracking-tight);
+    color: var(--color-text-primary);
+  }
+
+  @media (min-width: 60rem) {
+    .hero__title {
+      /* Fluid bump on wider screens — caps at the underlying token. */
+      font-size: clamp(var(--type-scale-6), 4.5vw, 3.25rem);
+    }
+  }
+
+  .hero__lede {
+    margin: 0;
+    font-size: var(--type-scale-4);
+    line-height: var(--type-leading-normal);
+    color: var(--color-text-muted);
+  }
+
+  .hero__ctas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+    align-items: center;
+  }
+
+  .hero__demo {
+    /* Cap the demo width so 16:9 viewports don't make it the dominant
+       LCP element competing with the headline. */
+    max-width: 40rem;
+    width: 100%;
+    justify-self: stretch;
+  }
+</style>

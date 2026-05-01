@@ -1,0 +1,207 @@
+---
+// Drift-gate-blocks-swap demo — the single most important interaction
+// on the landing. An animated "terminal" shows `c3p use dev` being
+// refused because the user has uncommitted edits to
+// `.claude/settings.json`, then suggests `c3p drift` and `git status`.
+//
+// Implementation rules:
+//   - Pure CSS animation. No JS, so it never blocks LCP (F-1).
+//   - Static markup means screen readers read the final state in order.
+//   - `prefers-reduced-motion: reduce` collapses every duration to
+//     0.01ms via the global rule in `tokens.css` / `global.css`, which
+//     naturally lands the demo on its final "moment of refusal" frame
+//     (F-4).
+//   - The terminal is decorative (the headline carries the message);
+//     `aria-hidden="true"` keeps assistive tech from narrating the
+//     ASCII while still letting visual users feel the animation. The
+//     accessible summary lives in a sibling `.sr-only` paragraph so
+//     the value prop is conveyed identically to all users.
+---
+<figure class="drift-demo">
+  <p class="sr-only">
+    Demonstration: running <code>c3p use dev</code> is refused because
+    <code>.claude/settings.json</code> has uncommitted edits. C3P prints a
+    refusal and tells you to commit, stash, or run <code>c3p drift</code>.
+  </p>
+
+  <div class="drift-demo__terminal" aria-hidden="true" role="presentation">
+    <div class="drift-demo__chrome">
+      <span class="drift-demo__dot drift-demo__dot--r"></span>
+      <span class="drift-demo__dot drift-demo__dot--y"></span>
+      <span class="drift-demo__dot drift-demo__dot--g"></span>
+      <span class="drift-demo__title">~/your-project</span>
+    </div>
+
+    <pre class="drift-demo__pane"><span class="drift-demo__line drift-demo__line--prompt"
+><span class="drift-demo__sigil">$</span> <span class="drift-demo__type"
+>c3p use dev</span><span class="drift-demo__caret">█</span></span>
+<span class="drift-demo__line drift-demo__line--blank"> </span>
+<span class="drift-demo__line drift-demo__line--err"
+><span class="drift-demo__badge">refused</span> uncommitted edits in <span class="drift-demo__path">.claude/settings.json</span></span>
+<span class="drift-demo__line drift-demo__line--hint"
+>  swapping now would <em>silently</em> overwrite your local changes.</span>
+<span class="drift-demo__line drift-demo__line--blank"> </span>
+<span class="drift-demo__line drift-demo__line--hint"
+>  next: <span class="drift-demo__cmd">c3p drift</span> &middot; <span class="drift-demo__cmd">git status</span></span></pre>
+  </div>
+
+  <figcaption class="drift-demo__caption">
+    The drift gate refuses unsafe swaps so your uncommitted work survives.
+  </figcaption>
+</figure>
+
+<style>
+  .drift-demo {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .drift-demo__terminal {
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+    /* Reserve a sane min-height so the surrounding layout doesn't pop
+       between the empty pane (frame 0) and the populated pane (frame
+       N). Keeps LCP stable. */
+    min-height: 14rem;
+  }
+
+  .drift-demo__chrome {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-bg-surface);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .drift-demo__dot {
+    width: 0.65rem;
+    height: 0.65rem;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  .drift-demo__dot--r { background: #ef4444; }
+  .drift-demo__dot--y { background: #f59e0b; }
+  .drift-demo__dot--g { background: #10b981; }
+
+  .drift-demo__title {
+    margin-left: var(--space-3);
+    color: var(--color-text-subtle);
+    font-family: var(--font-mono);
+    font-size: var(--type-scale-1);
+  }
+
+  .drift-demo__pane {
+    margin: 0;
+    padding: var(--space-5);
+    font-family: var(--font-mono);
+    font-size: var(--type-scale-2);
+    line-height: var(--type-leading-relaxed);
+    color: var(--color-text-primary);
+    /* Allow long lines to wrap on narrow viewports. */
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .drift-demo__line {
+    display: block;
+    /* Each line fades in at its own delay; final state is fully visible
+       so reduced-motion (which collapses durations) lands on the
+       refusal frame correctly. */
+    opacity: 0;
+    animation:
+      drift-fade-in var(--motion-duration-md) var(--motion-easing-decel) forwards;
+  }
+
+  .drift-demo__line--prompt   { animation-delay: 100ms; }
+  /* Skip the blank spacer at index 1 (it animates with no visual effect). */
+  .drift-demo__line--err      { animation-delay: 1700ms; }
+  .drift-demo__line--hint:nth-of-type(4) { animation-delay: 1900ms; }
+  .drift-demo__line--hint:nth-of-type(6) { animation-delay: 2200ms; }
+  .drift-demo__line--blank    { opacity: 1; animation: none; }
+
+  .drift-demo__sigil {
+    color: var(--color-accent);
+    margin-right: var(--space-2);
+  }
+
+  /* Typewriter effect on the command — animate `width` from 0 to its
+     content length, hiding the overflow. `ch` units track monospace
+     character width naturally. */
+  .drift-demo__type {
+    display: inline-block;
+    overflow: hidden;
+    white-space: nowrap;
+    vertical-align: bottom;
+    width: 0;
+    animation: drift-type 1100ms steps(11, end) 200ms forwards;
+  }
+
+  .drift-demo__caret {
+    display: inline-block;
+    width: 0.6ch;
+    color: var(--color-accent);
+    animation: drift-blink 900ms steps(2, jump-none) infinite 1400ms;
+  }
+
+  .drift-demo__badge {
+    display: inline-block;
+    padding: 0 var(--space-2);
+    margin-right: var(--space-2);
+    background: var(--color-danger);
+    color: var(--color-bg-primary);
+    border-radius: var(--radius-sm);
+    font-weight: 700;
+    font-size: var(--type-scale-1);
+    letter-spacing: var(--type-tracking-wide);
+    text-transform: uppercase;
+  }
+
+  .drift-demo__path,
+  .drift-demo__cmd {
+    color: var(--color-warn);
+  }
+
+  .drift-demo__line--err {
+    color: var(--color-text-primary);
+  }
+
+  .drift-demo__line--hint {
+    color: var(--color-text-muted);
+  }
+
+  .drift-demo__caption {
+    color: var(--color-text-muted);
+    font-size: var(--type-scale-2);
+    text-align: center;
+  }
+
+  @keyframes drift-fade-in {
+    from { opacity: 0; transform: translateY(2px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes drift-type {
+    from { width: 0; }
+    to   { width: 11ch; }
+  }
+
+  @keyframes drift-blink {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0; }
+  }
+
+  /* Reduced motion: belt-and-braces. Globals already collapse durations,
+     but we explicitly land the typewriter on full-width and stop the
+     caret from blinking so the final frame is unambiguously a refusal. */
+  @media (prefers-reduced-motion: reduce) {
+    .drift-demo__line { opacity: 1; }
+    .drift-demo__type { width: 11ch; }
+    .drift-demo__caret { animation: none; opacity: 0; }
+  }
+</style>
