@@ -27,7 +27,7 @@ files contribute to the resolved tree.
 ## How splicing works
 
 ```mermaid
-flowchart LR
+flowchart TD
     subgraph py["python-toolchain"]
         py1["agents/pylint.md"]
         py2["commands/format-py.md"]

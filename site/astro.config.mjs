@@ -28,13 +28,30 @@ export default defineConfig({
   // bakes the SVG into the static HTML at build time so no client JS is
   // required (R-U-14). Backed by Playwright + chromium — see
   // `playwright install` step in `pnpm build`.
+  //
+  // `theme: 'neutral'` keeps the diagram readable on both light and dark site
+  // themes (no brand-coloured fills that would clash with the dark default).
   markdown: {
-    rehypePlugins: [[rehypeMermaid, { strategy: 'inline-svg' }]],
+    rehypePlugins: [
+      [
+        rehypeMermaid,
+        {
+          strategy: 'inline-svg',
+          mermaidConfig: { theme: 'neutral' },
+        },
+      ],
+    ],
   },
   integrations: [
     starlight({
       title: 'C3P',
       description: 'Profile-based config swaps for Claude Code',
+      // Disable Starlight's auto-injected /404 route so it doesn't collide
+      // with our custom `src/pages/404.astro` (R-U-6). Today our /404.astro
+      // wins by Astro's priority resolver, but Astro logs a deprecation
+      // warning and a future major will hard-error on the collision. Opting
+      // out at the integration level removes both. (Bug claude-code-profiles-imu.)
+      disable404Route: true,
       // Design tokens + Starlight CSS-hook overrides + a11y baseline (E2).
       // Same file is imported directly by `src/pages/*.astro`, so the
       // marketing surface and the docs surface share one vocabulary.

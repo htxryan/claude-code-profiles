@@ -23,7 +23,7 @@ sources, use [`includes`](/docs/concepts/includes/) instead.
 ## How layering works
 
 ```mermaid
-flowchart LR
+flowchart TD
     subgraph base["base (parent)"]
         b1["settings.json"]
         b2["agents/coder.md"]

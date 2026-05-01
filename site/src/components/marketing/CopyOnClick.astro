@@ -113,14 +113,13 @@ const { command, label = 'Install' } = Astro.props;
   .copy-cta__cmd {
     font-family: var(--font-mono);
     font-size: var(--type-scale-2);
-    color: var(--color-text-on-accent);
-    /* Tinted overlay derived from the surrounding text color — keeps
-       contrast in both themes without hardcoding a color. The rgba()
-       fallback is for engines below Chrome 111 / Firefox 113 / Safari
-       16.2 that don't parse color-mix(); without it the chip would
-       render transparent on the accent button and drop contrast. */
-    background: rgba(255 255 255 / 0.15);
-    background: color-mix(in srgb, currentColor 18%, transparent);
+    /* Inset chip — uses page-surface tokens (not the button's accent
+       palette) so chip text and chip background are opposing colors
+       that pass WCAG AA in both themes. The previous design tinted
+       `currentColor`, which can't lift contrast (chip ends up the
+       same hue as its text). */
+    background: var(--color-bg-primary);
+    color: var(--color-text-primary);
     padding: var(--space-1) var(--space-2);
     border-radius: var(--radius-sm);
     /* Truncate gracefully on narrow viewports rather than wrapping
