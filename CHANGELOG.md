@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/htxryan/claude-code-config-profiles/compare/v0.3.0...v0.4.0) (2026-05-01)
+
+
+### Features
+
+* **cli:** turn up the C3P thematic flourishes (round 2) + add hidden hello command ([c41d15d](https://github.com/htxryan/claude-code-config-profiles/commit/c41d15d8755966d821747c29a556ada32814af76))
+
 ## [0.3.0](https://github.com/htxryan/claude-code-config-profiles/compare/v0.2.4...v0.3.0) (2026-04-30)
 
 
