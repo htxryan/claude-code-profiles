@@ -106,9 +106,12 @@ so `/` renders the marketing page.
 ## Cloudflare Pages deploy configuration
 
 Deploy is handled by **Cloudflare Pages' native GitHub integration** — there
-is **no GitHub Actions workflow** for the site (per RA-5 of the spec). The
-configuration below lives in the CF Pages dashboard, not in this repo. It is
-documented here so the configuration is reviewable in-repo.
+is **no GitHub Actions workflow** for the site (per RA-5 of the spec, and
+overruled at Gate 2 of E5). The configuration below lives in the CF Pages
+dashboard, not in this repo. It is documented here verbatim so the
+configuration is reviewable in-repo even though it's enforced out-of-repo.
+
+### Build settings (Pages → Project → Settings → Builds & deployments)
 
 | Setting | Value |
 |---------|-------|
@@ -117,11 +120,98 @@ documented here so the configuration is reviewable in-repo.
 | Build command | `cd site && pnpm install --frozen-lockfile && pnpm build` |
 | Build output directory | `site/dist` |
 | Root directory (for build) | `/` |
-| Node version | `20` (env var `NODE_VERSION`) |
-| Preview deployments | All non-production branches + PRs |
-| Production custom domain | `getc3p.dev` (apex + `www.` redirect) |
+| Build system version | `2` (default) |
+| Node version | `20` (set via env var `NODE_VERSION=20`) |
+| Preview deployments | **Enabled for all non-production branches and PRs** |
+| Build watch paths | _(default — unrestricted)_ |
 
-E5 (`claude-code-profiles-z0k`) wires the actual deploy + domain.
+### Environment variables (Pages → Project → Settings → Environment variables)
+
+Set on **both** Production and Preview environments:
+
+| Variable | Value | Why |
+|----------|-------|-----|
+| `NODE_VERSION` | `20` | Astro/Starlight require Node 20+; Pages defaults to an older runtime |
+
+No GitHub Actions secrets are required — CF Pages talks to GitHub directly via
+its OAuth app at install time, not via repo-level tokens (R-UN-3).
+
+### Custom domains (Pages → Project → Custom domains)
+
+| Hostname | Target | Notes |
+|----------|--------|-------|
+| `getc3p.dev` (apex) | Production deployment | A/AAAA records auto-managed by Pages when DNS is on the same Cloudflare account |
+| `www.getc3p.dev` | 301 redirect to `https://getc3p.dev/` | Configured via a Bulk Redirect rule (Rules → Redirect Rules) or a `www` CNAME → apex; either is acceptable |
+
+### Dashboard screenshots
+
+Screenshots of the Build settings page and the Custom domains page are stored
+under [`docs/screenshots/cf-pages/`](../docs/screenshots/cf-pages/) (added when
+E5 is wired against the live dashboard). They are reference-only — the
+authoritative configuration is the live dashboard.
+
+## Rollback drill
+
+When a bad build reaches production at `https://getc3p.dev`, roll back to the
+prior good deployment. CF Pages deployments are atomic and immutable, so
+rollback promotes a previous deployment in-place — no rebuild, no DNS change.
+
+### Option A — Wrangler CLI (preferred for muscle memory)
+
+```bash
+# 1. Authenticate once per machine.
+pnpm dlx wrangler login
+
+# 2. List recent production deployments to find a prior good one.
+pnpm dlx wrangler pages deployment list \
+  --project-name=getc3p \
+  --environment=production
+
+# 3. Roll back to a known-good deployment ID (UUID from the list above).
+pnpm dlx wrangler pages deployment rollback <DEPLOYMENT_ID> \
+  --project-name=getc3p
+
+# 4. Verify the apex now serves the rolled-back build.
+curl -sI https://getc3p.dev | head -1   # expect: HTTP/2 200
+```
+
+### Option B — Dashboard (when CLI is unavailable)
+
+1. Open Cloudflare → Pages → `getc3p` → **Deployments**.
+2. Filter by environment = **Production**.
+3. Find the prior good deployment (one above the current red one).
+4. Click the deployment → **⋯ menu → Rollback to this deployment**.
+5. Confirm. Pages flips the production alias atomically; the apex serves the
+   rolled-back build immediately (atomic swap, R-S-2).
+
+### Drill cadence
+
+The rollback drill is run **once at E5 acceptance** against a deliberately
+broken branch (verifies F-4 + F-5), and **re-run any time** the deploy pipeline
+materially changes (build command, output dir, framework upgrade). Record the
+drill outcome in the issue that triggered the change.
+
+## Fitness function verification
+
+These commands verify E5 acceptance against the live deployment. Run after the
+CF Pages project + custom domain are wired.
+
+```bash
+# F-1: apex serves landing (matches the hero headline)
+curl -sSf https://getc3p.dev | grep -q "Swap Claude configs without losing work" && echo "F-1 ok"
+
+# F-2: www → apex 301
+curl -sI https://www.getc3p.dev | grep -E "^HTTP/.* 301" && echo "F-2 ok"
+
+# F-7: OG image is reachable as image/png
+curl -sI https://getc3p.dev/og.png | grep -i "content-type: image/png" && echo "F-7 ok"
+```
+
+F-3 (preview deploy on PR) and F-4 (broken-build isolation) are verified by
+opening a PR; CF Pages comments with the preview URL within ~5 min.
+
+F-6 is a meta-check: `ls .github/workflows/` should show **no** new
+`deploy-site.yml` (or similar) — deploys live in the CF dashboard, not in CI.
 
 ## What this directory does **not** touch
 
