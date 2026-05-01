@@ -24,7 +24,7 @@ permissions:
 
 jobs:
   build-test:
-    name: ${{ matrix.os }} / node ${{ matrix.node }}
+    name: cli ${{ matrix.os }} / node ${{ matrix.node }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -46,6 +46,7 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           cache: "pnpm"
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -59,6 +60,62 @@ jobs:
       - name: Test
         run: pnpm test
 
+  site:
+    name: site (build + IV offline)
+    runs-on: ubuntu-latest
+    # Single-OS / single-node: site/ is static SSG output served from CF
+    # edge — no per-platform behaviour to test. Keep the matrix narrow so
+    # the heavyweight playwright/chromium install only happens once.
+    defaults:
+      run:
+        working-directory: site
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+          cache-dependency-path: site/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Cache playwright browser binaries (~170MB chromium download).
+      # Key includes the playwright version so a bump invalidates the cache
+      # automatically. Without this, every CI run re-downloads chromium.
+      - name: Resolve playwright version
+        id: pw
+        run: echo "version=$(node -p "require('./package.json').devDependencies.playwright")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.pw.outputs.version }}
+
+      # `pnpm build` runs `playwright install chromium && astro check &&
+      # astro build` (chromium is needed at build time for the rehype-mermaid
+      # inline-svg strategy on the extends/includes Concepts pages, R-U-16).
+      - name: Build
+        run: pnpm build
+
+      # Integration Verification — offline mode skips Lighthouse (network +
+      # variance) and the production-URL smoke (we're testing this PR, not
+      # whatever's currently on production). Still runs: composition,
+      # mermaid render, token contract, theme/dark-mode, hero demo, axe,
+      # visual regression vs committed baselines, pagefind index, link
+      # integrity. Keeps PR feedback under ~30s after the build.
+      - name: IV (offline)
+        run: pnpm iv:offline
+
   audit:
     name: pnpm audit (high+critical)
     runs-on: ubuntu-latest
@@ -67,6 +124,15 @@ jobs:
     # whole point. continue-on-error keeps the job green even when an
     # advisory lands so the rest of CI is still merge-ready.
     continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        # Audit each independent dep tree separately so failures attribute
+        # cleanly to the package that owns the vuln. Site has its own
+        # lockfile (no workspace) so its tree is fully independent.
+        package:
+          - { name: "cli (root)", cwd: "." }
+          - { name: "site", cwd: "site" }
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -74,16 +140,19 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 10
 
       - name: Setup Node 20
         uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "pnpm"
+          cache-dependency-path: ${{ matrix.package.cwd }}/pnpm-lock.yaml
 
-      - name: Install dependencies
+      - name: Install dependencies (${{ matrix.package.name }})
+        working-directory: ${{ matrix.package.cwd }}
         run: pnpm install --frozen-lockfile
 
-      - name: pnpm audit (high + critical only)
+      - name: pnpm audit — ${{ matrix.package.name }} (high + critical only)
+        working-directory: ${{ matrix.package.cwd }}
         run: pnpm audit --audit-level=high
