@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.6.0](https://github.com/htxryan/claude-code-config-profiles/compare/v0.5.0...v0.6.0) (2026-05-01)
+
+
+### Features
+
+* **brand:** add C3P logo to README, marketing header, and docs sidebar ([#20](https://github.com/htxryan/claude-code-config-profiles/issues/20)) ([9f1d444](https://github.com/htxryan/claude-code-config-profiles/commit/9f1d4446100fbf46ff0c8c1b782b010c1787e58c))
+
+
+### Bug Fixes
+
+* **site:** make active sidebar link readable in both themes ([#18](https://github.com/htxryan/claude-code-config-profiles/issues/18)) ([49f60c9](https://github.com/htxryan/claude-code-config-profiles/commit/49f60c9de7bf005e3bc6864cd8fa75579d5735e9))
+
 ## [0.5.0](https://github.com/htxryan/claude-code-config-profiles/compare/v0.4.0...v0.5.0) (2026-05-01)
 
 
