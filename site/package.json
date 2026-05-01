@@ -13,7 +13,8 @@
     "dev": "astro dev",
     "build": "astro check && astro build",
     "preview": "astro preview",
-    "astro": "astro"
+    "astro": "astro",
+    "check:tokens": "node scripts/check-tokens.mjs"
   },
   "dependencies": {
     "@astrojs/starlight": "0.38.4",

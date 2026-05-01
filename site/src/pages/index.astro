@@ -1,7 +1,9 @@
 ---
-// E1 placeholder — replaced by E3 (marketing landing with drift-gate demo).
-// Keeping this minimal so the scaffold builds cleanly without dragging in
-// design tokens (E2) or hero motion code (E3).
+// E1 placeholder layout, upgraded by E2 to consume design tokens and meet the
+// accessibility baseline (skip-to-content, semantic landmarks, focus styles
+// inherited from `global.css`). E3 replaces the body content with the real
+// drift-gate hero + persona cards.
+import '../styles/global.css';
 ---
 
 <!doctype html>
@@ -13,10 +15,113 @@
     <meta name="description" content="Profile-based config swaps for Claude Code" />
   </head>
   <body>
-    <main>
-      <h1>C3P</h1>
-      <p>Profile-based config swaps for Claude Code.</p>
-      <p><a href="/docs/">Read the docs →</a></p>
+    <a href="#main-content" class="skip-link">Skip to content</a>
+
+    <header role="banner" class="site-header">
+      <div class="site-header__inner">
+        <a href="/" class="site-header__brand" aria-label="C3P home">C3P</a>
+        <nav aria-label="Primary">
+          <a href="/docs/">Docs</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main-content" tabindex="-1" class="landing">
+      <section class="hero" aria-labelledby="hero-title">
+        <h1 id="hero-title">C3P</h1>
+        <p class="hero__lede">Profile-based config swaps for Claude Code.</p>
+        <p>
+          <a class="cta" href="/docs/">Read the docs &rarr;</a>
+        </p>
+      </section>
     </main>
+
+    <footer role="contentinfo" class="site-footer">
+      <p>
+        <a href="https://github.com/htxryan/claude-code-config-profiles">GitHub</a>
+        &middot;
+        <a href="https://www.npmjs.com/package/claude-code-config-profiles">npm</a>
+      </p>
+    </footer>
+
+    <style>
+      /* Page-specific layout — consumes tokens from `global.css`. E3 will
+         replace the hero with the drift-gate motion demo. */
+
+      .site-header {
+        border-bottom: 1px solid var(--color-border);
+        background: var(--color-bg-surface);
+      }
+
+      .site-header__inner {
+        max-width: var(--container-max-width);
+        margin: 0 auto;
+        padding: var(--space-4) var(--space-5);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-5);
+      }
+
+      .site-header__brand {
+        font-weight: 700;
+        font-size: var(--type-scale-4);
+        color: var(--color-text-primary);
+        text-decoration: none;
+        letter-spacing: var(--type-tracking-tight);
+      }
+
+      .landing {
+        max-width: var(--container-max-width);
+        margin: 0 auto;
+        padding: var(--space-8) var(--space-5);
+      }
+
+      .hero {
+        text-align: center;
+        padding: var(--space-7) 0;
+      }
+
+      .hero h1 {
+        font-size: var(--type-scale-6);
+        line-height: var(--type-leading-tight);
+        letter-spacing: var(--type-tracking-tight);
+        margin: 0 0 var(--space-4);
+      }
+
+      .hero__lede {
+        font-size: var(--type-scale-4);
+        color: var(--color-text-muted);
+        margin: 0 0 var(--space-6);
+      }
+
+      .cta {
+        display: inline-block;
+        padding: var(--space-3) var(--space-5);
+        background: var(--color-accent);
+        color: var(--color-text-on-accent);
+        border-radius: var(--radius-md);
+        text-decoration: none;
+        font-weight: 600;
+        transition:
+          background var(--motion-duration-sm) var(--motion-easing-standard),
+          transform var(--motion-duration-xs) var(--motion-easing-standard);
+      }
+
+      .cta:hover {
+        background: var(--color-accent-emphasis);
+        color: var(--color-text-on-accent);
+        transform: translateY(-1px);
+      }
+
+      .site-footer {
+        max-width: var(--container-max-width);
+        margin: 0 auto;
+        padding: var(--space-6) var(--space-5);
+        color: var(--color-text-muted);
+        font-size: var(--type-scale-2);
+        border-top: 1px solid var(--color-border);
+      }
+    </style>
   </body>
 </html>

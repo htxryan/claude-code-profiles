@@ -21,6 +21,10 @@ export default defineConfig({
     starlight({
       title: 'C3P',
       description: 'Profile-based config swaps for Claude Code',
+      // Design tokens + Starlight CSS-hook overrides + a11y baseline (E2).
+      // Same file is imported directly by `src/pages/*.astro`, so the
+      // marketing surface and the docs surface share one vocabulary.
+      customCss: ['./src/styles/global.css'],
       social: [
         {
           icon: 'github',

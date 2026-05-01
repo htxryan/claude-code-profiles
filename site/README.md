@@ -37,7 +37,56 @@ site/
     │   ├── index.astro         # marketing landing (R-U-1)
     │   └── 404.astro           # added by E3 (R-U-6)
     ├── components/             # marketing-only components (E3)
-    └── styles/                 # design tokens (E2)
+    └── styles/
+        ├── tokens.css          # design vocabulary (E2)
+        └── global.css          # baseline + Starlight CSS hook overrides (E2)
+```
+
+### Design tokens (E2)
+
+`src/styles/tokens.css` is the single source of truth for color, type, motion,
+spacing, radius, and shadow. It produces tokens; it does not consume them.
+
+`src/styles/global.css` imports the tokens, applies baseline element styles,
+and remaps Starlight's `--sl-*` CSS hooks onto the token layer so the docs
+surface and marketing surface share one vocabulary. It is wired into Starlight
+via `customCss` in `astro.config.mjs`, and imported directly by
+`src/pages/index.astro`.
+
+**Load-bearing token names** (renaming requires migration across consumers):
+
+- Color: `--color-bg-primary`, `--color-bg-surface`, `--color-text-primary`,
+  `--color-text-muted`, `--color-accent`, `--color-border`
+- Type: `--type-scale-{1..6}`, `--type-leading-{tight|normal|relaxed}`
+- Motion: `--motion-duration-{xs|sm|md|lg}`,
+  `--motion-easing-{standard|emphasis}`
+- Spacing: `--space-{1..8}`
+- Radius: `--radius-{sm|md|lg}`
+
+Dark mode overrides the same semantic tokens under `:root[data-theme="dark"]`.
+`@media (prefers-reduced-motion: reduce)` collapses every
+`--motion-duration-*` to `0ms`; a belt-and-braces global rule in
+`global.css` catches any animation that bypasses the tokens.
+
+### Accessibility baseline (E2)
+
+- Skip-to-content link (`.skip-link`) on every marketing page; targets
+  `#main-content`. Starlight provides its own skip link on docs pages.
+- `:focus-visible` ring (`--focus-ring-width` / `--color-focus-ring`) — keyboard
+  users get the ring, mouse users don't.
+- Semantic landmarks (`header[role="banner"]`, `main`, `footer[role="contentinfo"]`)
+  on the marketing pages; Starlight provides equivalents for docs.
+- Color tokens are picked to meet WCAG AA contrast (4.5:1 normal, 3:1 large)
+  on both themes.
+
+**Verification (manual until Lighthouse CI is wired in E5/E6):**
+
+```bash
+pnpm dev              # http://localhost:4321
+# 1. Tab through the page — first Tab reveals the skip link.
+# 2. Toggle prefers-reduced-motion in DevTools → animations should be instant.
+# 3. Toggle the OS dark/light setting — both themes re-paint without flicker.
+# 4. Run Lighthouse (DevTools) → Accessibility ≥ 90 on / and /docs/.
 ```
 
 ### Why are docs nested at `src/content/docs/docs/`?

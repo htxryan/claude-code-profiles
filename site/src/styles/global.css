@@ -1,0 +1,204 @@
+/* =============================================================================
+ * Global styles — getc3p.dev
+ *
+ * Imported by both the marketing landing (`src/pages/*.astro`) and Starlight
+ * (via `customCss` in `astro.config.mjs`). Two responsibilities:
+ *
+ *   1. Apply baseline element styles that consume the design tokens.
+ *   2. Map Starlight's `--sl-*` CSS hooks onto our token layer so the docs
+ *      surface inherits the same vocabulary as the marketing surface.
+ *
+ * Cascade note (load-bearing): Starlight's `common.css` is injected AFTER
+ * our `customCss` in the document, so plain `:root { --sl-*: ... }` rules
+ * lose to Starlight's same-specificity defaults. We deliberately use
+ * `:root:root` (specificity 0,2,0) to win against Starlight's `:root`
+ * (0,1,0), and `:root:root[data-theme="light"]` (0,3,0) to win against
+ * Starlight's `:root[data-theme="light"]` (0,2,0). Without this, the
+ * remappings are silently dead.
+ *
+ * Rule: this file imports `tokens.css` and consumes those tokens. It never
+ * defines new design values — those live in `tokens.css`.
+ * ===========================================================================*/
+
+@import "./tokens.css";
+
+/* =============================================================================
+ * Starlight CSS hook overrides
+ *
+ * Starlight exposes `--sl-*` custom properties as its theming contract. We
+ * remap them onto our tokens so editing `tokens.css` propagates to both
+ * surfaces. The selector specificity is intentional — see the cascade note
+ * in the file header.
+ *
+ * Convention mirrors Starlight: `:root` is dark; `[data-theme="light"]`
+ * flips to light.
+ * ===========================================================================*/
+
+/* Dark theme (default) — wins over Starlight's `:root` defaults */
+:root:root {
+  --sl-color-bg:             var(--color-bg-primary);
+  --sl-color-bg-nav:         var(--color-bg-surface);
+  --sl-color-bg-sidebar:     var(--color-bg-surface);
+  --sl-color-bg-inline-code: var(--color-bg-muted);
+
+  --sl-color-text:           var(--color-text-primary);
+  --sl-color-text-accent:    var(--color-accent);
+  --sl-color-text-invert:    var(--color-text-on-accent);
+
+  /* Accent ladder — Starlight uses three stops; we collapse onto two
+     and reuse a muted surface for the lowest. */
+  --sl-color-accent-low:     var(--color-bg-muted);
+  --sl-color-accent:         var(--color-accent);
+  --sl-color-accent-high:    var(--color-accent-emphasis);
+
+  --sl-color-hairline:       var(--color-border);
+  --sl-color-hairline-light: var(--color-border);
+  --sl-color-hairline-shade: var(--color-border-strong);
+
+  --sl-font:        var(--font-sans);
+  --sl-font-mono:   var(--font-mono);
+  --sl-text-base:   var(--type-scale-3);
+  --sl-line-height: var(--type-leading-normal);
+}
+
+/* Light theme — wins over Starlight's `:root[data-theme="light"]` */
+:root:root[data-theme="light"] {
+  --sl-color-bg:             var(--color-bg-primary);
+  --sl-color-bg-nav:         var(--color-bg-surface);
+  --sl-color-bg-sidebar:     var(--color-bg-surface);
+  --sl-color-bg-inline-code: var(--color-bg-muted);
+
+  --sl-color-text:           var(--color-text-primary);
+  --sl-color-text-accent:    var(--color-accent);
+  --sl-color-text-invert:    var(--color-text-on-accent);
+
+  --sl-color-accent-low:     var(--color-bg-muted);
+  --sl-color-accent:         var(--color-accent);
+  --sl-color-accent-high:    var(--color-accent-emphasis);
+
+  --sl-color-hairline:       var(--color-border);
+  --sl-color-hairline-light: var(--color-border);
+  --sl-color-hairline-shade: var(--color-border-strong);
+}
+
+/* =============================================================================
+ * Baseline element styles
+ *
+ * Applied site-wide. Marketing pages import this directly; Starlight pages
+ * receive it via `customCss`.
+ * ===========================================================================*/
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  /* Anchor type scale at 16px and let `--type-scale-*` step from there. */
+  font-size: 100%;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--type-scale-3);
+  line-height: var(--type-leading-normal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: var(--color-accent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  transition: color var(--motion-duration-sm) var(--motion-easing-standard);
+}
+
+a:hover {
+  color: var(--color-accent-emphasis);
+}
+
+/* =============================================================================
+ * Focus ring
+ *
+ * `:focus-visible` only — keyboard users get the ring, mouse users don't.
+ * Width and offset come from tokens; color guarantees ≥ 3:1 against any
+ * surface in either theme (manually verified).
+ * ===========================================================================*/
+
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: var(--focus-ring-offset);
+  border-radius: var(--radius-sm);
+}
+
+/* =============================================================================
+ * Skip-to-content link
+ *
+ * Visually hidden until focused. Lands on `#main-content` which marketing
+ * pages and Starlight both expose.
+ * ===========================================================================*/
+
+.skip-link {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: var(--shadow-md);
+  transform: translateY(-200%);
+  transition: transform var(--motion-duration-sm) var(--motion-easing-standard);
+  z-index: 1000;
+}
+
+.skip-link:focus,
+.skip-link:focus-visible {
+  transform: translateY(0);
+}
+
+/* Visually-hidden helper — for screen-reader-only labels */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* =============================================================================
+ * Reduced motion belt-and-braces
+ *
+ * `tokens.css` already collapses `--motion-duration-*` to 0ms under
+ * `prefers-reduced-motion: reduce`. This block catches anything that
+ * bypassed the tokens — third-party CSS, future contributors who forget,
+ * Starlight internals — and flattens them too.
+ * ===========================================================================*/
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
