@@ -125,7 +125,39 @@ const isDirect = (() => {
   }
 })();
 
+/**
+ * EPIPE-safe stdio listeners. The synchronous try/catch in
+ * `output.writeSafe` only catches sync throws; a closed downstream pipe
+ * (e.g. `c3p status | grep -q ...` when grep short-circuits) sometimes
+ * surfaces EPIPE asynchronously as an `error` event on the underlying
+ * socket, which bypasses the try/catch and prints a node:events
+ * traceback. Attaching a listener on the streams converts that into a
+ * clean exit-0. Bug claude-code-profiles-qga.
+ *
+ * Only active on the bin entry path (not when `main` is imported by a
+ * test or embedder), so reattaching on every test spawn doesn't matter
+ * but importing this module never wires unexpected listeners on the
+ * caller's process.
+ */
+function setupPipeSafeStdio(): void {
+  const handle = (stream: NodeJS.WriteStream): void => {
+    stream.on("error", (err: NodeJS.ErrnoException) => {
+      if (err.code === "EPIPE" || err.code === "EBADF") {
+        // Downstream consumer closed the read end. Nothing useful to do —
+        // pending writes are already lost, exit cleanly.
+        process.exit(0);
+      }
+      // Anything else is genuinely unexpected; let the default uncaught-
+      // exception handler surface it.
+      throw err;
+    });
+  };
+  handle(process.stdout);
+  handle(process.stderr);
+}
+
 if (isDirect) {
+  setupPipeSafeStdio();
   main(process.argv.slice(2)).then(
     (code) => process.exit(code),
     (err) => {
