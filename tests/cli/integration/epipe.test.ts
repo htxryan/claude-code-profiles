@@ -73,7 +73,13 @@ function runPipeline(args: string[]): Promise<PipelineResult> {
   });
 }
 
-describe("EPIPE on early pipe close (claude-code-profiles-qga)", () => {
+// Windows pipe semantics differ from POSIX (EOF/ENOTCONN paths, no SIGPIPE),
+// the GHA windows runner doesn't have a native `head` on PATH, and Git-Bash's
+// bash mangles Windows paths with backslashes when they're spliced into a
+// `bash -c` command string. The bin.ts fix (`err.code === 'EPIPE'`) still
+// works cross-platform because Node normalizes pipe errors to EPIPE — only
+// this *test harness* is Unix-specific. macOS + Linux exercise the regression.
+describe.skipIf(process.platform === "win32")("EPIPE on early pipe close (claude-code-profiles-qga)", () => {
   // Loop the test a few times because the underlying race is timing-
   // dependent — the original sighting only fired once in ~30 invocations.
   // Five iterations is enough to catch a regression that flakes 1-in-3.
