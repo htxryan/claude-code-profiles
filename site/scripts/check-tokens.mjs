@@ -15,9 +15,12 @@
 
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import process from 'node:process';
 
-const ASTRO_DIR = new URL('../dist/_astro/', import.meta.url);
+// `fileURLToPath` handles Windows drive letters and URL-encoded characters
+// (spaces in paths) that bare `URL.pathname` mishandles.
+const ASTRO_DIR = fileURLToPath(new URL('../dist/_astro/', import.meta.url));
 
 // Load-bearing names from `docs/specs/getc3p-web-presence.md` E2 contract.
 const REQUIRED_TOKENS = [
@@ -77,7 +80,7 @@ try {
   process.exit(1);
 }
 
-const css = readFileSync(join(ASTRO_DIR.pathname, cssFile), 'utf8');
+const css = readFileSync(join(ASTRO_DIR, cssFile), 'utf8');
 
 const missing = [];
 for (const name of [...REQUIRED_TOKENS, ...REQUIRED_STARLIGHT_HOOKS]) {

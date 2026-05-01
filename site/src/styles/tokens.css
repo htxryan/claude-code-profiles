@@ -213,16 +213,17 @@
 /* =============================================================================
  * Reduced motion (R-S-1, fitness function F-5)
  *
- * Collapses every `--motion-duration-*` to 0ms so any animation/transition
- * that consumes the tokens becomes instant. The belt-and-braces global rule
- * in `global.css` catches anything that bypasses the tokens.
+ * Collapses every `--motion-duration-*` to 0.01ms so any animation/transition
+ * that consumes the tokens becomes effectively instant — but `transitionend`
+ * still fires, which matters for state machines that wait on it. Matches the
+ * belt-and-braces global rule in `global.css`; both paths must agree.
  * ===========================================================================*/
 
 @media (prefers-reduced-motion: reduce) {
   :root {
-    --motion-duration-xs: 0ms;
-    --motion-duration-sm: 0ms;
-    --motion-duration-md: 0ms;
-    --motion-duration-lg: 0ms;
+    --motion-duration-xs: 0.01ms;
+    --motion-duration-sm: 0.01ms;
+    --motion-duration-md: 0.01ms;
+    --motion-duration-lg: 0.01ms;
   }
 }

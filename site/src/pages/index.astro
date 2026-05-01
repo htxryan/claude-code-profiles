@@ -13,11 +13,34 @@ import '../styles/global.css';
     <meta name="viewport" content="width=device-width" />
     <title>C3P — getc3p.dev</title>
     <meta name="description" content="Profile-based config swaps for Claude Code" />
+    <script is:inline>
+      // Mirror Starlight's theme contract so the marketing landing matches
+      // whichever theme the user picked in /docs/, falling back to the OS
+      // setting. Runs before paint to avoid a flash. Starlight stores the
+      // chosen theme under `localStorage["starlight-theme"]` (values:
+      // "auto" | "dark" | "light"); we honor it identically.
+      (function () {
+        try {
+          var stored = localStorage.getItem('starlight-theme');
+          var theme =
+            stored === 'light' || stored === 'dark'
+              ? stored
+              : window.matchMedia('(prefers-color-scheme: light)').matches
+                ? 'light'
+                : 'dark';
+          if (theme === 'light') {
+            document.documentElement.dataset.theme = 'light';
+          }
+        } catch (_) {
+          /* localStorage / matchMedia unavailable — keep dark default. */
+        }
+      })();
+    </script>
   </head>
   <body>
     <a href="#main-content" class="skip-link">Skip to content</a>
 
-    <header role="banner" class="site-header">
+    <header class="site-header">
       <div class="site-header__inner">
         <a href="/" class="site-header__brand" aria-label="C3P home">C3P</a>
         <nav aria-label="Primary">
@@ -36,7 +59,7 @@ import '../styles/global.css';
       </section>
     </main>
 
-    <footer role="contentinfo" class="site-footer">
+    <footer class="site-footer">
       <p>
         <a href="https://github.com/htxryan/claude-code-config-profiles">GitHub</a>
         &middot;

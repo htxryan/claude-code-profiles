@@ -63,9 +63,10 @@ via `customCss` in `astro.config.mjs`, and imported directly by
 - Spacing: `--space-{1..8}`
 - Radius: `--radius-{sm|md|lg}`
 
-Dark mode overrides the same semantic tokens under `:root[data-theme="dark"]`.
+Theme convention mirrors Starlight: `:root` IS the dark default, and
+`:root[data-theme="light"]` overrides the same semantic tokens for light mode.
 `@media (prefers-reduced-motion: reduce)` collapses every
-`--motion-duration-*` to `0ms`; a belt-and-braces global rule in
+`--motion-duration-*` to `0.01ms`; a belt-and-braces global rule in
 `global.css` catches any animation that bypasses the tokens.
 
 ### Accessibility baseline (E2)
@@ -74,8 +75,10 @@ Dark mode overrides the same semantic tokens under `:root[data-theme="dark"]`.
   `#main-content`. Starlight provides its own skip link on docs pages.
 - `:focus-visible` ring (`--focus-ring-width` / `--color-focus-ring`) — keyboard
   users get the ring, mouse users don't.
-- Semantic landmarks (`header[role="banner"]`, `main`, `footer[role="contentinfo"]`)
-  on the marketing pages; Starlight provides equivalents for docs.
+- Semantic landmarks (`<header>`, `<main>`, `<footer>`) on the marketing
+  pages — these elements carry their `banner`/`main`/`contentinfo` roles
+  implicitly per the HTML spec, no `role=` attribute needed. Starlight
+  provides equivalents for docs.
 - Color tokens are picked to meet WCAG AA contrast (4.5:1 normal, 3:1 large)
   on both themes.
 
