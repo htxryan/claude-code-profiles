@@ -2,14 +2,30 @@ name: release-please
 
 # Maintains a perpetual "release PR" against main bundling all unreleased
 # conventional-commit changes. When the release PR is merged, release-please
-# tags the commit + creates a GitHub release. We then chain the npm publish
-# steps into the same job (gated on `release_created` output).
+# tags the commit + creates a GitHub release. We then chain `smoke` and
+# `publish` jobs gated on the `release_created` output.
 #
-# Why publish in this job instead of a separate workflow on `release: published`?
-# Releases created by release-please use the default GITHUB_TOKEN. GitHub's
-# anti-loop policy explicitly prevents workflows from triggering other
-# workflows when the trigger is a GITHUB_TOKEN-authored event. Chaining the
-# publish steps inline sidesteps that without needing a PAT.
+# Why publish in this workflow instead of a separate workflow on
+# `release: published`? Releases created by release-please use the default
+# GITHUB_TOKEN. GitHub's anti-loop policy explicitly prevents workflows
+# from triggering other workflows when the trigger is a GITHUB_TOKEN-
+# authored event. Chaining the publish job inline sidesteps that without
+# needing a PAT.
+#
+# Job graph:
+#   release-please ─┐
+#                   ├─ (release_created?) ─→ smoke (matrix: ubuntu/macos/windows) ─→ publish
+#                   └─ (no release)        ─→ (skip both)
+#
+# Smoke runs ONLY on the release commit, not on every PR. Its job is to
+# gate the npm publish: pack the tarball, install it into a clean
+# consumer project on each OS, run `c3p --help`. If smoke fails the
+# release tag has been created (release-please does that first) but
+# `npm publish` is skipped — bad artifact never reaches the registry.
+# Recovering from a failing smoke means deleting the tag + fixing the bug
+# + re-cutting the release. Acceptable cost for catching packaging bugs
+# (missing `files` entries, broken bin shebang, Windows shim regressions)
+# that source-tree CI cannot see.
 #
 # Auth for `npm publish`: tokenless OIDC trusted publisher. npm allows
 # exactly one trusted-publisher entry per package, so this workflow is
@@ -34,6 +50,8 @@ permissions:
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
     steps:
       - id: release
         uses: googleapis/release-please-action@v5
@@ -43,22 +61,83 @@ jobs:
           config-file: .release-please-config.json
           manifest-file: .release-please-manifest.json
 
-      # Everything below runs only on the release commit (the merge of the
-      # release PR). On normal pushes (which only update the open release PR),
-      # `release_created` is empty and these steps are skipped.
-
+  smoke:
+    name: smoke ${{ matrix.os }}
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    # Bash on all three runners — Git for Windows ships bash, so the
+    # tarball-glob and tmpdir manipulation below behave identically.
+    # Windows runners default to pwsh otherwise.
+    defaults:
+      run:
+        shell: bash
+    steps:
       - name: Checkout
-        if: ${{ steps.release.outputs.release_created }}
         uses: actions/checkout@v6
 
       - name: Install pnpm
-        if: ${{ steps.release.outputs.release_created }}
+        uses: pnpm/action-setup@v6
+        with:
+          version: 9
+
+      - name: Setup Node 20
+        # Engines minimum. A smoke pass on the lowest supported runtime
+        # guarantees the tarball works for any consumer at >= 20.
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: "pnpm"
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Pack tarball
+        id: pack
+        run: |
+          mkdir -p "$RUNNER_TEMP/pack"
+          pnpm pack --pack-destination="$RUNNER_TEMP/pack"
+          tarball=$(ls "$RUNNER_TEMP/pack"/*.tgz | head -1)
+          echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
+
+      - name: Install tarball into clean consumer project
+        # Use npm rather than pnpm for the consumer install: most users
+        # install via npm, and on Windows npm generates `.cmd` / `.ps1`
+        # bin shims (a different code path from POSIX shebang dispatch)
+        # that we want exercised here.
+        run: |
+          mkdir -p "$RUNNER_TEMP/consumer"
+          cd "$RUNNER_TEMP/consumer"
+          npm init -y > /dev/null
+          npm install "${{ steps.pack.outputs.tarball }}"
+
+      - name: Run c3p --help from installed tarball
+        run: |
+          cd "$RUNNER_TEMP/consumer"
+          ./node_modules/.bin/c3p --help
+
+  publish:
+    needs: [release-please, smoke]
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install pnpm
         uses: pnpm/action-setup@v6
         with:
           version: 9
 
       - name: Setup Node 24
-        if: ${{ steps.release.outputs.release_created }}
         # Node 24 LTS ships npm >= 11.5.1, which is the minimum for npm OIDC
         # trusted publishing. Older runtimes need a manual `npm install -g
         # npm@latest`, but that command hits a self-upgrade module-resolution
@@ -71,23 +150,18 @@ jobs:
           registry-url: "https://registry.npmjs.org"
 
       - name: Verify npm version (OIDC trusted publishing needs >= 11.5.1)
-        if: ${{ steps.release.outputs.release_created }}
         run: |
           npm --version
           node --version
 
       - name: Install dependencies
-        if: ${{ steps.release.outputs.release_created }}
         run: pnpm install --frozen-lockfile
 
       - name: Build
-        if: ${{ steps.release.outputs.release_created }}
         run: pnpm run build
 
       - name: Test
-        if: ${{ steps.release.outputs.release_created }}
         run: pnpm test
 
       - name: Publish to npm with provenance
-        if: ${{ steps.release.outputs.release_created }}
         run: npm publish --provenance --access public
