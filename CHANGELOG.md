@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.5.0](https://github.com/htxryan/claude-code-config-profiles/compare/v0.4.0...v0.5.0) (2026-05-01)
+
+
+### Features
+
+* **site:** design tokens + a11y baseline (E2) ([9fb99c8](https://github.com/htxryan/claude-code-config-profiles/commit/9fb99c84356c801beb7655d47532b67c5b1d2d4e))
+* **site:** E3 marketing landing + 404 + drift-gate demo ([708e3d5](https://github.com/htxryan/claude-code-config-profiles/commit/708e3d52b27b1c3dd1698380e9db6a70f03b0d54))
+* **site:** E4 docs IA — concepts, CLI reference, guides, about ([e4e71df](https://github.com/htxryan/claude-code-config-profiles/commit/e4e71dfa2ef963c30bba565b283575fe9240ba7d))
+* **site:** E6 Integration Verification — IV script + visual baselines ([d6872b2](https://github.com/htxryan/claude-code-config-profiles/commit/d6872b2f0de3b5b8a48e476d3f1d47c4c2714651))
+* **site:** scaffold Astro + Starlight at site/ (E1) ([cc661fb](https://github.com/htxryan/claude-code-config-profiles/commit/cc661fbd9d1ea9f8baa9799061efb5d46e294e77))
+
+
+### Bug Fixes
+
+* **cli:** handle async EPIPE on stdout/stderr (closes claude-code-profiles-qga) ([e11c37b](https://github.com/htxryan/claude-code-config-profiles/commit/e11c37b0d5afa85c142a12780df8ae5450a7f91a))
+* **site:** address E2 review feedback (a11y, portability, theme cascade) ([da55db8](https://github.com/htxryan/claude-code-config-profiles/commit/da55db8cdacec157e72c9efa03ef8714b49e8600))
+* **site:** address E3 review feedback round 2 ([5d9d5b7](https://github.com/htxryan/claude-code-config-profiles/commit/5d9d5b737fa6604b7b80fb3fff834f1240d9ded0))
+* **site:** address E4 review feedback ([db2e5c9](https://github.com/htxryan/claude-code-config-profiles/commit/db2e5c920d23091004551283bc658005f9de6a56))
+* **site:** address E4 review feedback round 2 ([a720741](https://github.com/htxryan/claude-code-config-profiles/commit/a720741234355b96ce66e2422ed81b2579822f7b))
+* **site:** address E6 IV review feedback round 3 ([36562c8](https://github.com/htxryan/claude-code-config-profiles/commit/36562c83b70a264e1d60cabc094ad4360c7b1598))
+* **site:** bump Node requirement to 22.12+ (Astro 6 minimum) ([da5ea69](https://github.com/htxryan/claude-code-config-profiles/commit/da5ea699c6246ffeef0deeef156dee443899df91))
+* **site:** close P3 followups from E6 IV (CTA contrast, 404 collision, Mermaid polish) ([979893f](https://github.com/htxryan/claude-code-config-profiles/commit/979893fb2a460ba0ee067df6a3c5429b2ea4f180))
+* **site:** drift-gate demo timing + selector robustness ([390904e](https://github.com/htxryan/claude-code-config-profiles/commit/390904e97bb3e7a0dc543a8856594841b61b0e32))
+* **site:** use Mermaid for extends/includes diagrams (R-U-16) ([ec73e7d](https://github.com/htxryan/claude-code-config-profiles/commit/ec73e7d9cd5afe7b32f2b0063eb2c10f522709ac))
+
 ## [0.4.0](https://github.com/htxryan/claude-code-config-profiles/compare/v0.3.0...v0.4.0) (2026-05-01)
 
 
