@@ -36,7 +36,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - id: release
-        uses: googleapis/release-please-action@v4
+        uses: googleapis/release-please-action@v5
         with:
           # Single-package repo. release-please reads .release-please-config.json
           # and .release-please-manifest.json from the repo root.
@@ -49,11 +49,11 @@ jobs:
 
       - name: Checkout
         if: ${{ steps.release.outputs.release_created }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install pnpm
         if: ${{ steps.release.outputs.release_created }}
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           version: 9
 
@@ -64,7 +64,7 @@ jobs:
         # npm@latest`, but that command hits a self-upgrade module-resolution
         # bug on some setup-node tarballs (MODULE_NOT_FOUND promise-retry),
         # so we just use a runtime that already has the right CLI baked in.
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "24"
           cache: "pnpm"
