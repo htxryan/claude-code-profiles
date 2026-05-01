@@ -86,41 +86,53 @@
  *
  * Applied site-wide. Marketing pages import this directly; Starlight pages
  * receive it via `customCss`.
+ *
+ * Wrapped in `@layer base` (load-bearing): Starlight ships its component
+ * styles in `@layer starlight.{base,core,components}`. An unlayered `a {}`
+ * rule beats every layered rule regardless of specificity, which broke the
+ * active sidebar link — our generic `a { color: var(--color-accent) }`
+ * overrode Starlight's `[aria-current='page'] { color: text-invert }` and
+ * the label rendered as accent-on-accent (invisible). Putting our element
+ * baselines in a layer lets Starlight's component rules win on docs pages
+ * while marketing pages — which have no Starlight CSS — still pick them up.
+ * Token remappings above stay unlayered: they must win.
  * ===========================================================================*/
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
 
-html {
-  /* Anchor type scale at 16px and let `--type-scale-*` step from there. */
-  font-size: 100%;
-  -webkit-text-size-adjust: 100%;
-  text-size-adjust: 100%;
-}
+  html {
+    /* Anchor type scale at 16px and let `--type-scale-*` step from there. */
+    font-size: 100%;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
 
-body {
-  margin: 0;
-  background: var(--color-bg-primary);
-  color: var(--color-text-primary);
-  font-family: var(--font-sans);
-  font-size: var(--type-scale-3);
-  line-height: var(--type-leading-normal);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
+  body {
+    margin: 0;
+    background: var(--color-bg-primary);
+    color: var(--color-text-primary);
+    font-family: var(--font-sans);
+    font-size: var(--type-scale-3);
+    line-height: var(--type-leading-normal);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
 
-a {
-  color: var(--color-accent);
-  text-decoration-thickness: 1px;
-  text-underline-offset: 2px;
-  transition: color var(--motion-duration-sm) var(--motion-easing-standard);
-}
+  a {
+    color: var(--color-accent);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 2px;
+    transition: color var(--motion-duration-sm) var(--motion-easing-standard);
+  }
 
-a:hover {
-  color: var(--color-accent-emphasis);
+  a:hover {
+    color: var(--color-accent-emphasis);
+  }
 }
 
 /* =============================================================================
