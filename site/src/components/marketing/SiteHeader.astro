@@ -1,0 +1,47 @@
+---
+// Shared site chrome — header (R-U-1).
+//
+// Both `index.astro` and `404.astro` previously inlined identical
+// `.site-header*` rules. Extracting here makes the CSS the single
+// source of truth; Astro scopes the `<style>` block to this
+// component so the class names cannot collide with anything else.
+
+interface Props {
+  docsHref?: string;
+}
+
+const { docsHref = '/docs/' } = Astro.props;
+---
+<header class="site-header">
+  <div class="site-header__inner">
+    <a href="/" class="site-header__brand" aria-label="C3P home">C3P</a>
+    <nav aria-label="Primary">
+      <a href={docsHref}>Docs</a>
+    </nav>
+  </div>
+</header>
+
+<style>
+  .site-header {
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-bg-surface);
+  }
+
+  .site-header__inner {
+    max-width: var(--container-max-width);
+    margin: 0 auto;
+    padding: var(--space-4) var(--space-5);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-5);
+  }
+
+  .site-header__brand {
+    font-weight: 700;
+    font-size: var(--type-scale-4);
+    color: var(--color-text-primary);
+    text-decoration: none;
+    letter-spacing: var(--type-tracking-tight);
+  }
+</style>

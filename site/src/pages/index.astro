@@ -11,6 +11,8 @@ import MetaHead from '../components/marketing/MetaHead.astro';
 import ThemeInit from '../components/marketing/ThemeInit.astro';
 import Hero from '../components/marketing/Hero.astro';
 import FeatureCard from '../components/marketing/FeatureCard.astro';
+import SiteHeader from '../components/marketing/SiteHeader.astro';
+import SiteFooter from '../components/marketing/SiteFooter.astro';
 
 const INSTALL_COMMAND = 'npm install -g claude-code-config-profiles';
 const DOCS_HREF = '/docs/';
@@ -45,14 +47,7 @@ const PERSONAS = [
   <body>
     <a href="#main-content" class="skip-link">Skip to content</a>
 
-    <header class="site-header">
-      <div class="site-header__inner">
-        <a href="/" class="site-header__brand" aria-label="C3P home">C3P</a>
-        <nav aria-label="Primary">
-          <a href={DOCS_HREF}>Docs</a>
-        </nav>
-      </div>
-    </header>
+    <SiteHeader docsHref={DOCS_HREF} />
 
     <main id="main-content" tabindex="-1" class="landing">
       <Hero installCommand={INSTALL_COMMAND} docsHref={DOCS_HREF} />
@@ -65,45 +60,16 @@ const PERSONAS = [
       </section>
     </main>
 
-    <footer class="site-footer">
-      <div class="site-footer__inner">
-        <p class="site-footer__links">
-          <a href={REPO_URL} target="_blank" rel="noopener noreferrer">GitHub</a>
-          <span aria-hidden="true">&middot;</span>
-          <a href={NPM_URL} target="_blank" rel="noopener noreferrer">npm</a>
-          <span aria-hidden="true">&middot;</span>
-          <a href={LICENSE_URL} target="_blank" rel="noopener noreferrer">License</a>
-        </p>
-        <p class="site-footer__voice">
-          Programmed for etiquette and uncommitted-edit refusal.
-        </p>
-      </div>
-    </footer>
+    <SiteFooter>
+      <a href={REPO_URL} target="_blank" rel="noopener noreferrer">GitHub</a>
+      <span aria-hidden="true">&middot;</span>
+      <a href={NPM_URL} target="_blank" rel="noopener noreferrer">npm</a>
+      <span aria-hidden="true">&middot;</span>
+      <a href={LICENSE_URL} target="_blank" rel="noopener noreferrer">License</a>
+      <Fragment slot="voice">Programmed for etiquette and uncommitted-edit refusal.</Fragment>
+    </SiteFooter>
 
     <style>
-      .site-header {
-        border-bottom: 1px solid var(--color-border);
-        background: var(--color-bg-surface);
-      }
-
-      .site-header__inner {
-        max-width: var(--container-max-width);
-        margin: 0 auto;
-        padding: var(--space-4) var(--space-5);
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: var(--space-5);
-      }
-
-      .site-header__brand {
-        font-weight: 700;
-        font-size: var(--type-scale-4);
-        color: var(--color-text-primary);
-        text-decoration: none;
-        letter-spacing: var(--type-tracking-tight);
-      }
-
       .landing {
         max-width: var(--container-max-width);
         margin: 0 auto;
@@ -133,40 +99,6 @@ const PERSONAS = [
         .personas__grid {
           grid-template-columns: repeat(3, minmax(0, 1fr));
         }
-      }
-
-      .site-footer {
-        border-top: 1px solid var(--color-border);
-        background: var(--color-bg-surface);
-      }
-
-      .site-footer__inner {
-        max-width: var(--container-max-width);
-        margin: 0 auto;
-        padding: var(--space-6) var(--space-5);
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-2);
-        align-items: center;
-        text-align: center;
-      }
-
-      .site-footer__links {
-        margin: 0;
-        display: flex;
-        flex-wrap: wrap;
-        gap: var(--space-3);
-        align-items: center;
-        justify-content: center;
-        color: var(--color-text-muted);
-        font-size: var(--type-scale-2);
-      }
-
-      .site-footer__voice {
-        margin: 0;
-        color: var(--color-text-subtle);
-        font-size: var(--type-scale-1);
-        font-style: italic;
       }
     </style>
   </body>

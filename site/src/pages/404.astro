@@ -17,6 +17,8 @@ import '../styles/global.css';
 import MetaHead from '../components/marketing/MetaHead.astro';
 import ThemeInit from '../components/marketing/ThemeInit.astro';
 import CtaButton from '../components/marketing/CtaButton.astro';
+import SiteHeader from '../components/marketing/SiteHeader.astro';
+import SiteFooter from '../components/marketing/SiteFooter.astro';
 ---
 <!doctype html>
 <html lang="en">
@@ -30,14 +32,7 @@ import CtaButton from '../components/marketing/CtaButton.astro';
   <body>
     <a href="#main-content" class="skip-link">Skip to content</a>
 
-    <header class="site-header">
-      <div class="site-header__inner">
-        <a href="/" class="site-header__brand" aria-label="C3P home">C3P</a>
-        <nav aria-label="Primary">
-          <a href="/docs/">Docs</a>
-        </nav>
-      </div>
-    </header>
+    <SiteHeader />
 
     <main id="main-content" tabindex="-1" class="not-found">
       <p class="not-found__code" aria-hidden="true">404</p>
@@ -81,40 +76,13 @@ import CtaButton from '../components/marketing/CtaButton.astro';
       </p>
     </main>
 
-    <footer class="site-footer">
-      <div class="site-footer__inner">
-        <p class="site-footer__links">
-          <a href="/">Home</a>
-          <span aria-hidden="true">&middot;</span>
-          <a href="/docs/">Docs</a>
-        </p>
-      </div>
-    </footer>
+    <SiteFooter>
+      <a href="/">Home</a>
+      <span aria-hidden="true">&middot;</span>
+      <a href="/docs/">Docs</a>
+    </SiteFooter>
 
     <style>
-      .site-header {
-        border-bottom: 1px solid var(--color-border);
-        background: var(--color-bg-surface);
-      }
-
-      .site-header__inner {
-        max-width: var(--container-max-width);
-        margin: 0 auto;
-        padding: var(--space-4) var(--space-5);
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: var(--space-5);
-      }
-
-      .site-header__brand {
-        font-weight: 700;
-        font-size: var(--type-scale-4);
-        color: var(--color-text-primary);
-        text-decoration: none;
-        letter-spacing: var(--type-tracking-tight);
-      }
-
       .not-found {
         max-width: 36rem;
         margin: 0 auto;
@@ -201,29 +169,6 @@ import CtaButton from '../components/marketing/CtaButton.astro';
 
       .not-found__home {
         margin: var(--space-2) 0 0;
-      }
-
-      .site-footer {
-        border-top: 1px solid var(--color-border);
-        background: var(--color-bg-surface);
-      }
-
-      .site-footer__inner {
-        max-width: var(--container-max-width);
-        margin: 0 auto;
-        padding: var(--space-5);
-        text-align: center;
-      }
-
-      .site-footer__links {
-        margin: 0;
-        display: flex;
-        flex-wrap: wrap;
-        gap: var(--space-3);
-        align-items: center;
-        justify-content: center;
-        color: var(--color-text-muted);
-        font-size: var(--type-scale-2);
       }
     </style>
   </body>
