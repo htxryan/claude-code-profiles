@@ -16,7 +16,7 @@ pnpm build        # produces site/dist/
 pnpm preview      # serve site/dist/ locally
 ```
 
-Requires Node 20+ and pnpm 10+.
+Requires Node 22.12+ (Astro 6 minimum) and pnpm 10+.
 
 ## Layout
 
@@ -121,7 +121,7 @@ configuration is reviewable in-repo even though it's enforced out-of-repo.
 | Build output directory | `site/dist` |
 | Root directory (for build) | `/` |
 | Build system version | `2` (default) |
-| Node version | `20` (set via env var `NODE_VERSION=20`) |
+| Node version | `22` (set via env var `NODE_VERSION=22`) — Astro 6 requires `>=22.12.0` |
 | Preview deployments | **Enabled for all non-production branches and PRs** |
 | Build watch paths | _(default — unrestricted)_ |
 
@@ -131,7 +131,7 @@ Set on **both** Production and Preview environments:
 
 | Variable | Value | Why |
 |----------|-------|-----|
-| `NODE_VERSION` | `20` | Astro/Starlight require Node 20+; Pages defaults to an older runtime |
+| `NODE_VERSION` | `22` | Astro 6 requires Node `>=22.12.0`; Pages defaults to an older runtime |
 
 No GitHub Actions secrets are required — CF Pages talks to GitHub directly via
 its OAuth app at install time, not via repo-level tokens (R-UN-3).

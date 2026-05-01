@@ -78,10 +78,12 @@ jobs:
         with:
           version: 10
 
-      - name: Setup Node 20
+      # Node 22+: Astro 6 requires >=22.12.0 (the engines field on site/
+      # package.json reflects this). Match what CF Pages uses in production.
+      - name: Setup Node 22
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "pnpm"
           cache-dependency-path: site/pnpm-lock.yaml
 
