@@ -24,6 +24,12 @@ type MaterializeOptions struct {
 	RetainPriorForTests bool
 }
 
+// testPreSpliceHook fires just before applyRootSplice (the LAST mutating step
+// of Materialize). Tests use this to verify the ordering invariant —
+// specifically, that state.json was written with the new rootSectionFp
+// BEFORE the live root CLAUDE.md was mutated. Production leaves it nil.
+var testPreSpliceHook func()
+
 // MaterializeResult is the orchestrator's return: the StateFile written to
 // disk and the discard-backup snapshot path (passed through from the caller
 // — D6's snapshotForDiscard runs BEFORE materialize on the discard-gate path
@@ -172,32 +178,24 @@ func Materialize(
 		return MaterializeResult{}, err
 	}
 
-	// Step c' (the splice): write the projectRoot section bytes if planned.
-	// Happens AFTER the .claude/ swap so a failure here leaves the .claude/
-	// swap committed (.prior/ cleanup hasn't run yet — reconcile + re-run is
-	// safe). We surface the splice error so the user knows projectRoot did
-	// NOT land.
-	var rootSectionFp *SectionFingerprint
-	if splicePlan != nil {
-		fp, err := applyRootSplice(paths, splicePlan)
-		if err != nil {
-			return MaterializeResult{}, err
-		}
-		// Empty-splice path (new plan has no projectRoot contributor):
-		// record nil rather than the empty-section fingerprint. The state
-		// field tracks "is there a managed section we own"; the new plan's
-		// answer is no.
-		if len(rootMerged) > 0 {
-			rootSectionFp = &fp
-		}
-	}
-
-	// Step c succeeded. Build the state file BEFORE removing prior so a
-	// crash during state-write still leaves a recoverable artifact. Next
-	// run sees .claude/ + .prior/; reconcile detects "fresh materialize
-	// landed but prior cleanup didn't run" — but the state file points at
-	// the old plan, so a follow-up reconcile will restore from .prior/. The
-	// re-materialize is idempotent.
+	// Step c succeeded. Build the state file BEFORE applying the projectRoot
+	// splice so the order of fallible work is:
+	//   1. ComputeSourceFingerprint (fallible IO)
+	//   2. WriteStateFile           (fallible IO, atomic temp+rename)
+	//   3. applyRootSplice          (fallible IO, last mutating step)
+	//
+	// If 1 or 2 fail: .claude/ is swapped but .prior/ still exists; state
+	// did not advance; root CLAUDE.md is untouched. Reconcile restores
+	// .claude/ from .prior/ on the next run. Fully consistent.
+	//
+	// If 3 fails: state.json records the new plan + new rootSectionFp but
+	// root bytes are stale. Drift detection surfaces this on next status
+	// and a re-run of `use` will re-apply the splice (idempotent).
+	//
+	// rootSectionFp must be baked into state.json before the splice runs,
+	// so we precompute it deterministically from splicePlan via
+	// computeRootSectionFingerprint (no IO; matches what applyRootSplice
+	// would compute by re-parsing the bytes it writes).
 
 	// Compute fingerprint from merged bytes (we have them in memory) and
 	// overlay mtimes from the freshly-renamed live tree. Whole-file
@@ -219,6 +217,19 @@ func Materialize(
 		return MaterializeResult{}, err
 	}
 
+	// Pre-compute the section fingerprint deterministically. Empty-splice
+	// path (new plan has no projectRoot contributor): record nil rather
+	// than the empty-section fingerprint — the state field tracks "is
+	// there a managed section we own"; the new plan's answer is no.
+	var rootSectionFp *SectionFingerprint
+	if splicePlan != nil && len(rootMerged) > 0 {
+		fp, err := computeRootSectionFingerprint(splicePlan)
+		if err != nil {
+			return MaterializeResult{}, err
+		}
+		rootSectionFp = &fp
+	}
+
 	now := FormatTimestamp(time.Now())
 	profile := plan.ProfileName
 	newState := StateFile{
@@ -233,6 +244,21 @@ func Materialize(
 	}
 	if err := WriteStateFile(paths, newState); err != nil {
 		return MaterializeResult{}, err
+	}
+
+	// Step c' (the splice): write the projectRoot section bytes if planned.
+	// LAST mutating step so any earlier fallible work that fails leaves
+	// root CLAUDE.md untouched — reconcile's .prior/-restore path is then
+	// sufficient on its own. The fingerprint state.json carries was
+	// pre-computed above and is byte-identical to what re-parsing the
+	// written bytes would yield.
+	if splicePlan != nil {
+		if testPreSpliceHook != nil {
+			testPreSpliceHook()
+		}
+		if err := applyRootSplice(paths, splicePlan); err != nil {
+			return MaterializeResult{}, err
+		}
 	}
 
 	// Foreground-drop prior dir. Production crash injection between this
@@ -331,9 +357,9 @@ func preflightEmptyRootSplice(paths StatePaths) (*rootSplicePlan, error) {
 	}, nil
 }
 
-// applyRootSplice renders the managed block from the staged section bytes,
-// concatenates with the preserved before/after slices, and writes atomically
-// via temp+rename in the same directory as the final file (no EXDEV risk).
+// renderRootSpliceContent renders the final file bytes a splice would write.
+// Pure: no IO, no side effects. Shared by computeRootSectionFingerprint and
+// applyRootSplice so both agree on what the post-splice file looks like.
 //
 // Idempotence detail: RenderManagedBlock always appends a trailing \n after
 // <end> so the marker sits on its own line in a freshly-init'd file. When
@@ -343,59 +369,73 @@ func preflightEmptyRootSplice(paths StatePaths) (*rootSplicePlan, error) {
 // that \n and grow the file by one byte per materialize — failing
 // byte-equality on a no-op re-apply. Strip the rendered block's trailing \n
 // when `after` already provides one.
-//
-// Returns the section-only fingerprint (R46): we re-parse newContent (the
-// bytes we just wrote) rather than re-reading from disk because (a) we just
-// wrote them and (b) re-reading would introduce a TOCTOU window. Hashing
-// in-memory plan.sectionBytes (the raw merge input) would silently disagree
-// with what drift extracts from disk, because RenderManagedBlock wraps the
-// body with newlines and the self-doc comment line — those bytes ARE between
-// :begin and :end on disk.
-func applyRootSplice(paths StatePaths, plan *rootSplicePlan) (SectionFingerprint, error) {
+func renderRootSpliceContent(plan *rootSplicePlan) string {
 	block := markers.RenderManagedBlock(plan.sectionBytes, plan.version)
 	if strings.HasPrefix(plan.after, "\n") && strings.HasSuffix(block, "\n") {
 		block = block[:len(block)-1]
 	}
-	newContent := plan.before + block + plan.after
+	return plan.before + block + plan.after
+}
 
-	tmpPath := RootClaudeMdTmpPath(paths)
-	f, err := os.OpenFile(tmpPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
-	if err != nil {
-		return SectionFingerprint{}, err
-	}
-	if _, err := f.Write([]byte(newContent)); err != nil {
-		_ = f.Close()
-		_ = os.Remove(tmpPath)
-		return SectionFingerprint{}, err
-	}
-	if err := f.Sync(); err != nil {
-		_ = f.Close()
-		_ = os.Remove(tmpPath)
-		return SectionFingerprint{}, err
-	}
-	if err := f.Close(); err != nil {
-		_ = os.Remove(tmpPath)
-		return SectionFingerprint{}, err
-	}
-	if err := AtomicRename(tmpPath, plan.filePath); err != nil {
-		_ = os.Remove(tmpPath)
-		return SectionFingerprint{}, err
-	}
-	FsyncDir(plan.filePath)
-
+// computeRootSectionFingerprint derives the section-only fingerprint (R46) the
+// splice will record, WITHOUT touching the filesystem. Pulled out of
+// applyRootSplice so Materialize can bake the fingerprint into state.json
+// BEFORE the splice runs — that way ComputeSourceFingerprint / WriteStateFile
+// can fail without leaving root CLAUDE.md mutated past what state.json
+// records. Re-parsing renderRootSpliceContent (rather than hashing
+// plan.sectionBytes directly) matches what drift extracts from disk:
+// RenderManagedBlock wraps the body with newlines and the self-doc comment
+// line, and those bytes ARE between :begin and :end on disk.
+func computeRootSectionFingerprint(plan *rootSplicePlan) (SectionFingerprint, error) {
+	newContent := renderRootSpliceContent(plan)
 	reparsed := markers.ParseMarkers(newContent)
 	if reparsed.Status != markers.StatusValid {
 		// Defensive: RenderManagedBlock just produced these markers; if
 		// parse doesn't find them, our renderer is broken (test-only
 		// signal). Emit a typed error so test failures point at the right
 		// module.
-		return SectionFingerprint{}, fmt.Errorf("applyRootSplice: rendered managed block did not round-trip through ParseMarkers — investigate RenderManagedBlock / MarkerRegex")
+		return SectionFingerprint{}, fmt.Errorf("computeRootSectionFingerprint: rendered managed block did not round-trip through ParseMarkers — investigate RenderManagedBlock / MarkerRegex")
 	}
 	sectionBytes := []byte(reparsed.Section)
 	return SectionFingerprint{
 		Size:        int64(len(sectionBytes)),
 		ContentHash: HashBytes(sectionBytes),
 	}, nil
+}
+
+// applyRootSplice writes the rendered bytes atomically via temp+rename in the
+// same directory as the final file (no EXDEV risk). The fingerprint is
+// computed by computeRootSectionFingerprint up-front so Materialize can record
+// it in state.json BEFORE this write — keeping state.json and the live root
+// CLAUDE.md in lock-step even if intermediate fallible steps fail.
+func applyRootSplice(paths StatePaths, plan *rootSplicePlan) error {
+	newContent := renderRootSpliceContent(plan)
+
+	tmpPath := RootClaudeMdTmpPath(paths)
+	f, err := os.OpenFile(tmpPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
+	if err != nil {
+		return err
+	}
+	if _, err := f.Write([]byte(newContent)); err != nil {
+		_ = f.Close()
+		_ = os.Remove(tmpPath)
+		return err
+	}
+	if err := f.Sync(); err != nil {
+		_ = f.Close()
+		_ = os.Remove(tmpPath)
+		return err
+	}
+	if err := f.Close(); err != nil {
+		_ = os.Remove(tmpPath)
+		return err
+	}
+	if err := AtomicRename(tmpPath, plan.filePath); err != nil {
+		_ = os.Remove(tmpPath)
+		return err
+	}
+	FsyncDir(plan.filePath)
+	return nil
 }
 
 // attemptStepCRollback tries to restore the rolled-aside .prior/ back to

@@ -17,3 +17,14 @@ func SetTestRenamePriorToTarget(fn func(src, dst string) error) func() {
 	renamePriorToTarget = fn
 	return func() { renamePriorToTarget = prev }
 }
+
+// SetTestPreSpliceHook installs a callback fired just before applyRootSplice
+// runs (the last mutating step of Materialize). Returns a restore func. Used
+// to verify the splice-ordering invariant: state.json must already carry the
+// new rootSectionFp BEFORE the live root CLAUDE.md is mutated, so a splice
+// failure leaves a recoverable inconsistency rather than a state-file lag.
+func SetTestPreSpliceHook(fn func()) func() {
+	prev := testPreSpliceHook
+	testPreSpliceHook = fn
+	return func() { testPreSpliceHook = prev }
+}

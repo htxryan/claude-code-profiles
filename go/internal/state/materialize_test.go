@@ -260,6 +260,73 @@ func TestMaterialize_EmptySpliceClearsPriorBytes(t *testing.T) {
 	}
 }
 
+// TestMaterialize_RootSplice_StateWrittenBeforeSplice is the codex-flagged
+// fitness function: when Materialize runs the root-CLAUDE.md splice, the
+// state file MUST already carry the new rootSectionFp BEFORE the live root
+// CLAUDE.md is mutated. Without that ordering, a fallible step between the
+// splice and state-write (ComputeSourceFingerprint, WriteStateFile) leaves
+// root mutated while state still points at the old plan — and reconcile
+// only restores .claude/, not the root splice. The pre-splice hook lets us
+// observe the on-disk state at exactly that moment.
+func TestMaterialize_RootSplice_StateWrittenBeforeSplice(t *testing.T) {
+	root := t.TempDir()
+	paths := state.BuildStatePaths(root)
+	live := "User above\n" + markers.RenderManagedBlock("", 1) + "User below\n"
+	if err := os.WriteFile(paths.RootClaudeMdFile, []byte(live), 0o644); err != nil {
+		t.Fatalf("write live: %v", err)
+	}
+
+	type observation struct {
+		stateExists       bool
+		stateActiveProf   string
+		stateRootFpHash   string
+		rootBytesUnchanged bool
+	}
+	var obs observation
+	originalLive, _ := os.ReadFile(paths.RootClaudeMdFile)
+
+	restore := state.SetTestPreSpliceHook(func() {
+		// state.json must already be on disk with the new fingerprint.
+		res, err := state.ReadStateFile(paths)
+		if err == nil && res.State.ActiveProfile != nil {
+			obs.stateExists = true
+			obs.stateActiveProf = *res.State.ActiveProfile
+			if res.State.RootClaudeMdSection != nil {
+				obs.stateRootFpHash = res.State.RootClaudeMdSection.ContentHash
+			}
+		}
+		// Live root CLAUDE.md must NOT yet be mutated.
+		current, _ := os.ReadFile(paths.RootClaudeMdFile)
+		obs.rootBytesUnchanged = string(current) == string(originalLive)
+	})
+	defer restore()
+
+	plan := makePlan("dev")
+	merged := []merge.MergedFile{mergedRootClaudeMd("PROFILE BODY\n")}
+	res, err := state.Materialize(paths, plan, merged, state.MaterializeOptions{}, "")
+	if err != nil {
+		t.Fatalf("Materialize: %v", err)
+	}
+
+	if !obs.stateExists {
+		t.Fatalf("state.json was not written before splice — ordering invariant broken")
+	}
+	if obs.stateActiveProf != "dev" {
+		t.Fatalf("state at splice-time activeProfile = %q, want dev", obs.stateActiveProf)
+	}
+	if obs.stateRootFpHash == "" {
+		t.Fatalf("state at splice-time has no rootClaudeMdSection fingerprint — must be pre-computed before splice")
+	}
+	if !obs.rootBytesUnchanged {
+		t.Fatalf("root CLAUDE.md was mutated before state.json was written — ordering invariant broken")
+	}
+	// Sanity: the pre-computed fingerprint matches the post-splice fingerprint
+	// (proving the precomputation is byte-identical to what the splice writes).
+	if res.State.RootClaudeMdSection == nil || res.State.RootClaudeMdSection.ContentHash != obs.stateRootFpHash {
+		t.Fatalf("post-splice fingerprint disagrees with pre-splice fingerprint baked into state.json")
+	}
+}
+
 // TestMaterialize_PreservesExternalTrustNotices covers R37a: notices from
 // prior state are kept; new external paths in the plan are appended.
 func TestMaterialize_PreservesExternalTrustNotices(t *testing.T) {

@@ -8,6 +8,7 @@ import (
 	"math"
 	"os"
 	"sort"
+	"strconv"
 	"time"
 )
 
@@ -332,12 +333,20 @@ func ReadStateFile(paths StatePaths) (ReadStateResult, error) {
 		// covers fractional and exponent forms (1e400 → +Inf, +Inf > 1) so the
 		// refuse-to-operate gate fires for any future-bin shape.
 		//
+		// strconv.ErrRange (overflow forms like 1e400) returns +Inf alongside
+		// the error; we treat that as a schema-too-new signal (any binary that
+		// emitted such a value is unmistakably newer than us). Other parse
+		// errors fall through to validateStateShape, which surfaces a
+		// SchemaMismatch warning with the raw bytes.
+		//
 		// Only the comparison runs in float space; OnDisk uses math.Round so
 		// state files with values like 1.5 don't render as "schemaVersion 1
 		// but bin supports 1" in the error message. OnDiskRaw preserves the
 		// exact JSON bytes for the user-facing message so Inf/NaN/exponent
 		// forms remain diagnostic.
-		if v, err := peek.SchemaVersion.Float64(); err == nil {
+		v, err := peek.SchemaVersion.Float64()
+		overflowed := errors.Is(err, strconv.ErrRange)
+		if err == nil || overflowed {
 			if v > float64(StateFileSchemaVersion) || math.IsNaN(v) {
 				onDisk := 0
 				if !math.IsInf(v, 0) && !math.IsNaN(v) {

@@ -360,6 +360,34 @@ func TestReadStateFile_PR28_SchemaTooNew_FloatForm(t *testing.T) {
 	}
 }
 
+// TestReadStateFile_PR28_SchemaTooNew_OverflowForm covers the codex-flagged
+// case: schemaVersion that overflows float64 (e.g. 1e400) returns +Inf from
+// json.Number.Float64 ALONGSIDE strconv.ErrRange. The previous code skipped
+// the whole schema check on err != nil, silently degrading to DefaultState
+// instead of refusing. A binary that emits 1e400 is unmistakably newer than
+// us — we MUST refuse to operate.
+func TestReadStateFile_PR28_SchemaTooNew_OverflowForm(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	paths := state.BuildStatePaths(root)
+	if err := os.MkdirAll(paths.MetaDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.WriteFile(paths.StateFile, []byte(`{"schemaVersion":1e400}`), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	_, err := state.ReadStateFile(paths)
+	if err == nil {
+		t.Fatalf("expected SchemaTooNewError, got nil")
+	}
+	if !state.IsSchemaTooNewError(err) {
+		t.Fatalf("error %v is not *SchemaTooNewError", err)
+	}
+	if !strings.Contains(err.Error(), "1e400") {
+		t.Fatalf("error %q should preserve raw JSON bytes (1e400) for diagnostic", err.Error())
+	}
+}
+
 func walkTmpFiles(t *testing.T, dir string) []string {
 	t.Helper()
 	var out []string
