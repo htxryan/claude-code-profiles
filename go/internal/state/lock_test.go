@@ -5,12 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -80,35 +79,34 @@ func TestAcquireLock_RejectsLiveHolder(t *testing.T) {
 	}
 }
 
-// TestAcquireLock_StalePIDRecovery covers R41a/R41b: a lock file left behind
-// by a crashed process (PID no longer alive) is reclaimed on the next acquire.
-//
-// We simulate the scenario by writing a lock file with a definitely-dead PID
-// (we exit a child process and reuse its now-stale PID). The OS-level advisory
-// lock is naturally released when the child exits, so the next acquirer sees
-// (locked file present, OS lock available, PID dead) → recover.
-func TestAcquireLock_StalePIDRecovery(t *testing.T) {
+// TestAcquireLock_RecoversFromOrphanedStamp covers R41a/R41b: a lock file
+// whose PID/timestamp stamp is left behind without a held OS-level advisory
+// lock is reclaimed on the next acquire. The implementation does NOT check
+// PID liveness — recovery hinges entirely on tryAdvisoryLock returning
+// (true, nil) because no process holds the OS lock — so this test seeds a
+// stamp via plain os.WriteFile (no flock) and verifies the next acquirer
+// overwrites it.
+func TestAcquireLock_RecoversFromOrphanedStamp(t *testing.T) {
 	t.Parallel()
 	paths := state.BuildStatePaths(t.TempDir())
 	if err := os.MkdirAll(paths.MetaDir, 0o755); err != nil {
 		t.Fatalf("mkdir meta: %v", err)
 	}
 
-	// Pick a definitely-dead PID by spawning a process that immediately exits
-	// and capturing its PID. On most Unix kernels a recently-exited PID is not
-	// reused for a while. On Windows we use the same approach via OpenProcess
-	// returning ERROR_INVALID_PARAMETER.
-	deadPID := spawnAndExit(t)
-
+	// Any PID stamp will do — a real-but-unrelated PID, a never-existed PID,
+	// or one we just made up. The acquire path doesn't read it back unless
+	// it fails to take the OS lock, which won't happen here because os.WriteFile
+	// doesn't touch flock.
+	const orphanedPID = 99999
 	timestamp := time.Now().UTC().Add(-time.Hour).Format(time.RFC3339Nano)
-	contents := fmt.Sprintf("%d %s\n", deadPID, timestamp)
+	contents := fmt.Sprintf("%d %s\n", orphanedPID, timestamp)
 	if err := os.WriteFile(paths.LockFile, []byte(contents), 0o644); err != nil {
-		t.Fatalf("seed stale lock: %v", err)
+		t.Fatalf("seed orphaned stamp: %v", err)
 	}
 
 	handle, err := state.AcquireLock(paths, state.AcquireOptions{})
 	if err != nil {
-		t.Fatalf("AcquireLock after stale: %v", err)
+		t.Fatalf("AcquireLock after orphaned stamp: %v", err)
 	}
 	defer handle.Release()
 
@@ -187,13 +185,17 @@ func TestWithLock_HonoursCancelledContext(t *testing.T) {
 
 // TestAcquireLock_WaitHonoursSmallBackoff verifies the bug-fix from code
 // review: a caller-supplied InitialBackoffMs of 10 must be floored at 50ms,
-// not silently replaced with the 250ms default. We measure the elapsed time
-// for a 200ms total budget against a held lock — at 50ms backoff we expect
-// ~4 polls, at 250ms backoff we'd expect 0–1 polls. The test fails if the
-// actual elapsed time exceeds 250ms (which would indicate the backoff was
-// floored at 250 like the buggy version, not 50).
+// not silently replaced with the 250ms default. The naive elapsed-time check
+// can't distinguish fix-vs-bug because the wait loop clamps the final sleep
+// to TotalMs-elapsed; both versions return at ~TotalMs. We instead count
+// poll attempts via SetTestPollHook:
+//
+//	Fixed   (initial floor 10→50, max=50): polls every 50ms over 200ms → ≥4 polls.
+//	Buggy   (10→250 default, max bumped to 250): one sleep clamped to 200ms → 2 polls.
+//
+// Asserting pollCount ≥ 3 catches the regression definitively.
 func TestAcquireLock_WaitHonoursSmallBackoff(t *testing.T) {
-	t.Parallel()
+	// Cannot t.Parallel(): SetTestPollHook touches package-global state.
 	paths := state.BuildStatePaths(t.TempDir())
 	holder, err := state.AcquireLock(paths, state.AcquireOptions{})
 	if err != nil {
@@ -201,21 +203,22 @@ func TestAcquireLock_WaitHonoursSmallBackoff(t *testing.T) {
 	}
 	defer holder.Release()
 
+	var pollCount int32
+	restore := state.SetTestPollHook(func() { atomic.AddInt32(&pollCount, 1) })
+	defer restore()
+
 	wait := &state.WaitOptions{
 		TotalMs:          200,
 		InitialBackoffMs: 10, // sub-floor; expect 50ms (not 250ms) from the fix
 		MaxBackoffMs:     50,
 	}
-	start := time.Now()
 	_, err = state.AcquireLock(paths, state.AcquireOptions{Wait: wait})
-	elapsed := time.Since(start)
 	if err == nil {
 		t.Fatalf("expected timeout error, got nil")
 	}
-	// Buggy floor would round 10 → 250, single retry, elapsed ≈ 250ms.
-	// Fixed floor: 10 → 50, ≥3 retries within 200ms budget, elapsed ≈ 200ms.
-	if elapsed > 245*time.Millisecond {
-		t.Errorf("elapsed %v exceeds 245ms — backoff likely defaulted to 250ms instead of 50ms floor", elapsed)
+	got := atomic.LoadInt32(&pollCount)
+	if got < 3 {
+		t.Errorf("only %d poll(s) — initial backoff likely defaulted to 250ms instead of being floored at 50ms", got)
 	}
 }
 
@@ -304,30 +307,6 @@ func TestAcquireLock_ReleaseFreesLockForNextAcquirer(t *testing.T) {
 			t.Fatalf("iter %d: Release: %v", i, err)
 		}
 	}
-}
-
-// spawnAndExit launches a short-lived child process, waits for it to exit,
-// and returns its PID. The kernel doesn't reuse PIDs immediately, so this PID
-// is a reliable "definitely dead" stand-in for the stale-recovery test.
-func spawnAndExit(t *testing.T) int {
-	t.Helper()
-	exe := "true"
-	if runtime.GOOS == "windows" {
-		exe = "cmd"
-	}
-	args := []string{}
-	if runtime.GOOS == "windows" {
-		args = []string{"/c", "exit"}
-	}
-	cmd := exec.Command(exe, args...)
-	if err := cmd.Run(); err != nil {
-		t.Fatalf("spawn helper: %v", err)
-	}
-	pid := cmd.ProcessState.Pid()
-	if pid <= 0 {
-		t.Fatalf("invalid spawned PID %d", pid)
-	}
-	return pid
 }
 
 // Silence unused import check on platforms that don't need filepath here.

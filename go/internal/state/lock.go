@@ -28,11 +28,10 @@ type LockHandle struct {
 	// AcquiredAt is the ISO 8601 timestamp written when the lock was acquired.
 	AcquiredAt string
 
-	mu             sync.Mutex
-	released       bool
-	releaseFn      func() error
-	signalCleanup  func()
-	platformHandle interface{} // OS-specific (file descriptor, etc.) held until Release.
+	mu            sync.Mutex
+	released      bool
+	releaseFn     func() error
+	signalCleanup func()
 }
 
 // Release relinquishes the lock. Idempotent and safe to call from signal
@@ -70,7 +69,7 @@ type LockHeldError struct {
 
 func (e *LockHeldError) Error() string {
 	return fmt.Sprintf(
-		"Oh dear, Lock at %q is held by PID %d (acquired at %s) — wait for the other process to finish, or remove %q if the PID is dead",
+		"lock at %q is held by PID %d (acquired at %s) — wait for the other process to finish, or remove %q if the PID is dead",
 		e.LockPath, e.HolderPID, e.HolderTimestamp, e.LockPath,
 	)
 }
@@ -91,6 +90,11 @@ func (e *LockCorruptError) Error() string {
 // read). Three attempts is enough to clear any single transient race; more
 // would mask a real bug.
 const acquireMaxRetries = 3
+
+// testPollHook fires on every iteration of acquireLockWithWait's loop. Tests
+// install it via SetTestPollHook (export_test.go) to count poll attempts and
+// catch regressions in backoff arithmetic. Production code never sets this.
+var testPollHook func()
 
 // AcquireOptions configures lock acquisition. Zero value is safe (no signal
 // handlers, fail-fast on conflict) — callers wanting wait/poll behaviour
@@ -174,6 +178,9 @@ func acquireLockWithWait(paths StatePaths, opts AcquireOptions) (*LockHandle, er
 	noticeSent := false
 
 	for {
+		if testPollHook != nil {
+			testPollHook()
+		}
 		handle, err := acquireLockOnce(paths, opts.SignalHandlers)
 		if err == nil {
 			return handle, nil
@@ -273,12 +280,11 @@ func acquireLockOnce(paths StatePaths, signalHandlers bool) (*LockHandle, error)
 		FsyncDir(paths.LockFile)
 
 		handle := &LockHandle{
-			Path:           paths.LockFile,
-			PID:            pid,
-			AcquiredAt:     timestamp,
-			platformHandle: f,
+			Path:       paths.LockFile,
+			PID:        pid,
+			AcquiredAt: timestamp,
 		}
-		handle.releaseFn = makeReleaseFn(handle, paths.LockFile, f)
+		handle.releaseFn = makeReleaseFn(paths.LockFile, f)
 		if signalHandlers {
 			handle.signalCleanup = registerSignalRelease(handle)
 		}
@@ -295,7 +301,7 @@ func acquireLockOnce(paths StatePaths, signalHandlers bool) (*LockHandle, error)
 // released when the fd closes, and unlinking would make the file racy with
 // concurrent acquirers (a competitor opening between our unlink and a hand-
 // off would see ENOENT and re-create, bypassing the OS lock briefly).
-func makeReleaseFn(_ *LockHandle, lockPath string, f *os.File) func() error {
+func makeReleaseFn(lockPath string, f *os.File) func() error {
 	return func() error {
 		err := unlockAdvisoryAndClose(f)
 		if releaseUnlinksLockFile {
@@ -321,9 +327,10 @@ func unlockAdvisoryAndClose(f *os.File) error {
 // WithLock acquires the project lock, runs fn, and always releases (even on
 // panic via defer). Mirrors src/state/lock.ts:withLock.
 //
-// ctx is honored only for cancellation between retries inside acquireLock;
-// once the lock is held, fn owns interruption. Tests can pass a cancelled
-// context to surface ctx.Err() before the OS lock is taken.
+// ctx is honored only at entry: ctx.Err() is checked once before AcquireLock
+// runs. The wait/retry loop inside AcquireLock does NOT inspect ctx, so a
+// caller cancelling mid-wait will block until WaitOptions.TotalMs expires.
+// Tests pass a pre-cancelled context to surface ctx.Err() before any FS work.
 func WithLock(ctx context.Context, paths StatePaths, opts AcquireOptions, fn func(*LockHandle) error) (err error) {
 	if ctx != nil {
 		if cerr := ctx.Err(); cerr != nil {
@@ -352,24 +359,20 @@ type parsedLock struct {
 }
 
 func parseLockContents(raw string) (parsedLock, bool) {
-	trimmed := strings.TrimSpace(raw)
-	if trimmed == "" {
+	// strings.Fields splits on any unicode whitespace run, so we tolerate
+	// canonical "pid ts\n", a tab variant, or any future stamp format that
+	// keeps PID and timestamp as the first two whitespace-separated tokens.
+	// RFC3339Nano timestamps don't contain whitespace, so taking field[1] as
+	// the timestamp is safe.
+	fields := strings.Fields(raw)
+	if len(fields) < 2 {
 		return parsedLock{}, false
 	}
-	space := strings.IndexByte(trimmed, ' ')
-	if space <= 0 {
-		return parsedLock{}, false
-	}
-	pidStr := trimmed[:space]
-	ts := strings.TrimSpace(trimmed[space+1:])
-	pid, err := strconv.Atoi(pidStr)
+	pid, err := strconv.Atoi(fields[0])
 	if err != nil || pid <= 0 {
 		return parsedLock{}, false
 	}
-	if ts == "" {
-		return parsedLock{}, false
-	}
-	return parsedLock{pid: pid, timestamp: ts}, true
+	return parsedLock{pid: pid, timestamp: fields[1]}, true
 }
 
 // writeLockContents truncates f and writes contents, fsyncing before return.

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/htxryan/c3p/internal/merge"
@@ -17,6 +18,21 @@ import (
 type dirMtime struct {
 	path  string
 	mtime time.Time
+}
+
+// CycleError is returned by CopyTree when a symlink cycle is detected during
+// the descent. Surfaced as a typed error so callers can present a clear
+// message instead of stack-overflow ambiguity.
+type CycleError struct {
+	// Path is the symlink whose resolved target was already on the
+	// recursion stack.
+	Path string
+	// ResolvedTo is the canonical path that triggered the cycle.
+	ResolvedTo string
+}
+
+func (e *CycleError) Error() string {
+	return fmt.Sprintf("symlink cycle at %q: resolves to %q which is already on the descent stack", e.Path, e.ResolvedTo)
 }
 
 // CopyTree recursively copies src to dst, creating dst and any parent dirs.
@@ -31,6 +47,11 @@ type dirMtime struct {
 // Mode and frequently fails for non-admin users; dereferencing keeps the
 // discard-backup and persist paths cross-platform reliable.
 //
+// Cycle detection: every directory entered (whether reached directly or via a
+// symlink) is canonicalized with filepath.EvalSymlinks and tracked on the DFS
+// path; a re-entry returns *CycleError instead of recursing into stack
+// overflow.
+//
 // Directory mtimes are applied in a post-order pass after all child writes
 // complete. POSIX bumps a directory's mtime on every child create/rename, so
 // any Chtimes call on a directory before its children land gets clobbered.
@@ -41,7 +62,8 @@ func CopyTree(src, dst string) error {
 		return err
 	}
 	var dirs []dirMtime
-	if err := copyTreeRecursive(src, dst, &dirs); err != nil {
+	ancestors := make(map[string]struct{})
+	if err := copyTreeRecursive(src, dst, &dirs, ancestors); err != nil {
 		return err
 	}
 	// Deepest-first: a directory's mtime restoration must outlive every child
@@ -61,7 +83,11 @@ func CopyTree(src, dst string) error {
 // pointed-at tree (the divergence from filepath.Walk that the TS reference
 // gets for free via fs.cp({dereference: true})). dirs accumulates directory
 // mtime records for the post-order restoration pass at the top level.
-func copyTreeRecursive(src, dst string, dirs *[]dirMtime) error {
+//
+// ancestors is a DFS-stack-scoped set of canonical directory paths currently
+// on the recursion path; entering a directory whose canonical form is already
+// in the set means we've followed a symlink cycle and must bail.
+func copyTreeRecursive(src, dst string, dirs *[]dirMtime, ancestors map[string]struct{}) error {
 	info, err := os.Lstat(src)
 	if err != nil {
 		return err
@@ -75,6 +101,19 @@ func copyTreeRecursive(src, dst string, dirs *[]dirMtime) error {
 
 	switch {
 	case resolved.IsDir():
+		// Canonicalize for cycle detection. EvalSymlinks resolves every
+		// symlink component AND the path itself, so two different symlink
+		// chains that land on the same directory share a key.
+		canonical, err := filepath.EvalSymlinks(src)
+		if err != nil {
+			return fmt.Errorf("canonicalizing %q: %w", src, err)
+		}
+		if _, seen := ancestors[canonical]; seen {
+			return &CycleError{Path: src, ResolvedTo: canonical}
+		}
+		ancestors[canonical] = struct{}{}
+		defer delete(ancestors, canonical)
+
 		if err := os.MkdirAll(dst, resolved.Mode().Perm()); err != nil {
 			return err
 		}
@@ -85,7 +124,7 @@ func copyTreeRecursive(src, dst string, dirs *[]dirMtime) error {
 		for _, e := range entries {
 			childSrc := filepath.Join(src, e.Name())
 			childDst := filepath.Join(dst, e.Name())
-			if err := copyTreeRecursive(childSrc, childDst, dirs); err != nil {
+			if err := copyTreeRecursive(childSrc, childDst, dirs, ancestors); err != nil {
 				return err
 			}
 		}
@@ -142,6 +181,20 @@ func copyRegularFile(src, dst string, info os.FileInfo) error {
 // The returned error is the first failure; partial writes are left in place
 // so the pending/prior protocol can either commit or discard atomically.
 func WriteFiles(targetDir string, files []merge.MergedFile) error {
+	// Defense in depth against path traversal: the resolver populates RelPath
+	// from a controlled walk so today's inputs are safe, but a future caller
+	// bypassing the resolver shouldn't be able to escape targetDir via
+	// "../foo" or "/etc/passwd". Validate before any FS work.
+	for _, f := range files {
+		if filepath.IsAbs(f.Path) {
+			return fmt.Errorf("WriteFiles: path %q must be relative to targetDir", f.Path)
+		}
+		cleaned := filepath.Clean(f.Path)
+		if cleaned == ".." || strings.HasPrefix(cleaned, ".."+string(filepath.Separator)) {
+			return fmt.Errorf("WriteFiles: path %q escapes targetDir", f.Path)
+		}
+	}
+
 	if err := os.MkdirAll(targetDir, 0o755); err != nil {
 		return err
 	}

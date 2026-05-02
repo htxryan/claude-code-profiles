@@ -1,6 +1,7 @@
 package state_test
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -186,6 +187,61 @@ func TestCopyTree_PreservesDirectoryMtime(t *testing.T) {
 	delta := info.ModTime().Sub(historical)
 	if delta < -2*time.Second || delta > 2*time.Second {
 		t.Errorf("dst dir mtime = %v, want %v (delta %v)", info.ModTime(), historical, delta)
+	}
+}
+
+// TestCopyTree_DetectsSymlinkCycle locks down the cycle-detection guard:
+// without it, a symlink whose resolved target lies on the recursion stack
+// caused unbounded recursion (TS reference fs.cp dereferences AND detects
+// cycles; the Go port now matches). We expect a typed *CycleError, not a
+// stack overflow.
+func TestCopyTree_DetectsSymlinkCycle(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation requires elevation on Windows")
+	}
+	src := t.TempDir()
+	mustWrite(t, filepath.Join(src, "leaf.txt"), "leaf", 0o644)
+	// Cycle: src/loop -> src (descend into src via loop, see loop again, ...).
+	if err := os.Symlink(src, filepath.Join(src, "loop")); err != nil {
+		t.Fatalf("symlink: %v", err)
+	}
+
+	dst := filepath.Join(t.TempDir(), "out")
+	err := state.CopyTree(src, dst)
+	if err == nil {
+		t.Fatalf("expected cycle error, got nil")
+	}
+	var cycle *state.CycleError
+	if !errors.As(err, &cycle) {
+		t.Fatalf("err = %v, want *state.CycleError", err)
+	}
+}
+
+// TestWriteFiles_RejectsPathTraversal verifies the defense-in-depth check:
+// any caller (now or future) bypassing the resolver and passing an absolute
+// path or "../" escape MUST be rejected before any FS work happens.
+func TestWriteFiles_RejectsPathTraversal(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		path string
+	}{
+		{"absolute", "/etc/passwd"},
+		{"parent escape", "../escape.txt"},
+		{"nested parent escape", "sub/../../escape.txt"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			dst := t.TempDir()
+			err := state.WriteFiles(dst, []merge.MergedFile{
+				{Path: tc.path, Bytes: []byte("x")},
+			})
+			if err == nil {
+				t.Fatalf("expected rejection of %q, got nil", tc.path)
+			}
+		})
 	}
 }
 
