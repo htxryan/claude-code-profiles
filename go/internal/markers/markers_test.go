@@ -154,6 +154,19 @@ func TestParseMarkers_HigherVersion(t *testing.T) {
 	}
 }
 
+// A version digit string that overflows strconv.Atoi must NOT silently
+// degrade to Version=0 with StatusValid — RenderManagedBlock clamps v<=0 to
+// v1, which would corrupt a hypothetical high-version file on the next write.
+// We surface the input as StatusMalformed so the caller knows to repair it.
+func TestParseMarkers_VersionOverflowIsMalformed(t *testing.T) {
+	overflow := strings.Repeat("9", 25)
+	text := "<!-- c3p:v" + overflow + ":begin -->body<!-- c3p:v" + overflow + ":end -->"
+	r := ParseMarkers(text)
+	if r.Status != StatusMalformed {
+		t.Fatalf("want malformed for version overflow, got %q (version=%d)", r.Status, r.Version)
+	}
+}
+
 func TestParseMarkers_EmptySection(t *testing.T) {
 	text := strings.Join([]string{
 		"before",

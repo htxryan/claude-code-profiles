@@ -139,11 +139,12 @@ type pair struct {
 // the input string (no offset bookkeeping); callers that pre-slice translate
 // them back themselves.
 //
-// Overflow note: a pathologically long version string (e.g. 25 digits) makes
-// strconv.Atoi return an error, in which case Version on the resulting
-// ParseResult is 0 even though Status is StatusValid. That's a knowingly
-// silent fallback — the regex anchors the field as `\d+` so the input is
-// well-formed, just outside the range we model.
+// Overflow handling: a pathologically long version string (e.g. 25 digits)
+// makes strconv.Atoi return ErrRange. We skip such pairs rather than emitting
+// a StatusValid result with Version=0 — a downstream consumer that re-renders
+// at v=0 (clamped to v1 by RenderManagedBlock) would corrupt a high-version
+// file. Because the begin/end byte shape still matches markerAnyRegex, the
+// caller's lone-marker check surfaces the overflowed input as StatusMalformed.
 func findFirstPair(content string) (pair, bool) {
 	beginLocs := markerBeginRegex.FindAllStringSubmatchIndex(content, -1)
 	for _, beginLoc := range beginLocs {
@@ -155,6 +156,11 @@ func findFirstPair(content string) (pair, bool) {
 		ver := content[beginLoc[2]:beginLoc[3]]
 		tail := content[beginLoc[4]:beginLoc[5]]
 
+		v, err := strconv.Atoi(ver)
+		if err != nil {
+			continue
+		}
+
 		afterBegin := content[beginEnd:]
 		endLocs := markerEndRegex.FindAllStringSubmatchIndex(afterBegin, -1)
 		for _, endLoc := range endLocs {
@@ -165,7 +171,6 @@ func findFirstPair(content string) (pair, bool) {
 			}
 			absEndStart := beginEnd + endLoc[0]
 			absEndEnd := beginEnd + endLoc[1]
-			v, _ := strconv.Atoi(ver)
 			return pair{
 				startIdx: beginStart,
 				endIdx:   absEndEnd,
