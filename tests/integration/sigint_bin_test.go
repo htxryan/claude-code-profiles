@@ -134,10 +134,13 @@ func TestSigintBin_NoStateCorruptionAfterSigint(t *testing.T) {
 	_ = runWithSigintAfter(t, []string{"--cwd", root, "use", "big"}, 200*time.Millisecond)
 
 	// Follow-up swap must succeed — reconcile sweeps any orphaned
-	// pending/prior left by the killed predecessor.
+	// pending/prior left by the killed predecessor. The 5000-file fixture
+	// (sized for SIGINT-timing reliability above) takes 30-60 s on slower
+	// CI runners (ubuntu-24.04-arm observed at 30+ s), so the timeout
+	// allows headroom rather than racing against runner speed.
 	r := mustRun(t, helpers.SpawnOptions{
 		Args:      []string{"--cwd", root, "--on-drift=discard", "use", "big"},
-		TimeoutMs: 30000,
+		TimeoutMs: 120000,
 	})
 	if r.ExitCode != 0 {
 		t.Fatalf("follow-up use big: want 0, got %d (stderr=%q)", r.ExitCode, r.Stderr)

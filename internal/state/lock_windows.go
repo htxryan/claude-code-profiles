@@ -34,6 +34,20 @@ func isLockReadConflict(err error) bool {
 	return errors.Is(err, windows.ERROR_LOCK_VIOLATION)
 }
 
+// isFileInUseError reports whether err is a Windows "the file is open in
+// another handle so this delete cannot proceed" error. Used by the lock
+// release path: when we unlink the stamp file after releasing the OS-level
+// lock, a fresh acquirer in another goroutine/process may already have the
+// file open. The OS lock is what enforces exclusion; the unlink is purely
+// stamp cleanup, so a "file in use" error here is benign — the new holder
+// will overwrite the stamp on its own acquire path. ERROR_SHARING_VIOLATION
+// is the canonical case; ERROR_ACCESS_DENIED can also surface during
+// concurrent delete-vs-open races on some Windows file systems.
+func isFileInUseError(err error) bool {
+	return errors.Is(err, windows.ERROR_SHARING_VIOLATION) ||
+		errors.Is(err, windows.ERROR_ACCESS_DENIED)
+}
+
 // tryAdvisoryLock attempts a non-blocking exclusive LockFileEx on the entire
 // file. Returns (true, nil) on success, (false, nil) on contention, and
 // (false, err) on unexpected failures.

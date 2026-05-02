@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/htxryan/claude-code-config-profiles/tests/integration/helpers"
 )
@@ -58,9 +59,20 @@ func TestPreviewSnapshots_DriftModified(t *testing.T) {
 	if r.ExitCode != 0 {
 		t.Fatalf("setup use a: want 0, got %d (stderr=%q)", r.ExitCode, r.Stderr)
 	}
-	// Edit the live tree.
-	if err := os.WriteFile(filepath.Join(fx.ProjectRoot, ".claude", "CLAUDE.md"), []byte("alpha\nBETA\ngamma\n"), 0o644); err != nil {
+	// Edit the live tree. Same byte length as before (alpha\nBETA\ngamma vs
+	// alpha\nbeta\ngamma — case change is size-preserving), so the
+	// fingerprint fast path relies entirely on mtime to spot the change.
+	// On filesystems with 1-second mtime resolution (ext4 default, FAT,
+	// some CI volumes), `c3p use` and our os.WriteFile can both land in
+	// the same wall-second → identical mtime → fast path falsely reports
+	// clean. Bump mtime explicitly to force the slow path.
+	livePath := filepath.Join(fx.ProjectRoot, ".claude", "CLAUDE.md")
+	if err := os.WriteFile(livePath, []byte("alpha\nBETA\ngamma\n"), 0o644); err != nil {
 		t.Fatalf("write drift: %v", err)
+	}
+	future := time.Now().Add(2 * time.Second)
+	if err := os.Chtimes(livePath, future, future); err != nil {
+		t.Fatalf("chtimes drift: %v", err)
 	}
 
 	r = mustRun(t, helpers.SpawnOptions{

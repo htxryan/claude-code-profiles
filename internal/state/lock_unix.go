@@ -22,6 +22,15 @@ func isLockReadConflict(err error) bool {
 	return false
 }
 
+// isFileInUseError reports whether err is the Windows "another process has
+// the file open and we cannot delete it" error (ERROR_SHARING_VIOLATION /
+// ERROR_USER_MAPPED_FILE / ERROR_ACCESS_DENIED in delete-vs-open races).
+// Always false on POSIX: unlink succeeds even with other open fds because
+// the inode is reference-counted.
+func isFileInUseError(err error) bool {
+	return false
+}
+
 // tryAdvisoryLock attempts a non-blocking exclusive flock on f. Returns
 // (true, nil) on success, (false, nil) if another process holds the lock,
 // and (false, err) on unexpected failures.

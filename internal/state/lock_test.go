@@ -83,14 +83,28 @@ func TestAcquireLock_RejectsLiveHolder(t *testing.T) {
 	if !errors.As(err, &held) {
 		t.Fatalf("error %v not a *LockHeldError", err)
 	}
-	if held.HolderPID != os.Getpid() {
-		t.Errorf("HolderPID = %d, want %d", held.HolderPID, os.Getpid())
-	}
 	if held.LockPath != paths.LockFile {
 		t.Errorf("LockPath = %q, want %q", held.LockPath, paths.LockFile)
 	}
-	if !strings.Contains(held.Error(), strconv.Itoa(os.Getpid())) {
-		t.Errorf("error message %q missing PID", held.Error())
+	if readLockStampOK() {
+		// Stamp readable: assertions on PID + error message that names PID.
+		if held.HolderPID != os.Getpid() {
+			t.Errorf("HolderPID = %d, want %d", held.HolderPID, os.Getpid())
+		}
+		if !strings.Contains(held.Error(), strconv.Itoa(os.Getpid())) {
+			t.Errorf("error message %q missing PID", held.Error())
+		}
+	} else {
+		// Windows: LockFileEx blocks the read of the PID/timestamp stamp,
+		// so the held error degrades to PID=0, ts="(locked)". The contract
+		// surfaced here is "we returned a *LockHeldError naming this lock
+		// path"; identity-of-holder is best-effort.
+		if held.HolderPID != 0 {
+			t.Errorf("Windows: HolderPID = %d, want 0 (stamp-unreadable fallback)", held.HolderPID)
+		}
+		if held.HolderTimestamp != "(locked)" {
+			t.Errorf("Windows: HolderTimestamp = %q, want \"(locked)\"", held.HolderTimestamp)
+		}
 	}
 }
 

@@ -315,7 +315,9 @@ func makeReleaseFn(lockPath string, f *os.File) func() error {
 	return func() error {
 		err := unlockAdvisoryAndClose(f)
 		if releaseUnlinksLockFile {
-			if removeErr := os.Remove(lockPath); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
+			if removeErr := os.Remove(lockPath); removeErr != nil &&
+				!errors.Is(removeErr, os.ErrNotExist) &&
+				!isFileInUseError(removeErr) {
 				if err == nil {
 					err = removeErr
 				}
