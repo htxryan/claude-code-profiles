@@ -6,7 +6,9 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/htxryan/c3p/internal/state"
 )
@@ -112,3 +114,73 @@ func TestWindows_CrossDriveAtomicRename(t *testing.T) {
 		t.Fatalf("error %v does not wrap ErrCrossDevice", err)
 	}
 }
+
+// TestWindows_FileLockRace exercises the LockFileEx contention path with
+// concurrent goroutines (W1 PR6 #5). A single-process race with N
+// goroutines is sufficient to expose any deadlock or false-success in the
+// LockFileEx wrapper — running across two processes adds CI fragility
+// without exercising additional kernel paths (LockFileEx is per-handle,
+// not per-process).
+//
+// Invariant: across N concurrent acquire attempts, exactly one holds the
+// lock at a time, and N successful acquires + N releases complete in
+// bounded wall time without any goroutine reporting LockHeldError as a
+// terminal failure (under wait, contention is transparently retried).
+func TestWindows_FileLockRace(t *testing.T) {
+	t.Parallel()
+	paths := state.BuildStatePaths(t.TempDir())
+	const workers = 8
+	var (
+		wg      sync.WaitGroup
+		mu      sync.Mutex
+		holders int
+		maxHeld int
+		errs    []error
+	)
+	wg.Add(workers)
+	for i := 0; i < workers; i++ {
+		go func() {
+			defer wg.Done()
+			handle, err := state.AcquireLock(paths, state.AcquireOptions{
+				Wait: &state.WaitOptions{
+					TotalMs: 5_000,
+					// Backoff floor inside lock.go is 50ms — so InitialBackoffMs
+					// below the floor would be silently raised. Pin to the
+					// floor explicitly so the test's intent is obvious.
+					InitialBackoffMs: 50,
+					MaxBackoffMs:     50,
+				},
+			})
+			if err != nil {
+				mu.Lock()
+				errs = append(errs, err)
+				mu.Unlock()
+				return
+			}
+			mu.Lock()
+			holders++
+			if holders > maxHeld {
+				maxHeld = holders
+			}
+			mu.Unlock()
+			// Hold briefly so contenders observe contention.
+			time.Sleep(5 * time.Millisecond)
+			mu.Lock()
+			holders--
+			mu.Unlock()
+			if rerr := handle.Release(); rerr != nil {
+				mu.Lock()
+				errs = append(errs, rerr)
+				mu.Unlock()
+			}
+		}()
+	}
+	wg.Wait()
+	if len(errs) != 0 {
+		t.Fatalf("acquire/release errors: %v", errs)
+	}
+	if maxHeld != 1 {
+		t.Fatalf("max concurrent holders = %d, want 1 (LockFileEx exclusion violated)", maxHeld)
+	}
+}
+

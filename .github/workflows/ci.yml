@@ -74,11 +74,19 @@ jobs:
 
   go:
     # F1 (epic claude-code-profiles-248) — Go rewrite lives at go/ during
-    # the rewrite. This job runs the Go suite and the helper-parity audit
-    # (PR4) on every PR. Post-cutover (epic Z) the working-directory
-    # prefix goes away and this job folds back into build-test.
-    name: go
-    runs-on: ubuntu-latest
+    # the rewrite. This job runs the Go suite on every PR. Post-cutover
+    # (epic Z) the working-directory prefix goes away and this job folds
+    # back into build-test.
+    #
+    # PR17 (W1): the matrix includes windows-latest so windows_test.go cells
+    # (cross-drive rename, LockFileEx, .bat companion) run on every PR. No
+    # skipIf(win32) is allowed in the Go test tree.
+    name: go (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -105,7 +113,11 @@ jobs:
       - name: Test
         run: task go:test
 
+      # The helper-parity audit shells out to bash and assumes POSIX path
+      # handling; gate it to ubuntu so the windows runner doesn't fail on
+      # the bash dependency. The audit's invariants are platform-agnostic.
       - name: Helper-parity audit (PR4)
+        if: matrix.os == 'ubuntu-latest'
         run: task go:audit
 
   site:
