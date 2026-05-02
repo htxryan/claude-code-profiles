@@ -33,8 +33,14 @@ func SnapshotForDiscard(paths StatePaths) (string, error) {
 	// ISO timestamps are millisecond-precise so two snapshots within the same
 	// ms collide; copyTree's silent merge would corrupt retention accounting.
 	// Append a counter suffix `.1`, `.2`, ... until a free slot is found.
+	//
+	// Bounded probe: cap at MaxRetainedSnapshots+10 so an adversarial directory
+	// (or a swallowed PathExists error masking as true) can't loop forever.
+	// MaxRetainedSnapshots is the cap pruneOldSnapshots enforces, so any healthy
+	// backup dir has well under that count of same-ms collisions in practice.
 	baseStamp := isoStampSafeForFs(time.Now())
 	dest := filepath.Join(paths.BackupDir, baseStamp)
+	const maxProbe = MaxRetainedSnapshots + 10
 	for i := 1; ; i++ {
 		exists, err := PathExists(dest)
 		if err != nil {
@@ -42,6 +48,9 @@ func SnapshotForDiscard(paths StatePaths) (string, error) {
 		}
 		if !exists {
 			break
+		}
+		if i > maxProbe {
+			return "", fmt.Errorf("snapshot for discard: exhausted %d collision suffixes for base %q in %q", maxProbe, baseStamp, paths.BackupDir)
 		}
 		dest = filepath.Join(paths.BackupDir, fmt.Sprintf("%s.%d", baseStamp, i))
 	}
@@ -67,6 +76,15 @@ func isoStampSafeForFs(t time.Time) string {
 // pruneOldSnapshots keeps at most `keep` snapshots in backupDir, pruning
 // oldest first. Sort is by directory name (ISO timestamps lexically sort
 // chronologically for the chosen format).
+//
+// Lexicographic-sort invariants the SnapshotForDiscard format must hold:
+//   (1) base stamp is fixed-width ms-precise ISO-8601 with year first, so
+//       sort.Strings is strict chronological order;
+//   (2) bare stamp "...Z" sorts BEFORE "...Z.N" suffix variants because
+//       prefix comparison runs out of bytes on the bare side first;
+//   (3) ".1" < ".2" < ... lexically AND collisions are numbered in creation
+//       order, so siblings within one ms keep chronological order too.
+// If any of these change, switch to a parse-based sort.
 func pruneOldSnapshots(backupDir string, keep int) error {
 	entries, err := os.ReadDir(backupDir)
 	if err != nil {

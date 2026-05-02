@@ -9,9 +9,15 @@ import (
 // GitignoreEntries are the project-root .gitignore lines required by D5
 // artifacts (R15, R23a/R28). Order is the order they're appended on first
 // write; a section header precedes them so users see what added them.
+//
+// CLAUDE.md.*.tmp is the splice-write staging file; applyRootSplice deliberately
+// places it next to the live CLAUDE.md to keep the temp+rename on the same
+// filesystem (no EXDEV risk). sweepRootClaudeMdTmps removes them on the next
+// c3p op, but a crash followed by `git add -A` could otherwise stage the debris.
 var GitignoreEntries = []string{
 	".claude/",
 	".claude-profiles/.meta/",
+	"CLAUDE.md.*.tmp",
 }
 
 const gitignoreSectionHeader = "# Added by c3p"

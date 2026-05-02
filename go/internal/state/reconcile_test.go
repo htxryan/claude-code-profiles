@@ -1,6 +1,7 @@
 package state_test
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -276,5 +277,78 @@ func TestReconcileMaterialize_SweepsRootClaudeMdTmps(t *testing.T) {
 	}
 	if exists, _ := state.PathExists(unrelated); !exists {
 		t.Fatalf("unrelated .tmp swept (regression — sweep too aggressive)")
+	}
+}
+
+// TestReconcileMaterialize_ScratchRestoredWhenPriorRenameFails is the fitness
+// function for the safety property in ReconcilePendingPrior: if the prior →
+// target rename fails, the rolled-aside scratch dir holding the original live
+// bytes MUST be renamed back to the canonical target. PR1 invariant is "live
+// target is the last successful state" — leaving target absent and scratch
+// stranded would violate it. Without this test, a refactor of the rename pair
+// could silently regress the recovery branch.
+//
+// Asserts: (a) target ends up with original LIVE bytes (scratch was restored);
+// (b) priorDir still exists (caller didn't get to discard it); (c) the
+// underlying prior-restore error surfaces to the caller.
+func TestReconcileMaterialize_ScratchRestoredWhenPriorRenameFails(t *testing.T) {
+	root := t.TempDir()
+	paths := state.BuildStatePaths(root)
+
+	// Seed live target with a file we'll prove ends up back where it started.
+	if err := os.MkdirAll(paths.ClaudeDir, 0o755); err != nil {
+		t.Fatalf("mkdir claude: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(paths.ClaudeDir, "live.md"), []byte("LIVE"), 0o644); err != nil {
+		t.Fatalf("write live: %v", err)
+	}
+
+	// Seed prior so reconcile takes the restore-from-prior branch.
+	if err := os.MkdirAll(paths.PriorDir, 0o755); err != nil {
+		t.Fatalf("mkdir prior: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(paths.PriorDir, "prior.md"), []byte("PRIOR"), 0o644); err != nil {
+		t.Fatalf("write prior: %v", err)
+	}
+
+	injected := errors.New("simulated prior→target rename failure")
+	restore := state.SetTestRenamePriorToTarget(func(_, _ string) error {
+		return injected
+	})
+	defer restore()
+
+	_, err := state.ReconcileMaterialize(paths)
+	if err == nil {
+		t.Fatalf("expected error from injected rename failure, got nil")
+	}
+	if !errors.Is(err, injected) {
+		t.Fatalf("expected wrapped %v, got %v", injected, err)
+	}
+
+	// (a) target was restored from scratch — live.md should be back.
+	got, readErr := os.ReadFile(filepath.Join(paths.ClaudeDir, "live.md"))
+	if readErr != nil {
+		t.Fatalf("read live.md after recovery: %v (live tree was not restored)", readErr)
+	}
+	if string(got) != "LIVE" {
+		t.Fatalf("live.md = %q, want LIVE (scratch restore failed)", got)
+	}
+
+	// (b) prior still exists (the failing rename didn't move it; cleanup didn't run).
+	if exists, _ := state.PathExists(paths.PriorDir); !exists {
+		t.Fatalf("priorDir gone after failed rename — should still be on disk")
+	}
+
+	// (c) no scratch debris should remain alongside target after the
+	// recovery rename completed.
+	dir := filepath.Dir(paths.ClaudeDir)
+	entries, readDirErr := os.ReadDir(dir)
+	if readDirErr != nil {
+		t.Fatalf("readdir: %v", readDirErr)
+	}
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), ".claude.reconcile-") {
+			t.Fatalf("scratch %q left behind after successful scratch-restore", e.Name())
+		}
 	}
 }

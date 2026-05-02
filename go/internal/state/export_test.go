@@ -8,3 +8,12 @@ func SetTestPollHook(fn func()) func() {
 	testPollHook = fn
 	return func() { testPollHook = prev }
 }
+
+// SetTestRenamePriorToTarget swaps the prior→target AtomicRename used by
+// ReconcilePendingPrior. Returns a restore func. Used to exercise the
+// scratch-restore-on-restore-failure safety property without an FS-level fault.
+func SetTestRenamePriorToTarget(fn func(src, dst string) error) func() {
+	prev := renamePriorToTarget
+	renamePriorToTarget = fn
+	return func() { renamePriorToTarget = prev }
+}

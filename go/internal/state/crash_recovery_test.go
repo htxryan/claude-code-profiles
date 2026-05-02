@@ -3,6 +3,7 @@ package state_test
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/htxryan/c3p/internal/merge"
@@ -155,7 +156,7 @@ func TestCrashRecovery_RepeatedSwapsConverge(t *testing.T) {
 	paths := state.BuildStatePaths(root)
 	for i := 0; i < 5; i++ {
 		plan := makePlan("leaf")
-		merged := crashInjectionMerged("V" + itoa(i))
+		merged := crashInjectionMerged("V" + strconv.Itoa(i))
 		if _, err := state.Materialize(paths, plan, merged, state.MaterializeOptions{}, ""); err != nil {
 			t.Fatalf("Materialize #%d: %v", i, err)
 		}
@@ -204,14 +205,3 @@ func TestCrashRecovery_TmpStateWriteCrash(t *testing.T) {
 	}
 }
 
-func itoa(i int) string {
-	if i == 0 {
-		return "0"
-	}
-	digits := []byte{}
-	for i > 0 {
-		digits = append([]byte{byte('0' + i%10)}, digits...)
-		i /= 10
-	}
-	return string(digits)
-}

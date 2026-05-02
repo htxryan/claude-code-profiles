@@ -97,12 +97,12 @@ func TestEnsureGitignoreEntries_NoTmpAtProjectRoot(t *testing.T) {
 }
 
 // TestEnsureGitignoreEntries_AddsOnlyMissing covers the partial-presence
-// case: one entry already present; only the other is appended.
+// case: some entries already present; only the missing ones are appended.
 func TestEnsureGitignoreEntries_AddsOnlyMissing(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	paths := state.BuildStatePaths(root)
-	if err := os.WriteFile(paths.GitignoreFile, []byte(".claude/\n"), 0o644); err != nil {
+	if err := os.WriteFile(paths.GitignoreFile, []byte(".claude/\n.claude-profiles/.meta/\n"), 0o644); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
 	res, err := state.EnsureGitignoreEntries(paths)
@@ -112,7 +112,7 @@ func TestEnsureGitignoreEntries_AddsOnlyMissing(t *testing.T) {
 	if len(res.Added) != 1 {
 		t.Fatalf("added = %v, want only one missing entry", res.Added)
 	}
-	if res.Added[0] != ".claude-profiles/.meta/" {
-		t.Fatalf("added = %q, want .claude-profiles/.meta/", res.Added[0])
+	if res.Added[0] != "CLAUDE.md.*.tmp" {
+		t.Fatalf("added = %q, want CLAUDE.md.*.tmp", res.Added[0])
 	}
 }

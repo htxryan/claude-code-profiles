@@ -32,6 +32,12 @@ type ReconcileOutcome struct {
 // (defense-in-depth — only one should hold the lock at a time) never collide.
 var reconcileCounter atomic.Uint64
 
+// renamePriorToTarget is the swappable AtomicRename for the prior→target leg
+// of ReconcilePendingPrior. Production wires AtomicRename directly; tests can
+// inject a failure to exercise the scratch-restore safety property without
+// having to construct a real FS error.
+var renamePriorToTarget = AtomicRename
+
 // ReconcilePendingPrior performs the generic three-way pending/prior recovery.
 //
 // Recovery rules:
@@ -85,7 +91,7 @@ func ReconcilePendingPrior(target, pendingDir, priorDir, targetLabel string) (Re
 				scratch = ""
 			}
 		}
-		if err := AtomicRename(priorDir, target); err != nil {
+		if err := renamePriorToTarget(priorDir, target); err != nil {
 			// Restore failure: the canonical target is now absent and we
 			// hold scratch (the original live bytes). PR1 invariant is
 			// "live target is the last successful state"; if we return now

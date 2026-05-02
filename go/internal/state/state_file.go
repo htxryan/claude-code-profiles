@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"sort"
 	"time"
@@ -253,16 +254,22 @@ type StateReadWarning struct {
 // Distinct from StateReadWarningSchemaMismatch (which is the legacy/lower-
 // version path that R42 graceful-degrades): a higher-than-supported version
 // is an upgrade-required signal, not a corrupt-file signal.
+//
+// OnDiskRaw preserves the exact bytes of the schemaVersion field (e.g. "2.0",
+// "1e3", "1.5") so the rendered error message remains diagnostic when the
+// value is fractional, infinite, or NaN — int truncation would otherwise
+// produce a self-contradictory "has schemaVersion 1 but binary supports up to 1".
 type SchemaTooNewError struct {
 	Path        string
 	OnDisk      int
+	OnDiskRaw   string
 	BinMaxKnown int
 }
 
 func (e *SchemaTooNewError) Error() string {
 	return fmt.Sprintf(
-		"State file at %q has schemaVersion %d but this binary supports up to %d — refusing to operate to prevent data loss; please upgrade c3p to a version that knows about schema %d.",
-		e.Path, e.OnDisk, e.BinMaxKnown, e.OnDisk,
+		"State file at %q has schemaVersion %s but this binary supports up to %d — refusing to operate to prevent data loss; please upgrade c3p to a version that knows about schema %s.",
+		e.Path, e.OnDiskRaw, e.BinMaxKnown, e.OnDiskRaw,
 	)
 }
 
@@ -321,16 +328,25 @@ func ReadStateFile(paths StatePaths) (ReadStateResult, error) {
 	}
 	if peek.SchemaVersion != "" {
 		// json.Number.Float64 accepts 2, 2.0, 1e2 — anything JSON.parse on
-		// the JS side would interpret as a number. We round to the nearest
-		// integer for the comparison (0.5 isn't a valid version anyway, but
-		// fractional versions in this slot would surface as a SchemaMismatch
-		// downstream).
+		// the JS side would interpret as a number. The strictly-greater check
+		// covers fractional and exponent forms (1e400 → +Inf, +Inf > 1) so the
+		// refuse-to-operate gate fires for any future-bin shape.
+		//
+		// Only the comparison runs in float space; OnDisk uses math.Round so
+		// state files with values like 1.5 don't render as "schemaVersion 1
+		// but bin supports 1" in the error message. OnDiskRaw preserves the
+		// exact JSON bytes for the user-facing message so Inf/NaN/exponent
+		// forms remain diagnostic.
 		if v, err := peek.SchemaVersion.Float64(); err == nil {
-			onDisk := int(v)
-			if v > float64(StateFileSchemaVersion) {
+			if v > float64(StateFileSchemaVersion) || math.IsNaN(v) {
+				onDisk := 0
+				if !math.IsInf(v, 0) && !math.IsNaN(v) {
+					onDisk = int(math.Round(v))
+				}
 				return ReadStateResult{}, &SchemaTooNewError{
 					Path:        paths.StateFile,
 					OnDisk:      onDisk,
+					OnDiskRaw:   peek.SchemaVersion.String(),
 					BinMaxKnown: StateFileSchemaVersion,
 				}
 			}
@@ -592,12 +608,12 @@ func WriteStateFile(paths StatePaths, state StateFile) error {
 	if err := os.MkdirAll(paths.TmpDir, 0o755); err != nil {
 		return err
 	}
-	json, err := MarshalStateFileJSON(state)
+	data, err := MarshalStateFileJSON(state)
 	if err != nil {
 		return err
 	}
 	tmpPath := UniqueAtomicTmpPath(paths.TmpDir, paths.StateFile)
-	if err := AtomicWriteFile(paths.StateFile, tmpPath, json); err != nil {
+	if err := AtomicWriteFile(paths.StateFile, tmpPath, data); err != nil {
 		_ = os.Remove(tmpPath)
 		return err
 	}
