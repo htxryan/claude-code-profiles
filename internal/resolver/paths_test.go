@@ -4,6 +4,7 @@ import (
 	stderrors "errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -116,6 +117,12 @@ func TestIsExternal_DotDotPrefixedFilename(t *testing.T) {
 }
 
 func TestClassifyInclude_AbsoluteExternal(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// /var/tmp/... is not absolute on Windows — the validator correctly
+		// rejects it. Windows-style absolute path coverage lives in the
+		// Windows-specific test files.
+		t.Skip("POSIX-style absolute path semantics; not applicable on Windows")
+	}
 	projectRoot := mustAbs(t, "/tmp/some-project")
 	referencingDir := filepath.Join(projectRoot, ".claude-profiles", "myprofile")
 	paths := resolver.BuildPaths(projectRoot)

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -434,6 +435,11 @@ func TestResolve_MissingRelativeInclude(t *testing.T) {
 }
 
 func TestResolve_MissingAbsoluteInclude(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// /this/does/not/exist/anywhere is not absolute on Windows; the
+		// validator correctly rejects it before MissingIncludeError can fire.
+		t.Skip("POSIX-style absolute path; not applicable on Windows")
+	}
 	fx := makeFixture(t, fixtureSpec{
 		profiles: map[string]profileSpec{
 			"p": {manifest: map[string]any{"includes": []string{"/this/does/not/exist/anywhere"}}},

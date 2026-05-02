@@ -22,6 +22,18 @@ const (
 	lockfileFailImmediately = 0x00000001
 )
 
+// isLockReadConflict reports whether err is ERROR_LOCK_VIOLATION — what
+// Windows returns when ReadFile (and therefore os.ReadFile) tries to read
+// bytes covered by another process's exclusive LockFileEx region. Our lock
+// covers byte 0 of the lockfile, so anyone else opening the file to read
+// PID/timestamp diagnostics hits this. Caller (acquireLockOnce) treats it
+// the same as "held by another, identity unknown" — we already proved
+// non-ownership via tryAdvisoryLock returning (false, nil); the read is
+// best-effort diagnostics, not a precondition for the held verdict.
+func isLockReadConflict(err error) bool {
+	return errors.Is(err, windows.ERROR_LOCK_VIOLATION)
+}
+
 // tryAdvisoryLock attempts a non-blocking exclusive LockFileEx on the entire
 // file. Returns (true, nil) on success, (false, nil) on contention, and
 // (false, err) on unexpected failures.

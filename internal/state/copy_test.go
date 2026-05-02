@@ -224,16 +224,25 @@ func TestCopyTree_DetectsSymlinkCycle(t *testing.T) {
 func TestWriteFiles_RejectsPathTraversal(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
-		name string
-		path string
+		name      string
+		path      string
+		posixOnly bool // path uses POSIX absolute-path semantics
 	}{
-		{"absolute", "/etc/passwd"},
-		{"parent escape", "../escape.txt"},
-		{"nested parent escape", "sub/../../escape.txt"},
+		{"absolute", "/etc/passwd", true},
+		{"parent escape", "../escape.txt", false},
+		{"nested parent escape", "sub/../../escape.txt", false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
+			if tc.posixOnly && runtime.GOOS == "windows" {
+				// /etc/passwd is not absolute on Windows; the validator's
+				// absolute-path branch can't fire on this input. Windows
+				// users would write C:\Windows\... which is rejected by the
+				// same code path, but exercising it requires a Windows-shape
+				// fixture covered elsewhere.
+				t.Skip("POSIX absolute path; not applicable on Windows")
+			}
 			dst := t.TempDir()
 			err := state.WriteFiles(dst, []merge.MergedFile{
 				{Path: tc.path, Bytes: []byte("x")},

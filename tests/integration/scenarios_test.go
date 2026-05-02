@@ -31,6 +31,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -282,6 +283,14 @@ func TestScenario_S7_IncludeConflict(t *testing.T) {
 
 // S8: Missing external include (R7) — exit 3; stderr names missing path.
 func TestScenario_S8_MissingExternalInclude(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// /this/path/does/not/exist/anywhere is not absolute on Windows; the
+		// validator rejects it with exit 1 (invalid manifest) before the
+		// missing-include path (exit 3) can fire. Windows users would write
+		// C:\... — exercising that requires a Windows-shape fixture covered
+		// by the unit-level resolver tests.
+		t.Skip("POSIX absolute path; not applicable on Windows")
+	}
 	helpers.EnsureBuilt(t)
 	fx := helpers.MakeFixture(t, helpers.FixtureSpec{
 		Profiles: map[string]helpers.ProfileSpec{

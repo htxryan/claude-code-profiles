@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -15,6 +16,16 @@ import (
 
 	"github.com/htxryan/claude-code-config-profiles/internal/state"
 )
+
+// readLockStampOK reports whether the test process can read the lockfile
+// while it holds the OS-level advisory lock. POSIX flock binds the inode,
+// not the byte range, so reads from a different fd succeed. Windows
+// LockFileEx covers byte 0 — reads from any other handle (even our own
+// process's os.ReadFile) hit ERROR_LOCK_VIOLATION. Tests that want to
+// verify the on-disk PID stamp gate that assertion behind this helper.
+func readLockStampOK() bool {
+	return runtime.GOOS != "windows"
+}
 
 func TestAcquireLock_BasicAcquireRelease(t *testing.T) {
 	t.Parallel()
@@ -33,13 +44,17 @@ func TestAcquireLock_BasicAcquireRelease(t *testing.T) {
 		t.Errorf("handle AcquiredAt empty")
 	}
 
-	// Lock file exists with our PID stamped in.
-	contents, err := os.ReadFile(paths.LockFile)
-	if err != nil {
-		t.Fatalf("read lock: %v", err)
-	}
-	if !strings.HasPrefix(string(contents), strconv.Itoa(os.Getpid())+" ") {
-		t.Errorf("lock contents %q do not start with our PID", contents)
+	// Lock file exists with our PID stamped in. Skip the read-back assertion
+	// on Windows: LockFileEx blocks any read of the locked region (byte 0)
+	// while we hold the lock, even from our own process.
+	if readLockStampOK() {
+		contents, err := os.ReadFile(paths.LockFile)
+		if err != nil {
+			t.Fatalf("read lock: %v", err)
+		}
+		if !strings.HasPrefix(string(contents), strconv.Itoa(os.Getpid())+" ") {
+			t.Errorf("lock contents %q do not start with our PID", contents)
+		}
 	}
 
 	if err := handle.Release(); err != nil {
@@ -113,12 +128,16 @@ func TestAcquireLock_RecoversFromOrphanedStamp(t *testing.T) {
 	if handle.PID != os.Getpid() {
 		t.Errorf("recovered handle PID = %d, want %d", handle.PID, os.Getpid())
 	}
-	got, err := os.ReadFile(paths.LockFile)
-	if err != nil {
-		t.Fatalf("read post-recovery: %v", err)
-	}
-	if !strings.HasPrefix(string(got), strconv.Itoa(os.Getpid())+" ") {
-		t.Errorf("post-recovery lock %q not stamped with our PID", got)
+	// Skip the post-recovery stamp read on Windows (LockFileEx blocks reads
+	// of byte 0 while we hold the lock).
+	if readLockStampOK() {
+		got, err := os.ReadFile(paths.LockFile)
+		if err != nil {
+			t.Fatalf("read post-recovery: %v", err)
+		}
+		if !strings.HasPrefix(string(got), strconv.Itoa(os.Getpid())+" ") {
+			t.Errorf("post-recovery lock %q not stamped with our PID", got)
+		}
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -63,6 +64,14 @@ func TestCompletions_RejectsMissingShellArg(t *testing.T) {
 func TestCompletions_BashSourcesCleanly(t *testing.T) {
 	if !shellAvailable("bash") {
 		t.Skip("bash not on PATH")
+	}
+	if runtime.GOOS == "windows" {
+		// On windows-latest, Git Bash is on PATH but cannot interpret
+		// the Windows-style temp path passed to `source`: it strips the
+		// backslashes and reports "No such file or directory". The bash
+		// completion script's content is platform-agnostic and is verified
+		// on linux/macos in this same test.
+		t.Skip("bash path semantics differ on Windows; covered on POSIX runners")
 	}
 	helpers.EnsureBuilt(t)
 	r := mustRun(t, helpers.SpawnOptions{Args: []string{"completions", "bash"}})

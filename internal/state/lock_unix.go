@@ -14,6 +14,14 @@ import (
 // unlinking would race with concurrent acquirers).
 const releaseUnlinksLockFile = false
 
+// isLockReadConflict reports whether err is the platform-specific "another
+// process holds an exclusive byte-range lock on bytes we are trying to read"
+// error. Always false on POSIX: flock binds the inode, not byte ranges, so
+// reads from a different fd are never blocked by an existing flock holder.
+func isLockReadConflict(err error) bool {
+	return false
+}
+
 // tryAdvisoryLock attempts a non-blocking exclusive flock on f. Returns
 // (true, nil) on success, (false, nil) if another process holds the lock,
 // and (false, err) on unexpected failures.

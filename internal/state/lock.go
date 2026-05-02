@@ -234,11 +234,21 @@ func acquireLockOnce(paths StatePaths, signalHandlers bool) (*LockHandle, error)
 			// Lock is held by another process. Read the file to surface a
 			// useful error. ENOENT is impossible immediately after our open,
 			// but if it happens (file removed by signal handler) we retry.
+			// On Windows, the LockFileEx region covers byte 0, so the read
+			// itself fails with ERROR_LOCK_VIOLATION — that's still "held by
+			// another process", just without diagnostic detail.
 			raw, readErr := os.ReadFile(paths.LockFile)
 			if readErr != nil {
 				_ = f.Close()
 				if errors.Is(readErr, os.ErrNotExist) {
 					continue
+				}
+				if isLockReadConflict(readErr) {
+					return nil, &LockHeldError{
+						LockPath:        paths.LockFile,
+						HolderPID:       0,
+						HolderTimestamp: "(locked)",
+					}
 				}
 				return nil, readErr
 			}
