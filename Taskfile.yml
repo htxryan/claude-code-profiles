@@ -89,6 +89,11 @@ tasks:
     desc: Helper-parity audit (PR4) — diff TS vs Go test harness public surfaces
     cmd: bash scripts/helper_parity_audit.sh
 
+  go:lint-jsonout:
+    desc: D7 PR3 gate — forbids json.Marshal outside internal/cli/jsonout/
+    dir: go
+    cmd: bash scripts/jsonout_lint.sh
+
   # ── ci ─────────────────────────────────────────────────────────────────────
 
   ci:
@@ -103,3 +108,4 @@ tasks:
       - task: go:build
       - task: go:test
       - task: go:audit
+      - task: go:lint-jsonout

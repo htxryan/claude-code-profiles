@@ -19,7 +19,6 @@ package service
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 
@@ -284,5 +283,3 @@ type MergedFiles = []merge.MergedFile
 // ResolvedPlan is exported for tests.
 type ResolvedPlan = resolver.ResolvedPlan
 
-// fmtNoticedAt is helper used by use-handler when echoing trust notices.
-var _ = fmt.Sprintf

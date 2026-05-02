@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/htxryan/c3p/internal/markers"
@@ -286,5 +285,3 @@ func checkActiveProfileResolves(paths state.StatePaths, st state.StateFile) doct
 	return c
 }
 
-// _ silences unused-import warnings that may pop in during build cycles.
-var _ = filepath.Join
