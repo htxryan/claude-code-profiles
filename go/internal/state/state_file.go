@@ -1,0 +1,572 @@
+package state
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"sort"
+	"time"
+)
+
+// StateFileSchemaVersion is the schema stamp for state.json. Bumped only when
+// consumers (D6/D7) must update for a breaking shape change.
+const StateFileSchemaVersion = 1
+
+// ResolvedSourceRef is one contributor source recorded at materialize time.
+// D7 status/list use this to render provenance without re-running the
+// resolver. Subset of resolver.Contributor — only what's needed downstream.
+type ResolvedSourceRef struct {
+	ID       string `json:"id"`
+	Kind     string `json:"kind"`
+	RootPath string `json:"rootPath"`
+	External bool   `json:"external"`
+}
+
+// ExternalTrustNotice records that an external-trust notice has been printed
+// for a resolved external path so we don't re-print on every swap (R37a).
+type ExternalTrustNotice struct {
+	Raw          string `json:"raw"`
+	ResolvedPath string `json:"resolvedPath"`
+	NoticedAt    string `json:"noticedAt"`
+}
+
+// StateFile is the on-disk shape of .claude-profiles/.meta/state.json (R14,
+// R14a, R42).
+//
+// Always written via temp+rename so partial writes are not observable.
+// ActiveProfile == "" (the JSON null) means "no active profile" — either init
+// ran but no use occurred, or the file was unparseable / schema-mismatched
+// and treated as NoActive (R42).
+//
+// Shape mirrors src/state/types.ts:StateFile so the IV harness compares
+// byte-for-byte across languages. Pointer fields encode JSON null distinctly
+// from "field missing"; legacy-tolerant reads accept missing optional fields.
+type StateFile struct {
+	SchemaVersion        int                   `json:"schemaVersion"`
+	ActiveProfile        *string               `json:"activeProfile"`
+	MaterializedAt       *string               `json:"materializedAt"`
+	ResolvedSources      []ResolvedSourceRef   `json:"resolvedSources"`
+	Fingerprint          Fingerprint           `json:"fingerprint"`
+	ExternalTrustNotices []ExternalTrustNotice `json:"externalTrustNotices"`
+	// Optional fields (legacy state files written before cw6/azp lack them).
+	// Use pointers so we can distinguish absent from explicit null.
+	RootClaudeMdSection *SectionFingerprint `json:"rootClaudeMdSection"`
+	SourceFingerprint   *SourceFingerprint  `json:"sourceFingerprint"`
+}
+
+// fingerprintJSON is the JSON shape for Fingerprint. Files is rendered as a
+// JSON object keyed on relPath; we sort keys lexicographically when writing
+// so byte-output is stable across runs.
+type fingerprintJSON struct {
+	SchemaVersion int                              `json:"schemaVersion"`
+	Files         map[string]fingerprintEntryJSON  `json:"files"`
+	rawOrderKeys  []string                         // populated on read for diagnostics; not serialized
+	_             struct{}                         // disable struct-equality
+}
+
+type fingerprintEntryJSON struct {
+	Size        int64  `json:"size"`
+	MtimeMs     int64  `json:"mtimeMs"`
+	ContentHash string `json:"contentHash"`
+}
+
+type sectionFingerprintJSON struct {
+	Size        int64  `json:"size"`
+	ContentHash string `json:"contentHash"`
+}
+
+type sourceFingerprintJSON struct {
+	FileCount     int    `json:"fileCount"`
+	AggregateHash string `json:"aggregateHash"`
+}
+
+// MarshalJSON produces the canonical TS-compatible encoding of Fingerprint.
+// Files keys are sorted; entry fields are emitted in the canonical order
+// (size, mtimeMs, contentHash) matching JSON.stringify on the TS side.
+func (f Fingerprint) MarshalJSON() ([]byte, error) {
+	keys := make([]string, 0, len(f.Files))
+	for k := range f.Files {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	// Build via json.Marshal of an ordered struct construction (we use
+	// json.RawMessage to preserve key order in the files object).
+	buf := []byte{'{'}
+	buf = append(buf, []byte(`"schemaVersion":`)...)
+	v, err := json.Marshal(f.SchemaVersion)
+	if err != nil {
+		return nil, err
+	}
+	buf = append(buf, v...)
+	buf = append(buf, []byte(`,"files":{`)...)
+	for i, k := range keys {
+		if i > 0 {
+			buf = append(buf, ',')
+		}
+		kj, err := json.Marshal(k)
+		if err != nil {
+			return nil, err
+		}
+		buf = append(buf, kj...)
+		buf = append(buf, ':')
+		ej, err := json.Marshal(fingerprintEntryJSON{
+			Size:        f.Files[k].Size,
+			MtimeMs:     f.Files[k].MtimeMs,
+			ContentHash: f.Files[k].ContentHash,
+		})
+		if err != nil {
+			return nil, err
+		}
+		buf = append(buf, ej...)
+	}
+	buf = append(buf, '}', '}')
+	return buf, nil
+}
+
+// UnmarshalJSON parses the TS-compatible encoding of Fingerprint and
+// validates per-entry shape (R42 graceful degradation: malformed entries
+// surface as a typed validation failure to the reader, which downgrades to
+// defaultState).
+func (f *Fingerprint) UnmarshalJSON(b []byte) error {
+	var raw fingerprintJSON
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return err
+	}
+	f.SchemaVersion = raw.SchemaVersion
+	if raw.Files == nil {
+		f.Files = map[string]FingerprintEntry{}
+		return nil
+	}
+	out := make(map[string]FingerprintEntry, len(raw.Files))
+	for k, v := range raw.Files {
+		out[k] = FingerprintEntry{
+			Size:        v.Size,
+			MtimeMs:     v.MtimeMs,
+			ContentHash: v.ContentHash,
+		}
+	}
+	f.Files = out
+	return nil
+}
+
+// MarshalJSON for SectionFingerprint emits {size,contentHash}.
+func (s SectionFingerprint) MarshalJSON() ([]byte, error) {
+	return json.Marshal(sectionFingerprintJSON{
+		Size:        s.Size,
+		ContentHash: s.ContentHash,
+	})
+}
+
+func (s *SectionFingerprint) UnmarshalJSON(b []byte) error {
+	var raw sectionFingerprintJSON
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return err
+	}
+	s.Size = raw.Size
+	s.ContentHash = raw.ContentHash
+	return nil
+}
+
+// MarshalJSON for SourceFingerprint emits {fileCount,aggregateHash}.
+func (s SourceFingerprint) MarshalJSON() ([]byte, error) {
+	return json.Marshal(sourceFingerprintJSON{
+		FileCount:     s.FileCount,
+		AggregateHash: s.AggregateHash,
+	})
+}
+
+func (s *SourceFingerprint) UnmarshalJSON(b []byte) error {
+	var raw sourceFingerprintJSON
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return err
+	}
+	s.FileCount = raw.FileCount
+	s.AggregateHash = raw.AggregateHash
+	return nil
+}
+
+// DefaultState returns the "NoActive" StateFile — used when the file doesn't
+// exist, fails to parse, has a schema mismatch, or is otherwise invalid (R42
+// graceful degradation).
+func DefaultState() StateFile {
+	return StateFile{
+		SchemaVersion:        StateFileSchemaVersion,
+		ActiveProfile:        nil,
+		MaterializedAt:       nil,
+		ResolvedSources:      []ResolvedSourceRef{},
+		Fingerprint:          Fingerprint{SchemaVersion: FingerprintSchemaVersion, Files: map[string]FingerprintEntry{}},
+		ExternalTrustNotices: []ExternalTrustNotice{},
+		RootClaudeMdSection:  nil,
+		SourceFingerprint:    nil,
+	}
+}
+
+// StateReadWarningCode enumerates the recoverable read failures (R42).
+type StateReadWarningCode string
+
+const (
+	StateReadWarningMissing        StateReadWarningCode = "Missing"
+	StateReadWarningParseError     StateReadWarningCode = "ParseError"
+	StateReadWarningSchemaMismatch StateReadWarningCode = "SchemaMismatch"
+)
+
+// StateReadWarning is the recoverable-read result. Path names the file we
+// tried to read; Detail explains the failure (empty for Missing).
+type StateReadWarning struct {
+	Code   StateReadWarningCode
+	Path   string
+	Detail string
+}
+
+// SchemaTooNewError is raised when state.json carries a schemaVersion higher
+// than this binary supports (PR28). Refuse to operate so the user doesn't
+// silently lose data — the older bin would otherwise overwrite a newer-format
+// state file with its own narrower shape.
+//
+// Distinct from StateReadWarningSchemaMismatch (which is the legacy/lower-
+// version path that R42 graceful-degrades): a higher-than-supported version
+// is an upgrade-required signal, not a corrupt-file signal.
+type SchemaTooNewError struct {
+	Path        string
+	OnDisk      int
+	BinMaxKnown int
+}
+
+func (e *SchemaTooNewError) Error() string {
+	return fmt.Sprintf(
+		"State file at %q has schemaVersion %d but this binary supports up to %d — refusing to operate to prevent data loss; please upgrade c3p to a version that knows about schema %d.",
+		e.Path, e.OnDisk, e.BinMaxKnown, e.OnDisk,
+	)
+}
+
+// ReadStateResult is the outcome of ReadStateFile. Warning is non-nil when
+// the on-disk file was missing/unparseable/schema-mismatched and we degraded
+// to DefaultState (R42).
+type ReadStateResult struct {
+	State   StateFile
+	Warning *StateReadWarning
+}
+
+// ReadStateFile reads .state.json, validating shape. Never returns an error
+// for file-content problems (those produce DefaultState + warning per R42).
+// Filesystem errors other than ENOENT (permission denied, IO error) are
+// surfaced.
+//
+// PR28: a schemaVersion strictly greater than StateFileSchemaVersion produces
+// a *SchemaTooNewError instead of degrading to DefaultState — that path
+// would silently downgrade an upgraded user's state file on the next write.
+func ReadStateFile(paths StatePaths) (ReadStateResult, error) {
+	raw, err := os.ReadFile(paths.StateFile)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return ReadStateResult{
+				State:   DefaultState(),
+				Warning: &StateReadWarning{Code: StateReadWarningMissing, Path: paths.StateFile},
+			}, nil
+		}
+		return ReadStateResult{}, err
+	}
+
+	// First pass: peek at schemaVersion alone so PR28 can fire before a full
+	// shape validation runs. A schema-too-new file may legitimately have
+	// fields the current code doesn't model; refusing up front avoids a
+	// confusing "missing field" error message that obscures the real cause.
+	var peek struct {
+		SchemaVersion json.RawMessage `json:"schemaVersion"`
+	}
+	if err := json.Unmarshal(raw, &peek); err != nil {
+		return ReadStateResult{
+			State: DefaultState(),
+			Warning: &StateReadWarning{
+				Code:   StateReadWarningParseError,
+				Path:   paths.StateFile,
+				Detail: err.Error(),
+			},
+		}, nil
+	}
+	if len(peek.SchemaVersion) > 0 {
+		var v int
+		if err := json.Unmarshal(peek.SchemaVersion, &v); err == nil {
+			if v > StateFileSchemaVersion {
+				return ReadStateResult{}, &SchemaTooNewError{
+					Path:        paths.StateFile,
+					OnDisk:      v,
+					BinMaxKnown: StateFileSchemaVersion,
+				}
+			}
+		}
+	}
+
+	parsed, warn := validateStateShape(raw, paths.StateFile)
+	if warn != nil {
+		return ReadStateResult{State: DefaultState(), Warning: warn}, nil
+	}
+	return ReadStateResult{State: parsed, Warning: nil}, nil
+}
+
+// validateStateShape enforces the StateFile schema. We accept only the
+// current SchemaVersion; mismatches produce a SchemaMismatch warning so we
+// degrade gracefully (R42). The check is intentionally narrow — only enough
+// structure to safely consume the file.
+func validateStateShape(raw []byte, path string) (StateFile, *StateReadWarning) {
+	bad := func(detail string) *StateReadWarning {
+		return &StateReadWarning{
+			Code:   StateReadWarningSchemaMismatch,
+			Path:   path,
+			Detail: detail,
+		}
+	}
+	// We use a hand-rolled validator over the raw map so a per-entry shape
+	// problem (e.g. fingerprint.files[k].size missing) lands in the same
+	// SchemaMismatch warning rather than a Go-specific decoding error.
+	var generic map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &generic); err != nil {
+		return StateFile{}, &StateReadWarning{
+			Code:   StateReadWarningParseError,
+			Path:   path,
+			Detail: err.Error(),
+		}
+	}
+	if generic == nil {
+		return StateFile{}, bad("top-level value is not a JSON object")
+	}
+
+	var sv int
+	if err := json.Unmarshal(generic["schemaVersion"], &sv); err != nil {
+		return StateFile{}, bad(fmt.Sprintf("schemaVersion %s (expected %d)", string(generic["schemaVersion"]), StateFileSchemaVersion))
+	}
+	if sv != StateFileSchemaVersion {
+		return StateFile{}, bad(fmt.Sprintf("schemaVersion %d (expected %d)", sv, StateFileSchemaVersion))
+	}
+
+	var sf StateFile
+	sf.SchemaVersion = sv
+
+	// activeProfile: string | null
+	if rawAP, ok := generic["activeProfile"]; ok {
+		if string(rawAP) == "null" {
+			sf.ActiveProfile = nil
+		} else {
+			var s string
+			if err := json.Unmarshal(rawAP, &s); err != nil {
+				return StateFile{}, bad("activeProfile must be string or null")
+			}
+			sf.ActiveProfile = &s
+		}
+	} else {
+		return StateFile{}, bad("activeProfile must be string or null")
+	}
+
+	if rawMA, ok := generic["materializedAt"]; ok {
+		if string(rawMA) == "null" {
+			sf.MaterializedAt = nil
+		} else {
+			var s string
+			if err := json.Unmarshal(rawMA, &s); err != nil {
+				return StateFile{}, bad("materializedAt must be string or null")
+			}
+			sf.MaterializedAt = &s
+		}
+	} else {
+		return StateFile{}, bad("materializedAt must be string or null")
+	}
+
+	rawRS, hasRS := generic["resolvedSources"]
+	if !hasRS || len(rawRS) == 0 || rawRS[0] != '[' {
+		return StateFile{}, bad("resolvedSources must be an array")
+	}
+	if err := json.Unmarshal(rawRS, &sf.ResolvedSources); err != nil {
+		return StateFile{}, bad(fmt.Sprintf("resolvedSources: %s", err.Error()))
+	}
+
+	rawFP, hasFP := generic["fingerprint"]
+	if !hasFP || len(rawFP) == 0 || rawFP[0] != '{' {
+		return StateFile{}, bad("fingerprint must be a JSON object")
+	}
+	var fpMap map[string]json.RawMessage
+	if err := json.Unmarshal(rawFP, &fpMap); err != nil {
+		return StateFile{}, bad(fmt.Sprintf("fingerprint: %s", err.Error()))
+	}
+	var fpv int
+	if err := json.Unmarshal(fpMap["schemaVersion"], &fpv); err != nil {
+		return StateFile{}, bad(fmt.Sprintf("fingerprint.schemaVersion %s (expected %d)", string(fpMap["schemaVersion"]), FingerprintSchemaVersion))
+	}
+	if fpv != FingerprintSchemaVersion {
+		return StateFile{}, bad(fmt.Sprintf("fingerprint.schemaVersion %d (expected %d)", fpv, FingerprintSchemaVersion))
+	}
+	rawFiles, hasFiles := fpMap["files"]
+	if !hasFiles || len(rawFiles) == 0 || rawFiles[0] != '{' {
+		return StateFile{}, bad("fingerprint.files must be a JSON object")
+	}
+	var filesMap map[string]json.RawMessage
+	if err := json.Unmarshal(rawFiles, &filesMap); err != nil {
+		return StateFile{}, bad(fmt.Sprintf("fingerprint.files: %s", err.Error()))
+	}
+	files := make(map[string]FingerprintEntry, len(filesMap))
+	for k, v := range filesMap {
+		if len(v) == 0 || v[0] != '{' {
+			return StateFile{}, bad(fmt.Sprintf("fingerprint.files[%q] must be an object", k))
+		}
+		var entryMap map[string]json.RawMessage
+		if err := json.Unmarshal(v, &entryMap); err != nil {
+			return StateFile{}, bad(fmt.Sprintf("fingerprint.files[%q]: %s", k, err.Error()))
+		}
+		var size float64
+		if err := json.Unmarshal(entryMap["size"], &size); err != nil {
+			return StateFile{}, bad(fmt.Sprintf("fingerprint.files[%q].size must be a number", k))
+		}
+		var mtime float64
+		if err := json.Unmarshal(entryMap["mtimeMs"], &mtime); err != nil {
+			return StateFile{}, bad(fmt.Sprintf("fingerprint.files[%q].mtimeMs must be a number", k))
+		}
+		var hash string
+		if err := json.Unmarshal(entryMap["contentHash"], &hash); err != nil {
+			return StateFile{}, bad(fmt.Sprintf("fingerprint.files[%q].contentHash must be a string", k))
+		}
+		files[k] = FingerprintEntry{
+			Size:        int64(size),
+			MtimeMs:     int64(mtime),
+			ContentHash: hash,
+		}
+	}
+	sf.Fingerprint = Fingerprint{SchemaVersion: fpv, Files: files}
+
+	rawETN, hasETN := generic["externalTrustNotices"]
+	if !hasETN || len(rawETN) == 0 || rawETN[0] != '[' {
+		return StateFile{}, bad("externalTrustNotices must be an array")
+	}
+	if err := json.Unmarshal(rawETN, &sf.ExternalTrustNotices); err != nil {
+		return StateFile{}, bad(fmt.Sprintf("externalTrustNotices: %s", err.Error()))
+	}
+
+	// Optional: rootClaudeMdSection
+	if rawSec, ok := generic["rootClaudeMdSection"]; ok && string(rawSec) != "null" {
+		if len(rawSec) == 0 || rawSec[0] != '{' {
+			return StateFile{}, bad("rootClaudeMdSection must be an object or null")
+		}
+		var secMap map[string]json.RawMessage
+		if err := json.Unmarshal(rawSec, &secMap); err != nil {
+			return StateFile{}, bad(fmt.Sprintf("rootClaudeMdSection: %s", err.Error()))
+		}
+		var size float64
+		if err := json.Unmarshal(secMap["size"], &size); err != nil {
+			return StateFile{}, bad("rootClaudeMdSection.size must be a number")
+		}
+		var hash string
+		if err := json.Unmarshal(secMap["contentHash"], &hash); err != nil {
+			return StateFile{}, bad("rootClaudeMdSection.contentHash must be a string")
+		}
+		sf.RootClaudeMdSection = &SectionFingerprint{Size: int64(size), ContentHash: hash}
+	}
+
+	// Optional: sourceFingerprint
+	if rawSrc, ok := generic["sourceFingerprint"]; ok && string(rawSrc) != "null" {
+		if len(rawSrc) == 0 || rawSrc[0] != '{' {
+			return StateFile{}, bad("sourceFingerprint must be an object or null")
+		}
+		var srcMap map[string]json.RawMessage
+		if err := json.Unmarshal(rawSrc, &srcMap); err != nil {
+			return StateFile{}, bad(fmt.Sprintf("sourceFingerprint: %s", err.Error()))
+		}
+		var fc float64
+		if err := json.Unmarshal(srcMap["fileCount"], &fc); err != nil {
+			return StateFile{}, bad("sourceFingerprint.fileCount must be a number")
+		}
+		var hash string
+		if err := json.Unmarshal(srcMap["aggregateHash"], &hash); err != nil {
+			return StateFile{}, bad("sourceFingerprint.aggregateHash must be a string")
+		}
+		sf.SourceFingerprint = &SourceFingerprint{FileCount: int(fc), AggregateHash: hash}
+	}
+
+	return sf, nil
+}
+
+// MarshalJSON for StateFile produces the canonical key order matching the TS
+// implementation's JSON.stringify output, so a state file written by the Go
+// bin can be byte-compared against the TS bin (cross-language IV gate).
+//
+// Order: schemaVersion, activeProfile, materializedAt, resolvedSources,
+// fingerprint, externalTrustNotices, rootClaudeMdSection, sourceFingerprint.
+func (s StateFile) MarshalJSON() ([]byte, error) {
+	type alias struct {
+		SchemaVersion        int                   `json:"schemaVersion"`
+		ActiveProfile        *string               `json:"activeProfile"`
+		MaterializedAt       *string               `json:"materializedAt"`
+		ResolvedSources      []ResolvedSourceRef   `json:"resolvedSources"`
+		Fingerprint          Fingerprint           `json:"fingerprint"`
+		ExternalTrustNotices []ExternalTrustNotice `json:"externalTrustNotices"`
+		RootClaudeMdSection  *SectionFingerprint   `json:"rootClaudeMdSection"`
+		SourceFingerprint    *SourceFingerprint    `json:"sourceFingerprint"`
+	}
+	rs := s.ResolvedSources
+	if rs == nil {
+		rs = []ResolvedSourceRef{}
+	}
+	etn := s.ExternalTrustNotices
+	if etn == nil {
+		etn = []ExternalTrustNotice{}
+	}
+	if s.Fingerprint.Files == nil {
+		s.Fingerprint.Files = map[string]FingerprintEntry{}
+	}
+	return json.Marshal(alias{
+		SchemaVersion:        s.SchemaVersion,
+		ActiveProfile:        s.ActiveProfile,
+		MaterializedAt:       s.MaterializedAt,
+		ResolvedSources:      rs,
+		Fingerprint:          s.Fingerprint,
+		ExternalTrustNotices: etn,
+		RootClaudeMdSection:  s.RootClaudeMdSection,
+		SourceFingerprint:    s.SourceFingerprint,
+	})
+}
+
+// WriteStateFile atomically writes state.json (R14a). Ensures .meta/tmp/
+// exists, writes to a unique tmp, fsyncs, and renames into place. Output is
+// pretty-printed (2-space indent) so an accidentally checked-in file is
+// readable in `git diff`. Trailing newline for tool friendliness.
+func WriteStateFile(paths StatePaths, state StateFile) error {
+	if err := os.MkdirAll(paths.TmpDir, 0o755); err != nil {
+		return err
+	}
+	json, err := MarshalStateFileJSON(state)
+	if err != nil {
+		return err
+	}
+	tmpPath := UniqueAtomicTmpPath(paths.TmpDir, paths.StateFile)
+	if err := AtomicWriteFile(paths.StateFile, tmpPath, json); err != nil {
+		_ = os.Remove(tmpPath)
+		return err
+	}
+	return nil
+}
+
+// MarshalStateFileJSON returns the on-disk byte form of state.json. Exposed
+// for byte-identity tests and for any caller that wants to hash the canonical
+// form without going through disk.
+func MarshalStateFileJSON(state StateFile) ([]byte, error) {
+	out, err := json.MarshalIndent(state, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, '\n')
+	return out, nil
+}
+
+// FormatTimestamp produces a 3-decimal Z-suffixed ISO-8601 timestamp matching
+// JS Date.prototype.toISOString() (PR2). Neither RFC3339 nor RFC3339Nano
+// matches: RFC3339 omits sub-second; RFC3339Nano emits up to 9 decimals and
+// strips trailing zeros. The TS bin writes exactly 3 fractional digits (ms),
+// always Z-suffixed, with NO timezone offset. We pin that format here so a
+// state file written by Go is byte-identical to one written by Node.
+//
+// Format: 2006-01-02T15:04:05.000Z
+func FormatTimestamp(t time.Time) string {
+	utc := t.UTC()
+	// time.Format ".000" emits exactly three fractional digits, padded with
+	// zeros. The literal Z suffix replaces the offset because UTC time.Format
+	// would otherwise emit "+0000" (and "-07:00" off-UTC).
+	return utc.Format("2006-01-02T15:04:05.000Z")
+}

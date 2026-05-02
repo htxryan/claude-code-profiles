@@ -242,6 +242,30 @@ func NewInvalidSettingsJsonError(relPath, contributor, detail string) *InvalidSe
 	}
 }
 
+// RootClaudeMdMarkersMissingError reports that the project-root CLAUDE.md is
+// missing or has malformed/missing c3p managed-block markers when materialize
+// needed to splice into it (R44/R45). Pre-flight check runs BEFORE any side-
+// effects in materialize so a missing-marker abort leaves both `.claude/` and
+// project-root CLAUDE.md untouched (atomic-across-destinations invariant).
+//
+// The remediation message references `c3p init` per spec §12.4 — init is
+// responsible for injecting fresh markers idempotently.
+type RootClaudeMdMarkersMissingError struct {
+	MaterializeError
+	Path string
+}
+
+func NewRootClaudeMdMarkersMissingError(path string) *RootClaudeMdMarkersMissingError {
+	msg := fmt.Sprintf(
+		"Project-root CLAUDE.md at %q is missing or has no well-formed c3p managed-block markers — run `c3p init` to create them.",
+		path,
+	)
+	return &RootClaudeMdMarkersMissingError{
+		MaterializeError: MaterializeError{base{code: CodeRootMarkers, phase: PhaseMaterialize, message: msg}},
+		Path:             path,
+	}
+}
+
 // MergeReadFailedError reports a contributor's file (declared in the
 // ResolvedPlan) that could not be read at merge time. Indicates plan/disk
 // drift between resolution and merge — most often a contributor file was

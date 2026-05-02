@@ -4,12 +4,14 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
 
 	"github.com/htxryan/c3p/internal/merge"
+	"github.com/htxryan/c3p/internal/resolver"
 )
 
 // FingerprintSchemaVersion is the schema stamp for the fingerprint format.
@@ -42,6 +44,63 @@ type Fingerprint struct {
 func HashBytes(b []byte) string {
 	sum := sha256.Sum256(b)
 	return hex.EncodeToString(sum[:])
+}
+
+// SectionFingerprint is the section-only fingerprint for the project-root
+// CLAUDE.md (R46, cw6/T4). Distinct from FingerprintEntry because it tracks
+// the SECTION bytes (between the :begin/:end markers), NOT the whole-file
+// metadata. The whole-file mtime/size would change every time the user edits
+// outside the markers, which the spec explicitly says must NOT register as
+// drift.
+type SectionFingerprint struct {
+	Size        int64
+	ContentHash string
+}
+
+// SourceFingerprint is the aggregate fingerprint of the resolved-source files
+// at materialize time (azp). Used by `status` to surface "source updated since
+// last materialize" without doing a full re-resolve+merge. The aggregate hash
+// is sufficient (mtime+size, hashed) to flip the freshness bit; per-file
+// granularity is not needed here — the next `sync` does precise work.
+type SourceFingerprint struct {
+	FileCount     int
+	AggregateHash string
+}
+
+// ComputeSourceFingerprint stat-walks plan.Files (sorted by relPath, absPath)
+// and produces an aggregate hash over `relPath|absPath|size|mtimeMs\n` tuples.
+// Missing files (ENOENT) record size=-1, mtimeMs=-1 so deletion still flips
+// the aggregate. Non-ENOENT errors propagate — those are environment
+// problems, not freshness signals.
+//
+// Mirrors src/state/fingerprint.ts:computeSourceFingerprint. Sort order must
+// match the TS implementation byte-for-byte so cross-language IV harness
+// agrees.
+func ComputeSourceFingerprint(plan resolver.ResolvedPlan) (SourceFingerprint, error) {
+	files := append([]resolver.PlanFile(nil), plan.Files...)
+	sort.Slice(files, func(i, j int) bool {
+		if files[i].RelPath != files[j].RelPath {
+			return files[i].RelPath < files[j].RelPath
+		}
+		return files[i].AbsPath < files[j].AbsPath
+	})
+	hasher := sha256.New()
+	for _, f := range files {
+		size := int64(-1)
+		mtimeMs := int64(-1)
+		info, err := os.Stat(f.AbsPath)
+		if err == nil {
+			size = info.Size()
+			mtimeMs = info.ModTime().UnixMilli()
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return SourceFingerprint{}, err
+		}
+		fmt.Fprintf(hasher, "%s|%s|%d|%d\n", f.RelPath, f.AbsPath, size, mtimeMs)
+	}
+	return SourceFingerprint{
+		FileCount:     len(files),
+		AggregateHash: hex.EncodeToString(hasher.Sum(nil)),
+	}, nil
 }
 
 // FingerprintFromMergedFiles builds a Fingerprint from in-memory merged
