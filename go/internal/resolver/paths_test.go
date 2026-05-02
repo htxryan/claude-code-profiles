@@ -190,6 +190,25 @@ func TestClassifyInclude_RejectsTildeUserForm(t *testing.T) {
 	}
 }
 
+func TestClassifyInclude_RejectsBareDotAndDotDot(t *testing.T) {
+	// `.` and `..` lack the `./`/`../` prefix and would otherwise fall
+	// through to the bare-component branch — `.` resolves to `_components/`
+	// itself and `..` to `.claude-profiles/`, neither intended.
+	projectRoot := mustAbs(t, "/tmp/some-project")
+	referencingDir := filepath.Join(projectRoot, ".claude-profiles", "myprofile")
+	paths := resolver.BuildPaths(projectRoot)
+
+	for _, raw := range []string{".", ".."} {
+		t.Run(raw, func(t *testing.T) {
+			_, err := resolver.ClassifyInclude(raw, referencingDir, paths, "p")
+			var ime *pipelineerrors.InvalidManifestError
+			if !stderrors.As(err, &ime) {
+				t.Fatalf("expected InvalidManifestError, got %v", err)
+			}
+		})
+	}
+}
+
 func TestClassifyInclude_RejectsEmpty(t *testing.T) {
 	projectRoot := mustAbs(t, "/tmp/some-project")
 	referencingDir := filepath.Join(projectRoot, ".claude-profiles", "myprofile")

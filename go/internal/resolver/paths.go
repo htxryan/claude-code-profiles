@@ -129,6 +129,20 @@ func ClassifyInclude(raw, referencingProfileDir string, paths ResolverPaths, ref
 		)
 	}
 
+	// `.` and `..` are not legal R37 forms — they have no `./`/`../` prefix
+	// so they would otherwise fall through to the bare-component branch and
+	// resolve to `_components/` itself or `.claude-profiles/`, neither of
+	// which is the author's intent. Reject up-front.
+	if raw == "." || raw == ".." {
+		return IncludeRef{}, pipelineerrors.NewInvalidManifestError(
+			referencingProfileDir,
+			fmt.Sprintf(
+				`include %q in profile %q is not a valid form — use a bare component name, "./..." / "../..." for relative, "/..." for absolute, or "~/..." for home-relative`,
+				raw, referencedBy,
+			),
+		)
+	}
+
 	var (
 		kind         IncludeSourceKind
 		resolvedPath string

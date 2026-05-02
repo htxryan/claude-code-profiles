@@ -86,6 +86,15 @@ describe("classifyInclude() — R37", () => {
       InvalidManifestError,
     );
   });
+
+  it("rejects '.' and '..' (would otherwise resolve to _components/ or .claude-profiles/)", () => {
+    expect(() => classifyInclude(".", referencingDir, paths, "p")).toThrow(
+      InvalidManifestError,
+    );
+    expect(() => classifyInclude("..", referencingDir, paths, "p")).toThrow(
+      InvalidManifestError,
+    );
+  });
 });
 
 describe("isValidProfileName()", () => {
@@ -120,5 +129,11 @@ describe("isExternal()", () => {
 
   it("returns false when the path is the project root itself", () => {
     expect(isExternal("/Users/x/proj", "/Users/x/proj")).toBe(false);
+  });
+
+  it("does NOT flag a filename whose first component begins with '..' but is not a traversal segment", () => {
+    // Regression guard for the prefix-vs-segment bug: `..hidden` is a
+    // legitimate in-root filename, not a `..` parent-traversal segment.
+    expect(isExternal("/proj/..hidden", "/proj")).toBe(false);
   });
 });

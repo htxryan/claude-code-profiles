@@ -107,6 +107,17 @@ export function classifyInclude(
     );
   }
 
+  // `.` and `..` are not legal R37 forms — they have no `./`/`../` prefix
+  // so they would otherwise fall through to the bare-component branch and
+  // resolve to `_components/` itself or `.claude-profiles/`, neither of
+  // which is the author's intent. Reject up-front.
+  if (raw === "." || raw === "..") {
+    throw new InvalidManifestError(
+      referencingProfileDir,
+      `include "${raw}" in profile "${referencedBy}" is not a valid form — use a bare component name, "./..." / "../..." for relative, "/..." for absolute, or "~/..." for home-relative`,
+    );
+  }
+
   if (raw === "~" || raw.startsWith("~/")) {
     const home = os.homedir();
     const rest = raw === "~" ? "" : raw.slice(2); // strip "~/"
@@ -144,5 +155,12 @@ export function classifyInclude(
 
 export function isExternal(absPath: string, projectRoot: string): boolean {
   const rel = path.relative(projectRoot, absPath);
-  return rel.startsWith("..") || path.isAbsolute(rel);
+  if (rel === "") return false;
+  // Match only `..` (the parent itself) or a `..` segment followed by the
+  // platform separator. A bare filename like `..hidden` whose first
+  // characters happen to be `..` is a legitimate in-root path, not a
+  // traversal segment — `rel.startsWith("..")` would have wrongly flagged
+  // it external.
+  if (rel === ".." || rel.startsWith(".." + path.sep)) return true;
+  return path.isAbsolute(rel);
 }
