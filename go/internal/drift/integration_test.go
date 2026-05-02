@@ -29,7 +29,7 @@ func TestIntegration_S3_DiscardReplacesAndSnapshots(t *testing.T) {
 		t.Errorf("decision kind = %q, want prompt", decision.Kind)
 	}
 	// Simulate the user picking discard.
-	otherOpts.ActiveProfileName = report.Active
+	otherOpts.ActiveProfileName = derefActive(report.Active)
 	res, err := drift.ApplyGate(drift.GateChoiceDiscard, otherOpts)
 	if err != nil {
 		t.Fatalf("ApplyGate: %v", err)
@@ -87,7 +87,7 @@ func TestIntegration_S4_PersistSavesIntoActiveProfile(t *testing.T) {
 		t.Errorf("entry paths = %v, want %v", gotPaths, want)
 	}
 
-	otherOpts.ActiveProfileName = report.Active
+	otherOpts.ActiveProfileName = derefActive(report.Active)
 	res, err := drift.ApplyGate(drift.GateChoicePersist, otherOpts)
 	if err != nil {
 		t.Fatalf("ApplyGate: %v", err)
@@ -134,7 +134,7 @@ func TestIntegration_S6_AbortLeavesStateUnchanged(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DetectDrift: %v", err)
 	}
-	otherOpts.ActiveProfileName = report.Active
+	otherOpts.ActiveProfileName = derefActive(report.Active)
 	res, err := drift.ApplyGate(drift.GateChoiceAbort, otherOpts)
 	if err != nil {
 		t.Fatalf("ApplyGate: %v", err)
@@ -218,7 +218,7 @@ func TestIntegration_NonInteractiveAutoAbortNoChange(t *testing.T) {
 	if decision.Choice != drift.GateChoiceAbort {
 		t.Errorf("decision choice = %q, want abort", decision.Choice)
 	}
-	otherOpts.ActiveProfileName = report.Active
+	otherOpts.ActiveProfileName = derefActive(report.Active)
 	res, err := drift.ApplyGate(decision.Choice, otherOpts)
 	if err != nil {
 		t.Fatalf("ApplyGate: %v", err)
@@ -246,7 +246,7 @@ func TestIntegration_CleanSwapNoDriftProceed(t *testing.T) {
 	if decision.Kind != drift.GateOutcomeNoDrift {
 		t.Errorf("decision kind = %q, want no-drift", decision.Kind)
 	}
-	otherOpts.ActiveProfileName = report.Active
+	otherOpts.ActiveProfileName = derefActive(report.Active)
 	res, err := drift.ApplyGate(decision.Choice, otherOpts)
 	if err != nil {
 		t.Fatalf("ApplyGate: %v", err)

@@ -8,9 +8,10 @@ import (
 )
 
 func cleanReport() drift.DriftReport {
+	leaf := "leaf"
 	return drift.DriftReport{
 		SchemaVersion: drift.DriftReportSchemaVersion,
-		Active:        "leaf",
+		Active:        &leaf,
 		FingerprintOk: true,
 		Entries:       []drift.DriftEntry{},
 		ScannedFiles:  5,
@@ -20,9 +21,10 @@ func cleanReport() drift.DriftReport {
 }
 
 func driftedReport() drift.DriftReport {
+	leaf := "leaf"
 	return drift.DriftReport{
 		SchemaVersion: drift.DriftReportSchemaVersion,
-		Active:        "leaf",
+		Active:        &leaf,
 		FingerprintOk: true,
 		Entries: []drift.DriftEntry{
 			{RelPath: "CLAUDE.md", Status: drift.DriftStatusModified},
@@ -36,9 +38,33 @@ func driftedReport() drift.DriftReport {
 func noActiveReport() drift.DriftReport {
 	return drift.DriftReport{
 		SchemaVersion: drift.DriftReportSchemaVersion,
-		Active:        "",
+		Active:        nil,
 		FingerprintOk: false,
 		Entries:       []drift.DriftEntry{},
+	}
+}
+
+// unrecoverableReport is a drift report whose only entry is the section-
+// markers-broken terminal state for project-root CLAUDE.md (R46). It
+// counts as "drift exists" for the gate (FingerprintOk:true, len>0), so
+// the standard hard-block invariants apply.
+func unrecoverableReport() drift.DriftReport {
+	leaf := "leaf"
+	return drift.DriftReport{
+		SchemaVersion: drift.DriftReportSchemaVersion,
+		Active:        &leaf,
+		FingerprintOk: true,
+		Entries: []drift.DriftEntry{
+			{
+				RelPath:     "CLAUDE.md",
+				Status:      drift.DriftStatusUnrecoverable,
+				Destination: drift.DriftDestinationProjectRoot,
+				Error:       "markers missing — run init",
+			},
+		},
+		ScannedFiles: 0,
+		FastPathHits: 0,
+		SlowPathHits: 0,
 	}
 }
 
@@ -127,11 +153,12 @@ func TestDecideGate_FlagHonoredNonInteractive(t *testing.T) {
 	}
 }
 
-// Epic invariant: non-interactive never returns prompt across all combos.
+// Epic invariant: non-interactive never returns prompt across all combos
+// — including the unrecoverable-section terminal state (R46).
 func TestDecideGate_NonInteractiveNeverPrompts(t *testing.T) {
 	t.Parallel()
 	flags := []drift.GateChoice{"", drift.GateChoiceDiscard, drift.GateChoicePersist, drift.GateChoiceAbort}
-	reports := []drift.DriftReport{cleanReport(), driftedReport(), noActiveReport()}
+	reports := []drift.DriftReport{cleanReport(), driftedReport(), noActiveReport(), unrecoverableReport()}
 	for _, f := range flags {
 		for _, r := range reports {
 			out := drift.DecideGate(drift.GateInput{
@@ -143,6 +170,25 @@ func TestDecideGate_NonInteractiveNeverPrompts(t *testing.T) {
 				t.Errorf("non-interactive returned prompt with flag=%q report=%+v", f, r)
 			}
 		}
+	}
+}
+
+// HIGH #2 defense-in-depth: passing GateChoiceNoDriftProceed as the
+// --on-drift flag with drift entries present must NOT silently dispatch
+// to the no-snapshot materialize path. DecideGate downgrades the bogus
+// flag to abort.
+func TestDecideGate_RejectsNoDriftProceedAsFlag(t *testing.T) {
+	t.Parallel()
+	out := drift.DecideGate(drift.GateInput{
+		Report:      driftedReport(),
+		Mode:        drift.GateModeInteractive,
+		OnDriftFlag: drift.GateChoiceNoDriftProceed,
+	})
+	if out.Kind != drift.GateOutcomeAuto {
+		t.Errorf("kind = %q, want auto", out.Kind)
+	}
+	if out.Choice != drift.GateChoiceAbort {
+		t.Errorf("choice = %q, want abort (no-drift-proceed must not be honored as a flag)", out.Choice)
 	}
 }
 

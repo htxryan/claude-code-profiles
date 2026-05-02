@@ -32,7 +32,7 @@ func DetectDrift(paths state.StatePaths) (DriftReport, error) {
 	if st.ActiveProfile == nil {
 		return DriftReport{
 			SchemaVersion: DriftReportSchemaVersion,
-			Active:        "",
+			Active:        nil,
 			FingerprintOk: false,
 			Entries:       []DriftEntry{},
 			ScannedFiles:  0,
@@ -93,9 +93,10 @@ func DetectDrift(paths state.StatePaths) (DriftReport, error) {
 		return entries[i].Destination < entries[j].Destination
 	})
 
+	active := *st.ActiveProfile
 	return DriftReport{
 		SchemaVersion: DriftReportSchemaVersion,
-		Active:        *st.ActiveProfile,
+		Active:        &active,
 		FingerprintOk: true,
 		Entries:       entries,
 		ScannedFiles:  cmp.Metrics.ScannedFiles,
@@ -113,9 +114,13 @@ func driftKindToStatus(k state.DriftKind) DriftStatus {
 		return DriftStatusAdded
 	case state.DriftDeleted:
 		return DriftStatusDeleted
-	default:
-		return DriftStatus(k)
 	}
+	// Unknown kind: panic surfaces the gap at development time. A silent
+	// cast would let an unmodeled status value into DriftReport.Entries,
+	// which neither the CLI renderer nor the gate state machine knows how
+	// to handle — better to fail loudly during testing than silently in
+	// production.
+	panic("drift: unknown state.DriftKind " + string(k))
 }
 
 // compareRootClaudeMdSection compares the live project-root CLAUDE.md section

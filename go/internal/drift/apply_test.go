@@ -12,6 +12,16 @@ import (
 	"github.com/htxryan/c3p/internal/state"
 )
 
+// derefActive returns "" when the DriftReport's Active field is nil,
+// otherwise the dereferenced value. Used by tests that fold the active
+// profile name into ApplyGateOptions where empty == "no active profile".
+func derefActive(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return *p
+}
+
 // makePlanFor returns a minimal plan for ApplyGate persist tests. Note
 // the activeProfile string is what gets recorded in state.json after
 // materialize; ApplyGate's persist path uses it to build the persist target.

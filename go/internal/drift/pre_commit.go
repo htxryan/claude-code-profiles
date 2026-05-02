@@ -108,9 +108,13 @@ func preCommitWarnTo(paths state.StatePaths, w io.Writer) PreCommitWarnResult {
 func formatPreCommitWarning(r DriftReport) []string {
 	n := len(r.Entries)
 	lines := make([]string, 0, n+2)
+	active := ""
+	if r.Active != nil {
+		active = *r.Active
+	}
 	lines = append(lines, fmt.Sprintf(
 		"c3p: %d drifted file(s) in .claude/ vs active profile '%s'",
-		n, r.Active,
+		n, active,
 	))
 	limit := n
 	if limit > preCommitMaxLines {

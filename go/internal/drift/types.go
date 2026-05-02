@@ -74,8 +74,10 @@ type DriftEntry struct {
 //   - When FingerprintOk == false → len(Entries) == 0 and counts are 0
 type DriftReport struct {
 	SchemaVersion int `json:"schemaVersion"`
-	// Active is the active profile name from .state.json, or empty if NoActive.
-	Active string `json:"active"`
+	// Active is the active profile name from .state.json. nil pointer
+	// (rendered as JSON null) when NoActive — matches the TS wire shape
+	// `string | null` so the cross-language IV harness compares byte-for-byte.
+	Active *string `json:"active"`
 	// FingerprintOk is true iff state.json was readable AND activeProfile is
 	// non-null. False signals "no meaningful drift check possible".
 	FingerprintOk bool `json:"fingerprintOk"`

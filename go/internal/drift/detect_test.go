@@ -67,8 +67,8 @@ func TestDetectDrift_FingerprintNotOkWhenNoActive(t *testing.T) {
 	if report.FingerprintOk {
 		t.Errorf("FingerprintOk should be false when no active profile")
 	}
-	if report.Active != "" {
-		t.Errorf("Active = %q, want empty", report.Active)
+	if report.Active != nil {
+		t.Errorf("Active = %v, want nil", report.Active)
 	}
 	if len(report.Entries) != 0 {
 		t.Errorf("entries = %d, want 0", len(report.Entries))
@@ -88,8 +88,8 @@ func TestDetectDrift_NoEntriesWhenLiveMatchesRecorded(t *testing.T) {
 	if !report.FingerprintOk {
 		t.Errorf("FingerprintOk = false, want true")
 	}
-	if report.Active != "leaf" {
-		t.Errorf("Active = %q, want leaf", report.Active)
+	if report.Active == nil || *report.Active != "leaf" {
+		t.Errorf("Active = %v, want leaf", report.Active)
 	}
 	if len(report.Entries) != 0 {
 		t.Errorf("entries = %v, want []", report.Entries)

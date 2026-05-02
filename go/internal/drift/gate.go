@@ -37,6 +37,19 @@ func DecideGate(input GateInput) GateOutcome {
 	}
 
 	if input.OnDriftFlag != "" {
+		// Defense-in-depth: only the three CLI-visible choices are
+		// acceptable as flag values. no-drift-proceed is an internal sentinel
+		// (the no-drift outcome path) and must never be passed by a caller —
+		// passing it here with drift entries present would dispatch to the
+		// no-snapshot Materialize path and silently discard user edits
+		// without a backup. Refuse rather than silently corrupt.
+		if !isValidOnDriftFlag(input.OnDriftFlag) {
+			return GateOutcome{
+				Kind:   GateOutcomeAuto,
+				Choice: GateChoiceAbort,
+				Reason: fmt.Sprintf("invalid --on-drift=%s flag (must be discard|persist|abort); aborting", input.OnDriftFlag),
+			}
+		}
 		return GateOutcome{
 			Kind:   GateOutcomeAuto,
 			Choice: input.OnDriftFlag,
@@ -57,4 +70,15 @@ func DecideGate(input GateInput) GateOutcome {
 		Choice: "",
 		Reason: "interactive prompt required",
 	}
+}
+
+// isValidOnDriftFlag reports whether c is one of the three CLI-visible
+// gate choices a user can pass via --on-drift=<choice>. Returns false for
+// no-drift-proceed (internal sentinel) and any other GateChoice variant.
+func isValidOnDriftFlag(c GateChoice) bool {
+	switch c {
+	case GateChoiceDiscard, GateChoicePersist, GateChoiceAbort:
+		return true
+	}
+	return false
 }

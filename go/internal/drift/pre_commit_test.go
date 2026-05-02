@@ -124,23 +124,115 @@ func TestPreCommitWarn_R25a_FailOpenWhenStateMissing(t *testing.T) {
 }
 
 // Truncates output at 10 entries with an "and N more" line.
+//
+// Layout assertions are spelled out (header + glyph-prefixed entries +
+// truncation tail) so a future fixture change that adds drifted files
+// surfaces a clear test failure rather than a bare integer mismatch.
 func TestPreCommitWarn_TruncatesAt10Entries(t *testing.T) {
 	t.Parallel()
 	paths := makeBaseFixture(t)
-	for i := 0; i < 15; i++ {
+	const numAdded = 15
+	for i := 0; i < numAdded; i++ {
 		name := filepath.Join(paths.ClaudeDir, "extra-"+string(rune('a'+i))+".md")
 		if err := os.WriteFile(name, []byte{byte('a' + i)}, 0o644); err != nil {
 			t.Fatalf("WriteFile %s: %v", name, err)
 		}
 	}
 	res := preCommitWarnTo(paths, &bytes.Buffer{})
-	// header + 10 entries + "...and 5 more"
-	if len(res.Warnings) != 12 {
-		t.Errorf("Warnings len = %d, want 12 (1 header + 10 entries + 1 truncation)", len(res.Warnings))
+
+	// Confirm the underlying drift count matches the files we added —
+	// guards against a fixture change that adds previously-stable files.
+	if res.Report == nil {
+		t.Fatalf("Report is nil; expected a populated DriftReport")
+	}
+	if got := len(res.Report.Entries); got != numAdded {
+		t.Fatalf("entries = %d, want %d (fixture invariant)", got, numAdded)
+	}
+
+	// Output layout: 1 header + min(numAdded, 10) entry lines + truncation.
+	expectedEntryLines := 10
+	expectedWarnings := 1 + expectedEntryLines + 1
+	if len(res.Warnings) != expectedWarnings {
+		t.Errorf("Warnings len = %d, want %d (1 header + %d entries + 1 truncation)",
+			len(res.Warnings), expectedWarnings, expectedEntryLines)
 	}
 	last := res.Warnings[len(res.Warnings)-1]
-	if !strings.Contains(last, "and 5 more") {
-		t.Errorf("last line = %q, want substring 'and 5 more'", last)
+	expectedRemaining := numAdded - expectedEntryLines
+	if !strings.Contains(last, "and 5 more") || expectedRemaining != 5 {
+		t.Errorf("last line = %q, want substring 'and %d more'", last, expectedRemaining)
+	}
+}
+
+// Pre-commit renders the X glyph for unrecoverable-status entries
+// (cw6/T5 R46 — markers gone). Critical: the user immediately sees
+// the row needs init/validate, not the standard discard/persist gate.
+func TestPreCommitWarn_UnrecoverableEntryRendersX(t *testing.T) {
+	t.Parallel()
+	// Stand up a project-root section so DetectDrift surfaces the
+	// unrecoverable terminal when we strip the markers.
+	root := t.TempDir()
+	beforeMarkers := "# project\n\n"
+	managed := "<!-- c3p:v1:begin -->\nORIG\n<!-- c3p:v1:end -->\n"
+	if err := os.WriteFile(filepath.Join(root, "CLAUDE.md"), []byte(beforeMarkers+managed), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	paths := state.BuildStatePaths(root)
+	plan := resolver.ResolvedPlan{
+		SchemaVersion: resolver.ResolvedPlanSchemaVersion,
+		ProfileName:   "leaf",
+		Contributors: []resolver.Contributor{
+			{Kind: resolver.ContributorProfile, ID: "leaf", RootPath: "/abs/leaf"},
+		},
+		Files:         []resolver.PlanFile{},
+		Warnings:      []resolver.ResolutionWarning{},
+		ExternalPaths: []resolver.ExternalTrustEntry{},
+	}
+	merged := []merge.MergedFile{
+		{
+			Path:          "CLAUDE.md",
+			Bytes:         []byte("ORIG"),
+			Contributors:  []string{"leaf"},
+			MergePolicy:   resolver.MergePolicyConcat,
+			Destination:   resolver.DestinationProjectRoot,
+			SchemaVersion: merge.MergedFileSchemaVersion,
+		},
+	}
+	if _, err := state.Materialize(paths, plan, merged, state.MaterializeOptions{}, ""); err != nil {
+		t.Fatalf("Materialize: %v", err)
+	}
+	// User strips the markers — DetectDrift should report unrecoverable.
+	if err := os.WriteFile(paths.RootClaudeMdFile, []byte("# project\n\nNo markers anymore.\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile strip: %v", err)
+	}
+	res := preCommitWarnTo(paths, &bytes.Buffer{})
+
+	if res.ExitCode != 0 {
+		t.Errorf("ExitCode = %d, want 0", res.ExitCode)
+	}
+	if res.Report == nil {
+		t.Fatalf("Report is nil")
+	}
+	// Must have at least one unrecoverable entry.
+	foundUnrecoverable := false
+	for _, e := range res.Report.Entries {
+		if e.Status == DriftStatusUnrecoverable {
+			foundUnrecoverable = true
+			break
+		}
+	}
+	if !foundUnrecoverable {
+		t.Fatalf("no unrecoverable entry in Report.Entries: %+v", res.Report.Entries)
+	}
+	// Warning lines should include an X-prefixed CLAUDE.md line.
+	foundX := false
+	for _, w := range res.Warnings {
+		if strings.Contains(w, "X CLAUDE.md") {
+			foundX = true
+			break
+		}
+	}
+	if !foundX {
+		t.Errorf("no X-glyph line in warnings: %+v", res.Warnings)
 	}
 }
 
