@@ -234,6 +234,69 @@ func TestApplyGate_PersistRequiresActiveProfile(t *testing.T) {
 	}
 }
 
+// PR25: when SnapshotForDiscard succeeds but Materialize then fails (here
+// because the project-root markers were removed mid-run), ApplyGate must
+// still surface the backup path in the result. The user's edits are on disk
+// at that path; without the path, D7 cannot tell the user where their work
+// went and the snapshot dir gets orphaned.
+func TestApplyGate_DiscardSurfacesBackupOnMaterializeFailure(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	paths := state.BuildStatePaths(root)
+
+	// Stand up a project with a project-root section so Materialize takes
+	// the splice path (which has a preflight that fails on missing markers).
+	beforeMarkers := "# project\n\n"
+	managed := "<!-- c3p:v1:begin -->\nORIG\n<!-- c3p:v1:end -->\n"
+	if err := os.WriteFile(filepath.Join(root, "CLAUDE.md"), []byte(beforeMarkers+managed), 0o644); err != nil {
+		t.Fatalf("WriteFile root CLAUDE.md: %v", err)
+	}
+	plan := makePlanFor("leaf")
+	merged := []merge.MergedFile{
+		{
+			Path:          "CLAUDE.md",
+			Bytes:         []byte("ORIG"),
+			Contributors:  []string{"leaf"},
+			MergePolicy:   resolver.MergePolicyConcat,
+			Destination:   resolver.DestinationProjectRoot,
+			SchemaVersion: merge.MergedFileSchemaVersion,
+		},
+	}
+	if _, err := state.Materialize(paths, plan, merged, state.MaterializeOptions{}, ""); err != nil {
+		t.Fatalf("Materialize initial: %v", err)
+	}
+	// User adds drift to .claude/ AND strips the project-root markers — the
+	// snapshot will succeed (it copies .claude/ as-is) but the subsequent
+	// Materialize will fail at preflight because the markers are gone.
+	if err := os.WriteFile(filepath.Join(paths.ClaudeDir, "drift.md"), []byte("user work\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile drift: %v", err)
+	}
+	if err := os.WriteFile(paths.RootClaudeMdFile, []byte("# project\n\nNo markers anymore.\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile strip markers: %v", err)
+	}
+
+	opts := drift.ApplyGateOptions{
+		Paths: paths, Plan: plan, Merged: merged, ActiveProfileName: "leaf",
+	}
+	res, err := drift.ApplyGate(drift.GateChoiceDiscard, opts)
+	if err == nil {
+		t.Fatalf("expected Materialize to fail when markers are missing, got nil error")
+	}
+	if res.Action != drift.ApplyActionAborted {
+		t.Errorf("action = %q, want aborted on post-snapshot failure", res.Action)
+	}
+	if res.BackupSnapshot == "" {
+		t.Fatalf("BackupSnapshot empty on Materialize failure; user's edits are orphaned")
+	}
+	if exists, _ := state.PathExists(res.BackupSnapshot); !exists {
+		t.Errorf("backup dir missing on disk: %q", res.BackupSnapshot)
+	}
+	// And the user's drift.md must be inside the backup so they can recover it.
+	if _, rerr := os.Stat(filepath.Join(res.BackupSnapshot, "drift.md")); rerr != nil {
+		t.Errorf("backup missing user file drift.md: %v", rerr)
+	}
+}
+
 func TestApplyGate_UnknownChoiceErrors(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

@@ -59,14 +59,25 @@ func PreCommitWarn(paths state.StatePaths) PreCommitWarnResult {
 // writer. Tests use this directly to assert stderr behavior without the
 // data race that a global mutable writer would introduce when t.Parallel
 // tests overlap.
-func preCommitWarnTo(paths state.StatePaths, w io.Writer) PreCommitWarnResult {
+func preCommitWarnTo(paths state.StatePaths, w io.Writer) (result PreCommitWarnResult) {
 	warnings := []string{}
 	var report *DriftReport
 	defer func() {
-		// Defense in depth: a panic in detection should never block a commit.
-		// We can't inspect the recovered value here usefully (we'd lose the
-		// fail-open invariant if we re-panicked); silently absorb.
-		_ = recover()
+		// Defense in depth: a panic in detection should never block a commit
+		// (fail-open). But silent recovery makes future regressions invisible —
+		// emit a single diagnostic line so a panicking detector is debuggable.
+		// EPIPE: if the writer fails we still return exit 0; the message is
+		// best-effort, the fail-open contract is mandatory.
+		if r := recover(); r != nil {
+			line := fmt.Sprintf("c3p: drift check skipped: panic: %v", r)
+			warnings = append(warnings, line)
+			_, _ = fmt.Fprintln(w, line)
+			result = PreCommitWarnResult{
+				ExitCode: 0,
+				Warnings: warnings,
+				Report:   report,
+			}
+		}
 	}()
 
 	r, err := DetectDrift(paths)

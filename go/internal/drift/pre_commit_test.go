@@ -3,6 +3,7 @@ package drift
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -133,8 +134,11 @@ func TestPreCommitWarn_TruncatesAt10Entries(t *testing.T) {
 	paths := makeBaseFixture(t)
 	const numAdded = 15
 	for i := 0; i < numAdded; i++ {
-		name := filepath.Join(paths.ClaudeDir, "extra-"+string(rune('a'+i))+".md")
-		if err := os.WriteFile(name, []byte{byte('a' + i)}, 0o644); err != nil {
+		// Use a numeric suffix so filenames stay ASCII-stable if numAdded
+		// is ever raised past 26 — `string(rune('a'+i))` would silently
+		// produce multi-byte/punctuation names there.
+		name := filepath.Join(paths.ClaudeDir, fmt.Sprintf("extra-%02d.md", i))
+		if err := os.WriteFile(name, []byte{byte('a' + i%26)}, 0o644); err != nil {
 			t.Fatalf("WriteFile %s: %v", name, err)
 		}
 	}
@@ -158,7 +162,7 @@ func TestPreCommitWarn_TruncatesAt10Entries(t *testing.T) {
 	}
 	last := res.Warnings[len(res.Warnings)-1]
 	expectedRemaining := numAdded - expectedEntryLines
-	if !strings.Contains(last, "and 5 more") || expectedRemaining != 5 {
+	if !strings.Contains(last, fmt.Sprintf("and %d more", expectedRemaining)) {
 		t.Errorf("last line = %q, want substring 'and %d more'", last, expectedRemaining)
 	}
 }

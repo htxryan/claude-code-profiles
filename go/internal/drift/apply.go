@@ -83,7 +83,15 @@ func ApplyGate(choice GateChoice, opts ApplyGateOptions) (ApplyGateResult, error
 		}
 		r, err := state.Materialize(opts.Paths, opts.Plan, opts.Merged, state.MaterializeOptions{}, backup)
 		if err != nil {
-			return ApplyGateResult{}, err
+			// PR25: surface the backup path even when Materialize fails after
+			// snapshot. The user's edits are on disk at `backup`; D7 needs the
+			// path to render "your edits were saved at <path>" alongside the
+			// failure. Returning a zero-value result here would orphan the
+			// snapshot dir without any caller able to find it.
+			return ApplyGateResult{
+				Action:         ApplyActionAborted,
+				BackupSnapshot: backup,
+			}, err
 		}
 		return ApplyGateResult{
 			Action:            ApplyActionMaterialized,

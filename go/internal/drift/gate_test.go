@@ -173,6 +173,54 @@ func TestDecideGate_NonInteractiveNeverPrompts(t *testing.T) {
 	}
 }
 
+// All-unrecoverable entries auto-abort in EVERY mode — neither discard nor
+// persist can succeed when project-root markers are gone, so prompting the
+// user (or honoring a flag) only produces a confusing post-prompt failure.
+// The reason text points at the remediation command.
+func TestDecideGate_AllUnrecoverableAutoAborts(t *testing.T) {
+	t.Parallel()
+	for _, mode := range []drift.GateMode{drift.GateModeInteractive, drift.GateModeNonInteractive} {
+		for _, flag := range []drift.GateChoice{"", drift.GateChoiceDiscard, drift.GateChoicePersist, drift.GateChoiceAbort} {
+			out := drift.DecideGate(drift.GateInput{
+				Report:      unrecoverableReport(),
+				Mode:        mode,
+				OnDriftFlag: flag,
+			})
+			if out.Kind != drift.GateOutcomeAuto {
+				t.Errorf("mode=%q flag=%q: kind = %q, want auto", mode, flag, out.Kind)
+			}
+			if out.Choice != drift.GateChoiceAbort {
+				t.Errorf("mode=%q flag=%q: choice = %q, want abort", mode, flag, out.Choice)
+			}
+			if !strings.Contains(out.Reason, "init") {
+				t.Errorf("mode=%q flag=%q: reason = %q, want substring 'init'", mode, flag, out.Reason)
+			}
+		}
+	}
+}
+
+// Mixed entries (one unrecoverable + one regular) still hit the normal path —
+// the auto-abort only short-circuits when EVERY entry is unrecoverable. This
+// guards against an over-broad guard that would suppress legitimate drift
+// gating just because one section-marker row appears.
+func TestDecideGate_MixedEntriesDoNotAutoAbort(t *testing.T) {
+	t.Parallel()
+	leaf := "leaf"
+	mixed := drift.DriftReport{
+		SchemaVersion: drift.DriftReportSchemaVersion,
+		Active:        &leaf,
+		FingerprintOk: true,
+		Entries: []drift.DriftEntry{
+			{RelPath: "CLAUDE.md", Status: drift.DriftStatusUnrecoverable, Destination: drift.DriftDestinationProjectRoot},
+			{RelPath: "agents/a.md", Status: drift.DriftStatusModified},
+		},
+	}
+	out := drift.DecideGate(drift.GateInput{Report: mixed, Mode: drift.GateModeInteractive})
+	if out.Kind != drift.GateOutcomePrompt {
+		t.Errorf("kind = %q, want prompt (mixed drift should not auto-abort)", out.Kind)
+	}
+}
+
 // HIGH #2 defense-in-depth: passing GateChoiceNoDriftProceed as the
 // --on-drift flag with drift entries present must NOT silently dispatch
 // to the no-snapshot materialize path. DecideGate downgrades the bogus
