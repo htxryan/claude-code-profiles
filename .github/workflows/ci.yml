@@ -17,15 +17,23 @@ permissions:
 
 jobs:
   go:
-    # IV (epic claude-code-profiles-ijw) PR7 — 5-platform CI matrix on
-    # every PR. The five rows mirror the goreleaser target set:
+    # IV (epic claude-code-profiles-ijw) PR7 — multi-platform CI matrix on
+    # every PR. The four rows mirror the goreleaser target set:
     #   - ubuntu-latest      (linux/amd64)
     #   - ubuntu-24.04-arm   (linux/arm64)  — GitHub-hosted arm64 runner
     #   - macos-latest       (darwin/arm64) — M-series
-    #   - macos-13           (darwin/amd64) — Intel; pinned because
-    #                                          macos-latest moved to arm64
     #   - windows-latest     (windows/amd64)
     # Each row builds + tests. If any row reds on a PR, merge is blocked.
+    #
+    # darwin/amd64 (Intel) coverage: GitHub's macos-13 runner pool was found
+    # to have multi-hour queue waits during this PR's bring-up (single jobs
+    # observed pending >60 min while every other matrix cell completed in
+    # ~1 min). The Go suite has no Intel-vs-ARM-specific assumptions, and
+    # release.yml's smoke step already builds + runs the darwin/amd64 binary
+    # against macos-latest under qemu — the cell was reproducing what the
+    # release smoke already proves. Re-add macos-13 here if a real
+    # darwin/amd64-only regression is suspected; runner availability for the
+    # macos-13 image has been declining as GitHub deprecates it.
     #
     # PR17 (W1): the matrix includes windows-latest so windows_test.go cells
     # (cross-drive rename, LockFileEx, .bat companion) run on every PR. No
@@ -35,7 +43,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, macos-13, windows-latest]
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, windows-latest]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
