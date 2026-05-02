@@ -90,6 +90,22 @@ func (e *MalformedMarkersError) Error() string { return e.Message }
 // terminators parses identically to the LF form. Before/Section/After are
 // returned with their on-disk bytes intact.
 func ParseMarkers(content string) ParseResult {
+	// Overflow poisons the parse: any begin or end marker whose version
+	// digits don't fit in an int makes the whole input malformed. The TS
+	// canonical regex matches arbitrarily long digit strings and Number.parseInt
+	// promotes overflow to a JS float (lossy but non-failing); Go has no
+	// equivalent without big.Int. Without this check, an overflowed pair
+	// adjacent to a valid pair would either be silently skipped (returning
+	// StatusValid for the valid pair while leaving malformed marker bytes in
+	// Before/After) or evade the multi-block check (returning StatusValid v=1
+	// for `<valid v1>...<overflow pair>` where TS reports malformed via its
+	// count of two well-formed matches). Both outcomes corrupt the splice
+	// contract, so we surface the entire input as malformed and let the
+	// caller repair.
+	if hasOverflowedMarkerVersion(content) {
+		return ParseResult{Status: StatusMalformed}
+	}
+
 	p, ok := findFirstPair(content)
 	if !ok {
 		// No well-formed pair. If the input has any partial marker bytes at
@@ -139,12 +155,17 @@ type pair struct {
 // the input string (no offset bookkeeping); callers that pre-slice translate
 // them back themselves.
 //
-// Overflow handling: a pathologically long version string (e.g. 25 digits)
-// makes strconv.Atoi return ErrRange. We skip such pairs rather than emitting
-// a StatusValid result with Version=0 — a downstream consumer that re-renders
-// at v=0 (clamped to v1 by RenderManagedBlock) would corrupt a high-version
-// file. Because the begin/end byte shape still matches markerAnyRegex, the
-// caller's lone-marker check surfaces the overflowed input as StatusMalformed.
+// Skip-to-next-begin parity: when a begin marker has no matching end, we move
+// on to the next begin and try again. This matches the TS canonical regex —
+// JS RegExp.match without `g` retries from each subsequent index when the
+// initial start position fails to extend to a full match, so an orphaned
+// `:begin` followed by a well-formed pair returns the second pair (verified
+// against tests/markers.test.ts behavior).
+//
+// Overflow safety: ParseMarkers screens overflowed version digits up front
+// via hasOverflowedMarkerVersion and returns StatusMalformed before this
+// helper runs, so an Atoi failure here would indicate a logic bug. Defense
+// in depth: skip the offending begin to avoid panicking on the int conversion.
 func findFirstPair(content string) (pair, bool) {
 	beginLocs := markerBeginRegex.FindAllStringSubmatchIndex(content, -1)
 	for _, beginLoc := range beginLocs {
@@ -182,6 +203,27 @@ func findFirstPair(content string) (pair, bool) {
 		// begin/end pair may still be valid).
 	}
 	return pair{}, false
+}
+
+// hasOverflowedMarkerVersion reports whether any begin or end marker in the
+// content carries version digits that don't fit in an int (strconv.Atoi
+// returns ErrRange). See ParseMarkers for the rationale — overflow poisons
+// the entire parse so we don't have to choose between corrupting the splice
+// (silent skip) and diverging from the TS multi-block contract.
+func hasOverflowedMarkerVersion(content string) bool {
+	for _, locs := range markerBeginRegex.FindAllStringSubmatchIndex(content, -1) {
+		ver := content[locs[2]:locs[3]]
+		if _, err := strconv.Atoi(ver); err != nil {
+			return true
+		}
+	}
+	for _, locs := range markerEndRegex.FindAllStringSubmatchIndex(content, -1) {
+		ver := content[locs[2]:locs[3]]
+		if _, err := strconv.Atoi(ver); err != nil {
+			return true
+		}
+	}
+	return false
 }
 
 // RenderManagedBlock builds the canonical managed block (begin marker +

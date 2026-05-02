@@ -167,6 +167,63 @@ func TestParseMarkers_VersionOverflowIsMalformed(t *testing.T) {
 	}
 }
 
+// Overflow poisons the parse even when a well-formed pair is also present.
+// Without the up-front overflow screen, the overflowed pair would either be
+// silently skipped (overflow-then-valid → StatusValid v=1, leaving malformed
+// marker bytes in Before) or evade the multi-block check (valid-then-overflow
+// → StatusValid v=1, where TS reports malformed via two regex matches). Both
+// orderings must surface as StatusMalformed.
+func TestParseMarkers_OverflowAlongsideValidIsMalformed(t *testing.T) {
+	overflow := strings.Repeat("9", 25)
+	cases := []struct {
+		name string
+		text string
+	}{
+		{
+			name: "overflow then valid",
+			text: "<!-- c3p:v" + overflow + ":begin --> x <!-- c3p:v" + overflow + ":end --><!-- c3p:v1:begin -->\nbody\n<!-- c3p:v1:end -->",
+		},
+		{
+			name: "valid then overflow",
+			text: "<!-- c3p:v1:begin -->\nbody\n<!-- c3p:v1:end --><!-- c3p:v" + overflow + ":begin --> x <!-- c3p:v" + overflow + ":end -->",
+		},
+		{
+			name: "lone overflow begin then valid pair",
+			text: "<!-- c3p:v" + overflow + ":begin --><!-- c3p:v1:begin -->\nbody\n<!-- c3p:v1:end -->",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := ParseMarkers(tc.text)
+			if r.Status != StatusMalformed {
+				t.Fatalf("want malformed for %s, got %q (version=%d)", tc.name, r.Status, r.Version)
+			}
+		})
+	}
+}
+
+// Sonnet review pinning: an orphaned `:begin` followed by a well-formed
+// pair returns the SECOND pair as valid. This matches TS exactly — the
+// canonical regex `/<!-- c3p:v(\d+):begin([^>]*)-->([\s\S]*?)<!-- c3p:v\1:end\2-->/`
+// without the `g` flag retries from each subsequent index when the initial
+// start position fails to extend to a full match, so a v1 begin with no v1
+// end will eventually try v2 begin and succeed there. Pinned in both
+// implementations so a future tightening (e.g. requiring no stray marker
+// bytes before the matched pair) is a deliberate cross-language change.
+func TestParseMarkers_OrphanBeginThenPair_MatchesTS(t *testing.T) {
+	text := "<!-- c3p:v1:begin --> orphaned <!-- c3p:v2:begin --> body <!-- c3p:v2:end -->"
+	r := ParseMarkers(text)
+	if r.Status != StatusValid {
+		t.Fatalf("want valid (TS parity: regex retries from v2 begin), got %q", r.Status)
+	}
+	if r.Version != 2 {
+		t.Fatalf("want version 2 (the only pair with a matching end), got %d", r.Version)
+	}
+	if !strings.Contains(r.Section, "body") {
+		t.Fatalf("section should contain v2 body, got %q", r.Section)
+	}
+}
+
 func TestParseMarkers_EmptySection(t *testing.T) {
 	text := strings.Join([]string{
 		"before",
