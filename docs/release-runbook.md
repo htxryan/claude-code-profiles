@@ -199,8 +199,8 @@ After deprecation:
   any existing lockfile that pinned a 0.x version; the deprecation
   warning is the migration channel.
 - Trusted-publisher entry for this package on npm can be left in place
-  or removed; `release-please.yml` will not produce new 1.x npm
-  releases (the workflow path is going away in epic Z cutover).
+  or removed; the `release-please.yml` workflow was deleted in epic Z
+  cutover, so no new npm releases will be cut from this repo.
 
 ---
 

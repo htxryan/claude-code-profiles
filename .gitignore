@@ -1,4 +1,3 @@
-
 # Beads / Dolt files (added by bd init)
 .dolt/
 *.db
@@ -6,14 +5,6 @@
 
 # compound-agent managed
 .compound-agent/
-
-# Build output
-dist/
-node_modules/
-
-# Test artifacts
-coverage/
-.vitest/
 
 # site/ (Astro app at site/) — its build output and deps
 site/dist/
@@ -25,12 +16,9 @@ site/.claude/
 # (under test-baselines/{light,dark}/*.png) are committed.
 site/test-baselines/**/*.actual.png
 
-# Go (rewrite under go/; epic Z removes the prefix at cutover).
-# Binaries built locally; release artifacts go through goreleaser, never
-# committed. *.test catches binaries `go test -c` leaves behind.
-go/c3p
-go/c3p.exe
-go/**/*.test
-
-# compound-agent / lessons cache scoped per-tree (also exists at repo root).
-go/.claude/
+# Go — binaries built locally; release artifacts go through goreleaser,
+# never committed. *.test catches binaries `go test -c` leaves behind.
+/c3p
+/c3p.exe
+**/*.test
+dist/

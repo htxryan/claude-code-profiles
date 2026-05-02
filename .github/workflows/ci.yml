@@ -16,72 +16,7 @@ permissions:
   contents: read
 
 jobs:
-  build-test:
-    name: cli
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: read
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Install Task
-        uses: arduino/setup-task@v2
-        with:
-          version: 3.x
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          version: 10
-
-      - name: Setup Node 22
-        uses: actions/setup-node@v6
-        with:
-          node-version: "22"
-          cache: "pnpm"
-          cache-dependency-path: pnpm-lock.yaml
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Audit CLI dependencies
-        run: task audit
-        continue-on-error: true
-
-      - name: Audit site dependencies
-        run: task audit:site
-        continue-on-error: true
-
-      - name: Typecheck (src + tests)
-        run: task typecheck
-
-      - name: Build
-        run: task build
-
-      - name: Test
-        run: task test
-
-      - name: Secret scan
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   go:
-    # F1 (epic claude-code-profiles-248) — Go rewrite lives at go/ during
-    # the rewrite. This job runs the Go suite on every PR. Post-cutover
-    # (epic Z) the working-directory prefix goes away and this job folds
-    # back into build-test.
-    #
-    # PR17 (W1): the matrix includes windows-latest so windows_test.go cells
-    # (cross-drive rename, LockFileEx, .bat companion) run on every PR. No
-    # skipIf(win32) is allowed in the Go test tree.
-    #
     # IV (epic claude-code-profiles-ijw) PR7 — 5-platform CI matrix on
     # every PR. The five rows mirror the goreleaser target set:
     #   - ubuntu-latest      (linux/amd64)
@@ -90,8 +25,11 @@ jobs:
     #   - macos-13           (darwin/amd64) — Intel; pinned because
     #                                          macos-latest moved to arm64
     #   - windows-latest     (windows/amd64)
-    # Each row builds + tests + (on ubuntu) runs the helper-parity audit.
-    # If any row reds on a PR, merge is blocked.
+    # Each row builds + tests. If any row reds on a PR, merge is blocked.
+    #
+    # PR17 (W1): the matrix includes windows-latest so windows_test.go cells
+    # (cross-drive rename, LockFileEx, .bat companion) run on every PR. No
+    # skipIf(win32) is allowed in the Go test tree.
     name: go (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
@@ -109,27 +47,33 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
-          go-version: "1.22"
+          go-version-file: go.mod
           cache: true
-          cache-dependency-path: go/go.sum
+          cache-dependency-path: go.sum
 
       - name: Vet
-        run: task go:vet
+        run: task vet
 
       - name: Build
-        run: task go:build
+        run: task build
 
       - name: Test
-        run: task go:test
+        run: task test
 
-      # The helper-parity audit shells out to bash and assumes POSIX path
-      # handling; gate it to ubuntu so the windows runner doesn't fail on
-      # the bash dependency. The audit's invariants are platform-agnostic.
-      - name: Helper-parity audit (PR4)
+      # The jsonout lint shells out to bash; gate it to ubuntu so the
+      # windows runner does not need bash. The lint's invariant is
+      # platform-agnostic.
+      - name: jsonout lint (D7 PR3)
         if: matrix.os == 'ubuntu-latest'
-        run: task go:audit
+        run: task lint-jsonout
+
+      - name: Secret scan
+        if: matrix.os == 'ubuntu-latest'
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   site:
     name: site (build + IV offline)

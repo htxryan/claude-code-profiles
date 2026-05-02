@@ -8,10 +8,8 @@
 #   - WinGet (PR opens against microsoft/winget-pkgs via fork)     — PR8 (3)
 #
 # Release workflow lives at .github/workflows/release.yml and triggers on
-# v[1-9]*.*.* tags (post-cutover; v0.x tags are legacy npm releases).
-#
-# Pre-cutover (during the rewrite), Go sources live at go/. The `dir:` build
-# field handles that. Epic Z drops the `go/` prefix and removes that line.
+# v[1-9]*.*.* tags (Go binary releases; v0.x tags belong to the deprecated
+# npm package and are not produced by this repo any more).
 #
 # Source spec: docs/specs/c3p-go-migration.md PR8 / PR9 / PR10 / PR27.
 # Implementation context: docs/release-runbook.md.
@@ -21,7 +19,6 @@ project_name: c3p
 
 builds:
   - id: c3p
-    dir: ./go
     main: ./cmd/c3p
     binary: c3p
     env:

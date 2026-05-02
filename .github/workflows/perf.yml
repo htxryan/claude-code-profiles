@@ -49,11 +49,11 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
-          go-version: "1.22"
+          go-version-file: go.mod
           cache: true
-          cache-dependency-path: go/go.sum
+          cache-dependency-path: go.sum
 
       - name: Cold start (PR18)
         env:
@@ -63,5 +63,4 @@ jobs:
           # automatically; setting it explicitly here makes the threshold
           # selection auditable.
           CI: "true"
-        working-directory: go
         run: go test -run TestColdStart -v ./tests/integration/...
