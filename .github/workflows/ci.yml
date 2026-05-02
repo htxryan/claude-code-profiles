@@ -16,17 +16,41 @@ permissions:
   contents: read
 
 jobs:
-  build-test:
-    name: cli
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: read
-
+  go:
+    # IV (epic claude-code-profiles-ijw) PR7 — multi-platform CI matrix on
+    # every PR. The four rows mirror the goreleaser target set:
+    #   - ubuntu-latest      (linux/amd64)
+    #   - ubuntu-24.04-arm   (linux/arm64)  — GitHub-hosted arm64 runner
+    #   - macos-latest       (darwin/arm64) — M-series
+    #   - windows-latest     (windows/amd64)
+    # Each row builds + tests. If any row reds on a PR, merge is blocked.
+    #
+    # darwin/amd64 (Intel) coverage: GitHub's macos-13 runner pool was found
+    # to have multi-hour queue waits during this PR's bring-up (single jobs
+    # observed pending >60 min while every other matrix cell completed in
+    # ~1 min). The Go suite has no Intel-vs-ARM-specific assumptions, and
+    # release.yml's smoke step already builds + runs the darwin/amd64 binary
+    # against macos-latest under qemu — the cell was reproducing what the
+    # release smoke already proves. Re-add macos-13 here if a real
+    # darwin/amd64-only regression is suspected; runner availability for the
+    # macos-13 image has been declining as GitHub deprecates it.
+    #
+    # PR17 (W1): the matrix includes windows-latest so windows_test.go cells
+    # (cross-drive rename, LockFileEx, .bat companion) run on every PR. No
+    # skipIf(win32) is allowed in the Go test tree.
+    name: go (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, windows-latest]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
         with:
+          # gitleaks (Secret scan, ubuntu-latest only) needs full history to
+          # scan the range from PR base to HEAD; default shallow clone fails
+          # with "unknown revision" on the merge-base commit.
           fetch-depth: 0
 
       - name: Install Task
@@ -35,31 +59,15 @@ jobs:
           version: 3.x
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6
+      - name: Setup Go
+        uses: actions/setup-go@v6
         with:
-          version: 10
+          go-version-file: go.mod
+          cache: true
+          cache-dependency-path: go.sum
 
-      - name: Setup Node 22
-        uses: actions/setup-node@v6
-        with:
-          node-version: "22"
-          cache: "pnpm"
-          cache-dependency-path: pnpm-lock.yaml
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Audit CLI dependencies
-        run: task audit
-        continue-on-error: true
-
-      - name: Audit site dependencies
-        run: task audit:site
-        continue-on-error: true
-
-      - name: Typecheck (src + tests)
-        run: task typecheck
+      - name: Vet
+        run: task vet
 
       - name: Build
         run: task build
@@ -67,7 +75,15 @@ jobs:
       - name: Test
         run: task test
 
+      # The jsonout lint shells out to bash; gate it to ubuntu so the
+      # windows runner does not need bash. The lint's invariant is
+      # platform-agnostic.
+      - name: jsonout lint (D7 PR3)
+        if: matrix.os == 'ubuntu-latest'
+        run: task lint-jsonout
+
       - name: Secret scan
+        if: matrix.os == 'ubuntu-latest'
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,66 @@
+name: Perf
+
+# W3 (epic claude-code-profiles-94o) — performance gates.
+#
+# CI on every PR (.github/workflows/ci.yml::go) runs perf_test.go::TestBinarySize
+# and perf_test.go::TestLargeProfile because both are deterministic enough to
+# fire on per-PR cadence (size is byte-equal across runs; large-profile has a
+# 7 s platform-class CI budget — vs 5 s on dev hardware — that absorbs typical
+# noisy-neighbour fsync variance on linux/darwin).
+#
+# perf_test.go::TestColdStart is gated behind C3P_PERF_COLDSTART=1 and skipped
+# on the standard go test invocation. This workflow opts in to that gate via
+# the env var. We run nightly + on demand:
+#   - schedule:  03:00 UTC daily — outside US/EU work hours so spawn-time
+#                noise from CI runner activity is at its lowest.
+#   - workflow_dispatch: manual trigger for ad-hoc perf-impacting PR checks.
+#
+# Why not on every PR: cold-start measures wall-clock spawn time of the
+# binary. A noisy-neighbour CI runner can double the mean of an otherwise
+# fast spawn. The platform-class threshold (50 ms on CI) absorbs typical
+# noise; running once per day rather than per-PR keeps the regression
+# signal strong without flaking on shared infra.
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cold-start:
+    name: cold-start (mean-of-middle-8)
+    runs-on: ubuntu-latest
+    # 10 min cap is well above the expected ~1 s build + 10 spawns.
+    # Without an explicit cap the GitHub Actions default is 6 hours, so a
+    # hung `go build` (module fetch stall, toolchain bug) would silently
+    # burn the nightly slot. Set tight enough that a hang fails fast.
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Task
+        uses: arduino/setup-task@v2
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Cold start (PR18)
+        env:
+          C3P_PERF_COLDSTART: "1"
+          # CI=true triggers the 50 ms platform-class budget inside the
+          # test (vs the 25 ms developer budget). GitHub Actions sets CI
+          # automatically; setting it explicitly here makes the threshold
+          # selection auditable.
+          CI: "true"
+        run: go test -run TestColdStart -v ./tests/integration/...

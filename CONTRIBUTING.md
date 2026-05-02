@@ -7,49 +7,52 @@ the conventional-commit prefix on the title — reviewers shall thank you.
 ## Repo layout
 
 ```
-src/
+cmd/c3p/             # main package (binary entry — hand-rolled parser, no cobra)
+internal/
 ├── resolver/        # parse profile.json, walk extends/includes, build the file list
 ├── merge/           # merge strategies (last-wins, JSON merge, etc.)
 ├── state/           # on-disk state: lock, backup, gitignore, atomic copy
 ├── drift/           # detect/report byte differences between profile and live tree
 ├── cli/             # argv parser, dispatcher, command handlers, output channel
 │   ├── commands/    # one file per verb (init, use, list, status, ...)
+│   ├── jsonout/     # single deterministic JSON marshaller (D7 PR3)
 │   └── service/     # orchestration shared by use + sync (the swap pipeline)
-├── errors/          # typed error classes consumed by exit-code mapping
-├── markers.ts       # source of truth for project-root CLAUDE.md managed-block markers (cw6 / spec §12)
-└── index.ts         # public package entry
-tests/               # mirrors src/; integration suites under tests/cli/integration/
+├── errors/          # typed error sentinels consumed by exit-code mapping
+└── markers/         # source of truth for project-root CLAUDE.md managed-block markers (cw6 / spec §12)
+tests/integration/   # spawn-based CLI integration suite (helpers/{fixture.go, spawn.go})
+site/                # Astro docs site (separate package; deployed to CF Pages)
 ```
 
 ## Build & test
 
 ```bash
-pnpm install
-pnpm run build         # tsc → dist/
-pnpm run typecheck     # src + tests
-pnpm test              # vitest run (807 tests, ~140s)
-pnpm run test:watch    # iterate
+task vet               # go vet ./...
+task build             # go build ./... (CGO_ENABLED=0)
+task test              # go test ./... (unit + integration; ~30s)
+task lint-jsonout      # D7 PR3 gate — forbids json.Marshal outside internal/cli/jsonout/
+task ci                # full local CI mirror
 ```
 
-There is no separate lint step — `pnpm run typecheck` is the lint gate.
+Requires Go 1.25+ and [Task](https://taskfile.dev/). Direct `go test ./...`
+also works.
 
 ## Test discipline
 
-- **Vitest**, AAA structure (Arrange / Act / Assert).
-- **Integration tests live under `tests/cli/integration/`** and use real
-  `child_process.spawn` against the built CLI. They exercise the full
+- **Standard Go testing**, AAA structure (Arrange / Act / Assert).
+- **Integration tests live under `tests/integration/`** and use real
+  `os/exec` against the built CLI. They exercise the full
   argv → dispatcher → side-effect path.
 - **No DB / no network** — every test runs against a tmp project root created
-  via `mkdtempSync(os.tmpdir(), ...)`.
+  via `t.TempDir()`.
 - Cross-platform behavior is non-trivial: atomic-rename semantics, lockfile
   handling, signal delivery (SIGINT/SIGTERM/SIGHUP), and Windows-reserved
-  filename validation. CI runs the matrix; please don't merge a Linux-only
-  green.
+  filename validation. CI runs the 5-platform matrix; please don't merge a
+  Linux-only green.
 
 ## Conventional commits
 
-We use [Conventional Commits](https://www.conventionalcommits.org/) so
-`release-please` can derive the next version automatically.
+We use [Conventional Commits](https://www.conventionalcommits.org/) for the
+changelog and tag-derived release notes.
 
 Common prefixes:
 - `feat:` — user-visible new behavior (minor bump)
@@ -81,9 +84,10 @@ capture, etc.).
 
 ## Cross-platform considerations
 
-- **Atomic rename** (`fs.rename`) behaves slightly differently on Windows
-  (won't replace a non-empty target dir). The `state/` layer normalises this
-  by staging into `.tmp/` and using two-step rename + cleanup.
+- **Atomic rename** (`os.Rename`) behaves slightly differently on Windows
+  (won't replace a non-empty target dir, can fail across drive letters).
+  The `state/` layer normalises this by staging into `.tmp/` and using
+  two-step rename + cleanup; on Windows it prefers `MoveFileEx` semantics.
 - **Signal handling** — POSIX `SIGINT`/`SIGTERM`/`SIGHUP` are wired to release
   the lock. Windows lacks `SIGHUP`; the handler installer checks for support.
 - **Reserved filenames** — `CON`, `PRN`, `AUX`, `NUL`, `COM1..9`, `LPT1..9`
@@ -94,21 +98,21 @@ capture, etc.).
 
 ## Adding a new verb
 
-1. Add `src/cli/commands/<verb>.ts` exporting a `runX(opts)` function.
-2. Register the verb in `src/cli/parse.ts` and `src/cli/dispatch.ts`.
-3. Add help text to the `VERBS` map in `src/cli/help.ts`.
-4. Add an entry to the top-level `COMMANDS` block in `topLevelHelp()`.
-5. Add an integration test under `tests/cli/integration/scenarios.test.ts`.
+1. Add `internal/cli/commands/<verb>.go` exporting a `RunX(opts)` function.
+2. Register the verb in `internal/cli/parse.go` and `internal/cli/dispatch.go`.
+3. Add help text to the verbs map in `internal/cli/help.go`.
+4. Add an entry to the top-level commands block in the help renderer.
+5. Add an integration test under `tests/integration/scenarios_test.go`.
 6. Document the verb in `README.md`.
 
-The verb pattern (lock if mutating, output channel for human/JSON, error class
-mapped via `src/cli/exit.ts`) is consistent across existing commands — copy
-from the closest neighbour.
+The verb pattern (lock if mutating, output channel for human/JSON, error
+sentinel mapped via `internal/cli/exit.go`) is consistent across existing
+commands — copy from the closest neighbour.
 
 ## Code review
 
-For external PRs, the GitHub Actions CI matrix (build + typecheck + tests on
-ubuntu/macos/windows) is the required gate.
+For external PRs, the GitHub Actions CI matrix (vet + build + tests on the
+5-platform matrix) is the required gate.
 
 During internal development we also use a multi-model review fleet
 (`/compound:review`) for major changes — see `AGENTS.md`.
@@ -117,7 +121,7 @@ During internal development we also use a multi-model review fleet
 
 File issues at <https://github.com/htxryan/claude-code-config-profiles/issues>.
 Include:
-- Node version (`node --version`)
+- `c3p --version`
 - OS + version
 - Output of `c3p status --json` if relevant
 - Minimum reproduction (a `.claude-profiles/<name>/profile.json` is usually

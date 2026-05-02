@@ -1,0 +1,24 @@
+=== Full uncached test run (count=1) ===
+?   	github.com/htxryan/claude-code-config-profiles/cmd/c3p	[no test files]
+ok  	github.com/htxryan/claude-code-config-profiles/internal/cli	0.280s
+ok  	github.com/htxryan/claude-code-config-profiles/internal/cli/commands	0.331s
+ok  	github.com/htxryan/claude-code-config-profiles/internal/cli/jsonout	0.535s
+ok  	github.com/htxryan/claude-code-config-profiles/internal/cli/service	1.612s
+ok  	github.com/htxryan/claude-code-config-profiles/internal/drift	1.631s
+ok  	github.com/htxryan/claude-code-config-profiles/internal/errors	0.676s
+ok  	github.com/htxryan/claude-code-config-profiles/internal/markers	1.208s
+ok  	github.com/htxryan/claude-code-config-profiles/internal/merge	1.670s
+ok  	github.com/htxryan/claude-code-config-profiles/internal/resolver	1.707s
+ok  	github.com/htxryan/claude-code-config-profiles/internal/state	4.325s
+ok  	github.com/htxryan/claude-code-config-profiles/tests/integration	21.739s
+?   	github.com/htxryan/claude-code-config-profiles/tests/integration/helpers	[no test files]
+
+=== Test counts per package ===
+       3
+(total unique test functions; subtests inflate the actual assertion count)
+
+=== task release:check (W2 — goreleaser config validation) ===
+task: [release:check] goreleaser check
+  • checking                                  path=.goreleaser.yaml
+  • 1 configuration file(s) validated
+  • thanks for using GoReleaser!

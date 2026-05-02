@@ -9,7 +9,7 @@
 
 Fluent in many forms of `.claude/` configuration.
 
-> **npm package**: `claude-code-config-profiles` &nbsp;·&nbsp; **CLI binary**: `c3p`
+> **Binary**: `c3p` &nbsp;·&nbsp; **Distribution**: Homebrew (macOS) · WinGet (Windows) · GitHub Releases · `go install`
 
 C3P lets you maintain multiple named `.claude/` configurations in a project —
 for example a `dev` profile with verbose agents and looser permissions, and a
@@ -18,27 +18,61 @@ them atomically. Profiles compose via single-parent `extends` and additive
 `includes` (composable components), and a **drift gate** ensures, if I may, that
 uncommitted edits to the active `.claude/` are never lost when switching.
 
-> **Status**: alpha. The CLI surface is stable. Pre-1.0 means the on-disk layout
-> may still change in minor versions.
+> **Status**: 1.0. Single-binary Go CLI. Cross-compiled for
+> {linux, darwin, windows} × {amd64, arm64}; checksums and a cosign keyless
+> signature accompany every release.
 
 ## Install
 
+### Homebrew (macOS)
+
 ```bash
-npm install -g claude-code-config-profiles
+brew install htxryan/tap/c3p
 ```
 
-Requires Node 20+. The installed binary is `c3p`.
+> Linux Homebrew (Linuxbrew) is not supported by the tap; use the GitHub
+> Releases archive or `go install` instead.
 
-### Upgrading from 0.2.x
+### WinGet (Windows)
 
-0.3.0 renames the CLI binary from `claude-profiles` to `c3p`, along with the
-gitignore section header, CLAUDE.md managed-block markers, and pre-commit hook
-script. The rename is hard — legacy markers and headers in your repo are **not**
-auto-migrated. After upgrading the package, manually remove the old
-`# Added by claude-profiles` gitignore section and
-`<!-- claude-profiles:v1:… -->` markers from project-root `CLAUDE.md`, then
-re-run `c3p init` and `c3p hook install --force`. See the
-[CHANGELOG entry for 0.3.0](./CHANGELOG.md) for full details.
+```powershell
+winget install htxryan.c3p
+```
+
+### GitHub Releases (any platform)
+
+Download the archive for your `<os>_<arch>` from the
+[latest release](https://github.com/htxryan/claude-code-config-profiles/releases/latest),
+extract `c3p` (or `c3p.exe`), and place it on your `PATH`.
+
+The same release page hosts:
+
+- `c3p_<version>_checksums.txt` — SHA256 digests for every archive.
+- `c3p_<version>_checksums.txt.sig` + `.pem` — cosign keyless signature
+  bound to the release workflow's OIDC identity. Verify with:
+
+  ```bash
+  cosign verify-blob \
+    --certificate                c3p_<version>_checksums.txt.pem \
+    --signature                  c3p_<version>_checksums.txt.sig \
+    --certificate-identity-regexp 'https://github.com/htxryan/claude-code-config-profiles/\.github/workflows/release\.yml@.+' \
+    --certificate-oidc-issuer    https://token.actions.githubusercontent.com \
+    c3p_<version>_checksums.txt
+  sha256sum -c c3p_<version>_checksums.txt
+  ```
+
+### From source (`go install`)
+
+```bash
+go install github.com/htxryan/claude-code-config-profiles/cmd/c3p@latest
+```
+
+Requires Go 1.25+.
+
+> **Migrating from the npm package?** The legacy `claude-code-config-profiles`
+> npm package is deprecated. The CLI surface (`c3p init`, `c3p use`, `c3p
+> status`, …) is byte-equivalent — uninstall the npm package and install via
+> one of the channels above; no project changes required.
 
 ## Quickstart
 

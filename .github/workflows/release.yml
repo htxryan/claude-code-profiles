@@ -1,0 +1,207 @@
+name: release
+
+# W2 — Distribution Pipeline.
+#
+# Triggers on v[1-9]*.*.* tags (Go binary releases). Pre-1.0 v0.x tags
+# belong to the deprecated npm package and are not produced by this repo
+# any more (release-please.yml was removed in epic Z cutover). This
+# workflow deliberately does not match them so a re-tag of an old
+# version never accidentally triggers a Go release.
+#
+# On PRs that touch this file or .goreleaser.yaml, the validate job runs
+# `goreleaser release --snapshot` (PR8 fitness function: dry-run on tag
+# candidate before push).
+#
+# Smoke test (PR8.5): each native target builds + runs `c3p --version`
+# on its native runner; linux/arm64 runs via qemu-user-static on
+# ubuntu-latest. Smoke gates the release job — a binary that cannot
+# start never reaches a release artifact.
+#
+# Cosign keyless signing (PR8.3 SHALL): id-token: write enables OIDC
+# token access for sigstore. Goreleaser propagates a non-zero cosign exit,
+# which fails the workflow — there is no silent skip path.
+#
+# Tap publication (PR8.1): HOMEBREW_TAP_TOKEN is a fine-grained PAT
+# scoped to tap-write only, NOT the default GITHUB_TOKEN.
+
+on:
+  push:
+    tags:
+      - 'v[1-9]*.*.*'
+  pull_request:
+    paths:
+      - '.goreleaser.yaml'
+      - '.github/workflows/release.yml'
+
+# Workflow-level permissions are the floor for every job. id-token: write
+# (cosign keyless OIDC) is granted only to the release job, NOT here — fork
+# PRs run validate and must not inherit OIDC token-write.
+permissions:
+  contents: read
+
+concurrency:
+  # A stuck release on a tag would block re-runs of the same tag. Manual
+  # cancel via the Actions UI ("Cancel workflow") is the escape hatch
+  # documented in docs/release-runbook.md.
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    # PR-time dry-run: snapshot build + checksum, no sign/publish (signing
+    # needs OIDC which only the tag-push event has on this branch). Catches
+    # goreleaser config regressions before they hit a real release tag.
+    name: validate (snapshot)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: Goreleaser config check
+        # Schema-level validation. Catches deprecated-field regressions
+        # (e.g. brews→homebrew_casks rename) that snapshot tolerates but
+        # a real release-tag run would reject.
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: '~> v2'
+          args: check
+      - name: Goreleaser snapshot
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: '~> v2'
+          args: release --snapshot --clean --skip=publish,sign,announce
+      - name: Upload dist/ on failure
+        # Preserve partial archives, manifests, and cask file for
+        # debugging when the snapshot fails. if: always() so this also
+        # runs after a goreleaser non-zero exit.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-snapshot
+          path: dist/
+          if-no-files-found: ignore
+
+  smoke:
+    # PR8.5: cross-compile smoke test. Build for each target on a runner
+    # that can execute the resulting binary, then run `c3p --version`.
+    # A binary that segfaults at startup will fail this job and gate the
+    # release. Goreleaser will rebuild from the same source commit in the
+    # release job below — the only delta is `-ldflags -X main.version=`,
+    # which cannot break process startup.
+    #
+    # Coverage: every target the release artifact set ships:
+    #   linux amd64+arm64, darwin amd64+arm64, windows amd64+arm64.
+    # All run on native runners except linux/arm64, which uses qemu on an
+    # x86_64 ubuntu runner (works because Linux binfmt_misc + qemu-user
+    # transparently forwards arm64 ELF execs).
+    name: smoke ${{ matrix.goos }}/${{ matrix.goarch }}
+    if: github.event_name == 'push'
+    permissions:
+      contents: read
+    strategy:
+      # fail-fast: false trades a few runner-minutes for diagnostic clarity.
+      # If darwin/arm64 segfaults at startup, we want to know whether
+      # windows/arm64 also failed in the same release candidate, not just
+      # the first failure.
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-latest,    goos: linux,   goarch: amd64 }
+          - { runner: ubuntu-latest,    goos: linux,   goarch: arm64, qemu: true }
+          # macos-13 is the canonical GitHub-hosted Intel runner and matches
+          # ci.yml's matrix. macos-15-intel is not in the hosted-runner catalogue.
+          - { runner: macos-13,         goos: darwin,  goarch: amd64 }
+          - { runner: macos-14,         goos: darwin,  goarch: arm64 }
+          - { runner: windows-latest,   goos: windows, goarch: amd64 }
+          - { runner: windows-11-arm,   goos: windows, goarch: arm64 }
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: Setup QEMU (cross-arch smoke for non-native targets)
+        if: matrix.qemu == true
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+      - name: Build c3p for ${{ matrix.goos }}/${{ matrix.goarch }}
+        env:
+          CGO_ENABLED: "0"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          out="./c3p"
+          if [ "$GOOS" = "windows" ]; then
+            out="$out.exe"
+          fi
+          go build -trimpath -ldflags '-s -w' -o "$out" ./cmd/c3p
+      - name: Smoke ./c3p --version
+        run: |
+          bin="./c3p"
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            bin="./c3p.exe"
+          fi
+          "$bin" --version
+
+  release:
+    # Canonical build + sign + publish. Runs only on tag push, only after
+    # smoke passes. Goreleaser handles cross-compile, archives, checksums,
+    # cosign keyless signing, GH Release upload, brew tap PR, winget PR.
+    name: release
+    needs: smoke
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # GH Releases upload
+      id-token: write   # cosign keyless OIDC — scoped to this job only
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0  # full history needed for goreleaser changelog
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+      - name: Run goreleaser
+        # Pin to the v2 major. `version: latest` would silently break the
+        # pipeline on a goreleaser v3 release (config-format breaks have
+        # historically gated each major bump).
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: '~> v2'
+          args: release --clean
+        env:
+          # Default GITHUB_TOKEN: write access to *this* repo only.
+          # Used for the GH Releases upload.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # PR8.1 + PR27: fine-grained PAT scoped to htxryan/homebrew-tap
+          # writes only; ≤90-day expiration. NEVER the default GITHUB_TOKEN
+          # (whose scope would extend to this repo's full contents).
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          # Optional: WINGET_PKGS_TOKEN scoped to htxryan/winget-pkgs.
+          # When unset, the winget step skips upload (skip_upload templated
+          # in .goreleaser.yaml). The release does not abort.
+          WINGET_PKGS_TOKEN: ${{ secrets.WINGET_PKGS_TOKEN }}
+      - name: Upload dist/ on failure
+        # Preserve partial archives + manifests for debugging when goreleaser
+        # exits non-zero between build and publish.
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-release
+          path: dist/
+          if-no-files-found: ignore

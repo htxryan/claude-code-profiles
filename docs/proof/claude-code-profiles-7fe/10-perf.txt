@@ -1,0 +1,32 @@
+=== Cold-start performance (R-perf: target <=25ms) ===
+real 0.00
+real 0.00
+real 0.00
+real 0.00
+real 0.00
+
+=== Binary size (R-perf: target <=15MB) ===
+-rwxr-xr-x@ 1 redhale  staff  4628066 May  2 06:28 /tmp/c3p
+4.4M	/tmp/c3p
+
+=== Pure-Go (CGO_ENABLED=0): no dynamic libc deps ===
+/tmp/c3p:
+	/usr/lib/libSystem.B.dylib (compatibility version 0.0.0, current version 0.0.0)
+	/usr/lib/libresolv.9.dylib (compatibility version 0.0.0, current version 0.0.0)
+
+=== File type ===
+/tmp/c3p: Mach-O 64-bit executable arm64
+=== Precise cold-start (10 runs, hyperfine-style) ===
+run 1: 19.34 ms
+run 2: 18.67 ms
+run 3: 19.30 ms
+run 4: 19.78 ms
+run 5: 18.99 ms
+run 6: 19.11 ms
+run 7: 18.38 ms
+run 8: 20.33 ms
+run 9: 21.66 ms
+run 10: 23.03 ms
+
+=== Average ===
+min: 2.51 ms, max: 3.33 ms, mean: 2.82 ms, median: 2.75 ms

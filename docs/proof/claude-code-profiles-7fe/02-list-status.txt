@@ -1,0 +1,14 @@
+=== c3p list (text) ===
+NAME       META
+  default  
+  strict   
+
+=== c3p list --json (PR3 — single jsonout marshaller, deterministic) ===
+{"profiles":[{"name":"default","active":false,"description":"","extends":"","includes":[],"tags":[],"lastMaterialized":""},{"name":"strict","active":false,"description":"","extends":"","includes":[],"tags":[],"lastMaterialized":""}],"stateWarning":""}
+
+=== c3p status (no profile active yet) ===
+active profile: (none)
+Run `c3p use <name>` to select one.
+
+=== c3p status --json ===
+{"activeProfile":null,"materializedAt":null,"drift":{"fingerprintOk":false,"modified":0,"added":0,"deleted":0,"unrecoverable":0,"total":0},"sourceFresh":null,"sourceFingerprint":null,"warnings":[]}

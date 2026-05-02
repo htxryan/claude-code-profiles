@@ -1,0 +1,70 @@
+=== c3p use default ===
+switched to default
+exit code: 0
+
+=== File tree after use default ===
+.claude-profiles/.meta/lock
+.claude-profiles/.meta/state.json
+.claude-profiles/default/.claude/settings.json
+.claude-profiles/default/CLAUDE.md
+.claude-profiles/default/profile.json
+.claude-profiles/strict/.claude/settings.json
+.claude-profiles/strict/CLAUDE.md
+.claude-profiles/strict/profile.json
+.claude/settings.json
+.gitignore
+CLAUDE.md
+
+=== Materialized .claude/settings.json ===
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Edit",
+      "Bash"
+    ]
+  }
+}
+
+=== Root CLAUDE.md (default profile spliced into managed block) ===
+<!-- c3p:v1:begin -->
+<!-- Managed block. Do not edit between markers — changes are overwritten on next `c3p use`. -->
+
+# Default profile context
+Standard developer setup.
+
+<!-- c3p:v1:end -->
+
+=== State file (R42 schema) ===
+{
+  "schemaVersion": 1,
+  "activeProfile": "default",
+  "materializedAt": "2026-05-02T11:30:51.363Z",
+  "resolvedSources": [
+    {
+      "id": "default",
+      "kind": "profile",
+      "rootPath": "/var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/c3p-proof2.XXXXXX.0tBHFE40cz/.claude-profiles/default",
+      "external": false
+    }
+  ],
+  "fingerprint": {
+    "schemaVersion": 1,
+    "files": {
+      "settings.json": {
+        "size": 89,
+        "mtimeMs": 1777721451358,
+        "contentHash": "9084548c84bc1e941edb44d06f8c8e2c3b678365a8c4b1e835f63480dfd9dbd0"
+      }
+    }
+  },
+  "externalTrustNotices": [],
+  "rootClaudeMdSection": {
+    "size": 154,
+    "contentHash": "cdebd05484d749b802c5a533b0e95d51daee0fa9c03b8505dae926a5cc44c64f"
+  },
+  "sourceFingerprint": {
+    "fileCount": 2,
+    "aggregateHash": "d2d875140afed8ce60487d610b6c05c9eb45edf53963a92d55ae24859d239d3b"
+  }
+}

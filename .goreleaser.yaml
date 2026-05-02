@@ -1,0 +1,203 @@
+# W2 — Distribution Pipeline.
+#
+# Cross-compile c3p for {linux,darwin,windows} × {amd64,arm64}, archive,
+# checksum, cosign-sign (PR8.3 SHALL — signing failure aborts release),
+# and publish to:
+#   - GitHub Releases (this repo)
+#   - Homebrew tap     (htxryan/homebrew-tap, formula c3p)         — PR8.1
+#   - WinGet (PR opens against microsoft/winget-pkgs via fork)     — PR8 (3)
+#
+# Release workflow lives at .github/workflows/release.yml and triggers on
+# v[1-9]*.*.* tags (Go binary releases; v0.x tags belong to the deprecated
+# npm package and are not produced by this repo any more).
+#
+# Source spec: docs/specs/c3p-go-migration.md PR8 / PR9 / PR10 / PR27.
+# Implementation context: docs/release-runbook.md.
+
+version: 2
+project_name: c3p
+
+builds:
+  - id: c3p
+    main: ./cmd/c3p
+    binary: c3p
+    env:
+      - CGO_ENABLED=0  # PR20 default — no CGO in release artifacts.
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X main.version={{ .Version }}
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    mod_timestamp: '{{ .CommitTimestamp }}'
+
+archives:
+  - id: c3p
+    ids: [c3p]
+    # Explicit contract from W2 epic: c3p_${version}_${os}_${arch}.{tar.gz|zip}
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
+  algorithm: sha256
+
+# PR8.3 (SHALL): cosign keyless signing of the checksums file. The
+# checksum file binds the SHA256 of every artifact, so a single signature
+# transitively covers every artifact. Goreleaser propagates a non-zero
+# cosign exit, which fails the workflow — no silent skip (R11 mitigation).
+#
+# Keyless signing uses the workflow's OIDC token (id-token: write in the
+# release.yml permissions). The signing certificate is bound to the
+# release.yml workflow path; verifiers should use that as the
+# certificate-identity-regexp.
+signs:
+  - id: cosign
+    cmd: cosign
+    artifacts: checksum
+    output: true
+    signature: "${artifact}.sig"
+    certificate: "${artifact}.pem"
+    args:
+      - "sign-blob"
+      - "--yes"
+      - "--output-signature=${signature}"
+      - "--output-certificate=${certificate}"
+      - "${artifact}"
+
+# Homebrew tap publication. Spec contract:
+#   - tap repo (htxryan/homebrew-tap) requires human approval on formula PRs
+#   - auto-merge SHALL be disabled (enforced as a setting on the tap repo;
+#     this workflow MUST NOT enable goreleaser's auto-merge fields)
+#   - HOMEBREW_TAP_TOKEN is a fine-grained PAT scoped to tap-write only,
+#     rotated ≤90d (PR27). NOT the default GITHUB_TOKEN.
+#   - users install via: brew install htxryan/tap/c3p
+#
+# Note: goreleaser deprecated `brews:` (formulas) in v2.10 in favour of
+# `homebrew_casks:` (https://goreleaser.com/deprecations#brews). Casks
+# install pre-compiled binaries and avoid the formula-as-binary anti-pattern
+# goreleaser used to emit. The `brew install htxryan/tap/c3p` user-facing
+# command is identical on macOS.
+#
+# Tradeoff: Homebrew Casks are macOS-only — Linux Homebrew (Linuxbrew) users
+# must fall back to GitHub Releases or `go install`. README.md documents this.
+homebrew_casks:
+  - name: c3p
+    binaries: [c3p]
+    repository:
+      owner: htxryan
+      name: homebrew-tap
+      branch: "c3p-{{ .Version }}"
+      # envOrDefault avoids template-eval failure on fork PRs that exercise
+      # this config (validate job) without access to the secret. The publish
+      # pipe is skipped via --skip=publish in validate, so an empty token is
+      # never used to actually push.
+      token: '{{ envOrDefault "HOMEBREW_TAP_TOKEN" "" }}'
+      # PR8.1 contract: tap PRs are human-approved. We open the PR
+      # (pull_request.enabled: true) but do NOT enable auto-merge. The
+      # tap repo enforces "Require pull request review" at the branch
+      # protection layer as a backstop.
+      pull_request:
+        enabled: true
+        draft: false
+    commit_author:
+      name: c3p-release-bot
+      email: release@c3p.dev
+    homepage: "https://github.com/htxryan/claude-code-config-profiles"
+    description: "Swappable .claude/ configuration profiles for Claude Code projects"
+    license: MIT
+    # Binaries are unsigned (no Apple codesign). On macOS Gatekeeper
+    # quarantines downloaded binaries. The post-install hook strips the
+    # quarantine xattr so `c3p` runs without the "damaged and cannot be
+    # opened" dialog. Documented in docs/release-runbook.md.
+    # (Casks are macOS-only by definition — no platform guard needed.)
+    hooks:
+      post:
+        install: |
+          system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/c3p"]
+
+# WinGet manifest. Spec contract:
+#   - manifest opened by release workflow as PR against microsoft/winget-pkgs
+#   - manual upstream review required (msft policy)
+#   - htxryan/winget-pkgs is a one-shot human-bootstrapped fork
+#   - WINGET_PKGS_TOKEN: fine-grained PAT scoped to fork-write, rotated ≤90d
+#
+# When the WINGET_PKGS_TOKEN secret is missing, skip_upload templates to
+# 'true' so a release without the winget fork bootstrapped does not abort.
+# This lets the brew + GH-Releases channels ship while the human completes
+# the WinGet fork prerequisite.
+winget:
+  - name: c3p
+    publisher: htxryan
+    short_description: "Swappable .claude/ configuration profiles for Claude Code"
+    description: |
+      c3p (claude-code-config-profiles) is a CLI for managing swappable
+      .claude/ configuration profiles in Claude Code projects.
+    license: MIT
+    license_url: "https://github.com/htxryan/claude-code-config-profiles/blob/main/LICENSE"
+    homepage: "https://github.com/htxryan/claude-code-config-profiles"
+    publisher_url: "https://github.com/htxryan"
+    publisher_support_url: "https://github.com/htxryan/claude-code-config-profiles/issues"
+    package_identifier: htxryan.c3p
+    repository:
+      owner: htxryan
+      name: winget-pkgs
+      branch: "c3p-{{ .Version }}"
+      # envOrDefault matches the HOMEBREW_TAP_TOKEN pattern: avoids
+      # template-eval failure on fork PRs without secret access.
+      token: '{{ envOrDefault "WINGET_PKGS_TOKEN" "" }}'
+      pull_request:
+        enabled: true
+        base:
+          owner: microsoft
+          name: winget-pkgs
+          branch: master
+    skip_upload: '{{ if eq (envOrDefault "WINGET_PKGS_TOKEN" "") "" }}true{{ else }}false{{ end }}'
+
+release:
+  github:
+    owner: htxryan
+    name: claude-code-config-profiles
+  draft: false
+  prerelease: auto
+  # mode: replace — re-running the release workflow against an existing tag
+  # overwrites artifacts. Recovery for a partial-publish failure is a NEW
+  # patch tag (v1.2.4), NOT re-tagging v1.2.3 — see docs/release-runbook.md
+  # post-mortem section. `replace` exists only so a single workflow re-run
+  # after a transient failure (e.g. brew tap 503) can succeed without manual
+  # cleanup of half-uploaded artifacts.
+  mode: replace
+  name_template: "v{{ .Version }}"
+  header: |
+    ## c3p {{ .Version }}
+
+    Install:
+    - **Homebrew**: `brew install htxryan/tap/c3p`
+    - **WinGet**:   `winget install htxryan.c3p`
+    - **Direct**:   download an archive below; verify with the cosign block.
+
+    ### Verify
+    ```
+    cosign verify-blob \
+      --certificate                c3p_{{ .Version }}_checksums.txt.pem \
+      --signature                  c3p_{{ .Version }}_checksums.txt.sig \
+      --certificate-identity-regexp 'https://github.com/htxryan/claude-code-config-profiles/\.github/workflows/release\.yml@.+' \
+      --certificate-oidc-issuer    https://token.actions.githubusercontent.com \
+      c3p_{{ .Version }}_checksums.txt
+    sha256sum -c c3p_{{ .Version }}_checksums.txt
+    ```
+
+changelog:
+  use: github-native

@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.0.0](https://github.com/htxryan/claude-code-config-profiles/compare/v0.6.0...v1.0.0) (2026-05-02)
+
+### ⚠ BREAKING CHANGES
+
+* **migration:** the implementation language switches from TypeScript to Go;
+  the npm package `claude-code-config-profiles` is deprecated. The `c3p` CLI
+  surface, exit codes, JSON envelopes, and on-disk layout are byte-equivalent
+  across the 0.x → 1.0 boundary — only the install path changes.
+
+### Distribution
+
+Install via Homebrew (`brew install htxryan/tap/c3p`),
+WinGet (`winget install htxryan.c3p`),
+GitHub Releases (cosign-signed archives for
+{linux, darwin, windows} × {amd64, arm64}),
+or `go install github.com/htxryan/claude-code-config-profiles/cmd/c3p@latest`.
+
+### Features
+
+* **migration:** atomic TS→Go cutover at the repo root; no behaviour change,
+  pure structural collapse (epic Z).
+
 ## [0.6.0](https://github.com/htxryan/claude-code-config-profiles/compare/v0.5.0...v0.6.0) (2026-05-01)
 
 

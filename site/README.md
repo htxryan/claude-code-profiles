@@ -296,8 +296,7 @@ the time of writing:
 
 ## What this directory does **not** touch
 
-The CLI source tree at the repo root (`src/`, `tests/`, `package.json`,
-`pnpm-lock.yaml`, `tsconfig*.json`, `vitest.config.ts`, `dist/`,
-`.github/workflows/`, `.release-please-*`) is **unchanged** by this site.
-The existing matrix CI (R-U-13) and release-please pipeline (R-U-15) keep
-running untouched.
+The CLI source tree at the repo root (`cmd/c3p/`, `internal/`, `tests/`,
+`go.mod`, `go.sum`, `Taskfile.yml`, `.goreleaser.yaml`) is **unchanged** by
+this site. The Go matrix CI (`.github/workflows/ci.yml`) and the goreleaser
+release pipeline (`.github/workflows/release.yml`) keep running untouched.

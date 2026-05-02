@@ -2,67 +2,88 @@ version: "3"
 
 set: [pipefail]
 
+# c3p Taskfile. Post-cutover (epic Z): Go is the only implementation, lives
+# at the repo root. Site/ remains a separate Astro app.
+
 tasks:
   default:
     desc: List available tasks
     silent: true
     cmd: task --list
 
-  install:
-    desc: Install CLI dependencies
-    cmd: pnpm install
-
   install:site:
     desc: Install site dependencies
     dir: site
     cmd: pnpm install
 
-  # ── build ──────────────────────────────────────────────────────────────────
+  # ── go ─────────────────────────────────────────────────────────────────────
+  # CGO_ENABLED=0 is the PR20 default — release builds do not introduce a
+  # CGO dependency.
+
+  tidy:
+    desc: Resolve Go module dependencies
+    cmd: go mod tidy
+
+  vet:
+    desc: Static-analyse Go packages
+    cmd: go vet ./...
 
   build:
-    desc: Build the CLI
-    cmd: pnpm run build
+    desc: Build the Go CLI binary (CGO_ENABLED=0)
+    env:
+      CGO_ENABLED: "0"
+    cmd: go build ./...
+
+  test:
+    desc: Run Go unit + integration suite
+    env:
+      CGO_ENABLED: "0"
+    cmd: go test ./...
+
+  lint-jsonout:
+    desc: D7 PR3 gate — forbids json.Marshal outside internal/cli/jsonout/
+    cmd: bash scripts/jsonout_lint.sh
+
+  # ── site ───────────────────────────────────────────────────────────────────
 
   build:site:
     desc: Build the docs site (installs playwright, runs astro check + build)
     dir: site
     cmd: pnpm build
 
-  # ── typecheck ──────────────────────────────────────────────────────────────
-
-  typecheck:
-    desc: Type-check CLI source and tests
-    cmd: pnpm run typecheck
-
-  # ── test ───────────────────────────────────────────────────────────────────
-
-  test:
-    desc: Run CLI unit tests
-    cmd: pnpm test
-
   test:site:
     desc: Run site integration verification (offline mode)
     dir: site
     cmd: pnpm iv:offline
-
-  # ── audit ──────────────────────────────────────────────────────────────────
-
-  audit:
-    desc: Dependency security audit (CLI)
-    cmd: pnpm audit --audit-level=high
 
   audit:site:
     desc: Dependency security audit (site)
     dir: site
     cmd: pnpm audit --audit-level=high
 
+  # ── release (W2) ───────────────────────────────────────────────────────────
+  # Local pre-flight hooks for the W2 release pipeline. The actual release
+  # runs in .github/workflows/release.yml on a v[1-9]*.*.* tag push; these
+  # tasks are the PR8 fitness-function "dry-run on tag candidate before push".
+
+  release:check:
+    desc: W2 — validate .goreleaser.yaml without building
+    cmd: goreleaser check
+
+  release:dry-run:
+    desc: W2 — local snapshot build (no publish/sign) — pre-tag pre-flight
+    cmd: goreleaser release --snapshot --clean --skip=publish,sign,announce
+
   # ── ci ─────────────────────────────────────────────────────────────────────
 
   ci:
-    desc: Run full CI suite locally (mirrors GitHub Actions)
+    desc: Run the Go CI suite locally (mirrors the `go` job in .github/workflows/ci.yml)
+    # Note: the `site` job (build:site + test:site) is run separately because
+    # it requires pnpm install + a chromium download. Use `task build:site`
+    # and `task test:site` from site/ to mirror that job.
     cmds:
-      - task: typecheck
+      - task: vet
       - task: build
       - task: test
-      - task: audit
+      - task: lint-jsonout
       - task: audit:site
