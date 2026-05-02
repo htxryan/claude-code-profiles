@@ -269,6 +269,97 @@ func TestStateFile_PR2_ByteIdentity(t *testing.T) {
 	}
 }
 
+// TestStateFile_NoHTMLEscape covers the byte-identity fix for cross-language
+// IV: Go's default encoder escapes <, >, & to <, >, &; Node's
+// JSON.stringify does not. A profile name or external path containing those
+// characters must round-trip byte-identical to the TS bin's output.
+func TestStateFile_NoHTMLEscape(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	paths := state.BuildStatePaths(root)
+	profile := "ng<3>&friends"
+	sf := state.DefaultState()
+	sf.ActiveProfile = &profile
+	if err := state.WriteStateFile(paths, sf); err != nil {
+		t.Fatalf("WriteStateFile: %v", err)
+	}
+	raw, err := os.ReadFile(paths.StateFile)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	// Go's default Marshal escapes literal `<`, `>`, `&` to the JSON \u00xx
+	// form. We want those literal bytes preserved (Node's JSON.stringify
+	// behavior). The presence of the escaped form indicates the encoder
+	// leaked default HTML escaping — which would break byte-identity with
+	// the TS bin.
+	escaped := []string{
+		"\\u003c", "\\u003C", // <
+		"\\u003e", "\\u003E", // >
+		"\\u0026", // &
+	}
+	for _, e := range escaped {
+		if strings.Contains(string(raw), e) {
+			t.Fatalf("on-disk state.json contains JSON unicode escape %q (Go default escaping leaked); got:\n%s", e, raw)
+		}
+	}
+	if !strings.Contains(string(raw), "\"activeProfile\": \"ng<3>&friends\"") {
+		t.Fatalf("expected literal '<>&' in profile name; got:\n%s", raw)
+	}
+}
+
+// TestFingerprint_NoHTMLEscapeInRelPath asserts the same byte-identity rule
+// for fingerprint.files keys. .claude/ subpaths can legitimately contain
+// punctuation that intersects with HTML chars.
+func TestFingerprint_NoHTMLEscapeInRelPath(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	paths := state.BuildStatePaths(root)
+	sf := state.DefaultState()
+	sf.Fingerprint.Files["agents/<weird>&path.md"] = state.FingerprintEntry{
+		Size: 1, MtimeMs: 0, ContentHash: "abc",
+	}
+	if err := state.WriteStateFile(paths, sf); err != nil {
+		t.Fatalf("WriteStateFile: %v", err)
+	}
+	raw, err := os.ReadFile(paths.StateFile)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if !strings.Contains(string(raw), "\"agents/<weird>&path.md\"") {
+		t.Fatalf("expected literal '<>&' in fingerprint key; got:\n%s", raw)
+	}
+	for _, e := range []string{"\\u003c", "\\u003e", "\\u0026"} {
+		if strings.Contains(string(raw), e) {
+			t.Fatalf("fingerprint key still contains JSON unicode escape %q; got:\n%s", e, raw)
+		}
+	}
+}
+
+// TestReadStateFile_PR28_SchemaTooNew_FloatForm covers the secondary fix:
+// a future-bin's state file may legitimately render the schemaVersion as a
+// JSON number with a fractional or exponent form. PR28 must still refuse,
+// not silently degrade.
+func TestReadStateFile_PR28_SchemaTooNew_FloatForm(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	paths := state.BuildStatePaths(root)
+	if err := os.MkdirAll(paths.MetaDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	// 2.0 should still be > 1; the previous (int-only) decode would silently
+	// fall through to validateStateShape and degrade to DefaultState.
+	if err := os.WriteFile(paths.StateFile, []byte(`{"schemaVersion":2.0}`), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	_, err := state.ReadStateFile(paths)
+	if err == nil {
+		t.Fatalf("expected SchemaTooNewError, got nil")
+	}
+	if !state.IsSchemaTooNewError(err) {
+		t.Fatalf("error %v is not *SchemaTooNewError", err)
+	}
+}
+
 func walkTmpFiles(t *testing.T, dir string) []string {
 	t.Helper()
 	var out []string

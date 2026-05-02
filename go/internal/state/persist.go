@@ -137,6 +137,17 @@ func PersistLiveIntoProfile(paths StatePaths, activeProfileName string) error {
 		return err
 	}
 
+	// cw6/T5 (R46/AC-8): persist the live project-root CLAUDE.md section back
+	// to <profile>/CLAUDE.md BEFORE we drop .prior/. If this write fails and
+	// .prior/ has already been dropped, the failed root-section write is
+	// silent — ReconcilePersist on the next run sees no .prior/ and considers
+	// the persist complete, so the profile's root-section content is lost.
+	// Doing the write first means a failure here keeps .prior/ around so the
+	// next reconcile + retry can re-apply.
+	if err := persistRootClaudeMdSection(paths, persist.ProfileDir); err != nil {
+		return err
+	}
+
 	// Success — drop prior. (No state-file update here; the caller's
 	// subsequent materialize writes the new state.)
 	priorExists, err := PathExists(persist.PriorDir)
@@ -147,13 +158,6 @@ func PersistLiveIntoProfile(paths StatePaths, activeProfileName string) error {
 		if err := RmRf(persist.PriorDir); err != nil {
 			return err
 		}
-	}
-
-	// cw6/T5 (R46/AC-8): persist the live project-root CLAUDE.md section back
-	// to <profile>/CLAUDE.md. MUST come BEFORE the profileDir mtime touch so
-	// the touch reflects the complete persist.
-	if err := persistRootClaudeMdSection(paths, persist.ProfileDir); err != nil {
-		return err
 	}
 
 	// Touch profileDir so e.g. `list` shows a recent mtime; not strictly

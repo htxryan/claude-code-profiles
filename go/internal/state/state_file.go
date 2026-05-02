@@ -1,6 +1,7 @@
 package state
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -56,13 +57,11 @@ type StateFile struct {
 }
 
 // fingerprintJSON is the JSON shape for Fingerprint. Files is rendered as a
-// JSON object keyed on relPath; we sort keys lexicographically when writing
-// so byte-output is stable across runs.
+// JSON object keyed on relPath; MarshalJSON sorts keys lexicographically so
+// byte-output is stable across runs.
 type fingerprintJSON struct {
-	SchemaVersion int                              `json:"schemaVersion"`
-	Files         map[string]fingerprintEntryJSON  `json:"files"`
-	rawOrderKeys  []string                         // populated on read for diagnostics; not serialized
-	_             struct{}                         // disable struct-equality
+	SchemaVersion int                             `json:"schemaVersion"`
+	Files         map[string]fingerprintEntryJSON `json:"files"`
 }
 
 type fingerprintEntryJSON struct {
@@ -84,33 +83,36 @@ type sourceFingerprintJSON struct {
 // MarshalJSON produces the canonical TS-compatible encoding of Fingerprint.
 // Files keys are sorted; entry fields are emitted in the canonical order
 // (size, mtimeMs, contentHash) matching JSON.stringify on the TS side.
+//
+// Uses encodeNoHTMLEscape for individual fields so a relPath containing `<`,
+// `>`, or `&` (legitimate in some paths under .claude/) round-trips
+// byte-identical to Node's JSON.stringify.
 func (f Fingerprint) MarshalJSON() ([]byte, error) {
 	keys := make([]string, 0, len(f.Files))
 	for k := range f.Files {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
-	// Build via json.Marshal of an ordered struct construction (we use
-	// json.RawMessage to preserve key order in the files object).
-	buf := []byte{'{'}
-	buf = append(buf, []byte(`"schemaVersion":`)...)
-	v, err := json.Marshal(f.SchemaVersion)
+	var buf bytes.Buffer
+	buf.WriteByte('{')
+	buf.WriteString(`"schemaVersion":`)
+	v, err := encodeNoHTMLEscape(f.SchemaVersion)
 	if err != nil {
 		return nil, err
 	}
-	buf = append(buf, v...)
-	buf = append(buf, []byte(`,"files":{`)...)
+	buf.Write(v)
+	buf.WriteString(`,"files":{`)
 	for i, k := range keys {
 		if i > 0 {
-			buf = append(buf, ',')
+			buf.WriteByte(',')
 		}
-		kj, err := json.Marshal(k)
+		kj, err := encodeNoHTMLEscape(k)
 		if err != nil {
 			return nil, err
 		}
-		buf = append(buf, kj...)
-		buf = append(buf, ':')
-		ej, err := json.Marshal(fingerprintEntryJSON{
+		buf.Write(kj)
+		buf.WriteByte(':')
+		ej, err := encodeNoHTMLEscape(fingerprintEntryJSON{
 			Size:        f.Files[k].Size,
 			MtimeMs:     f.Files[k].MtimeMs,
 			ContentHash: f.Files[k].ContentHash,
@@ -118,10 +120,30 @@ func (f Fingerprint) MarshalJSON() ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		buf = append(buf, ej...)
+		buf.Write(ej)
 	}
-	buf = append(buf, '}', '}')
-	return buf, nil
+	buf.WriteByte('}')
+	buf.WriteByte('}')
+	return buf.Bytes(), nil
+}
+
+// encodeNoHTMLEscape marshals v with HTML escaping disabled (so `<`/`>`/`&`
+// are preserved literal — matching Node's JSON.stringify default). The
+// encoder appends a trailing newline that we strip; the result is the
+// compact JSON form suitable for inline embedding.
+func encodeNoHTMLEscape(v interface{}) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(v); err != nil {
+		return nil, err
+	}
+	out := buf.Bytes()
+	// Encoder always emits a trailing '\n'; strip for inline use.
+	if len(out) > 0 && out[len(out)-1] == '\n' {
+		out = out[:len(out)-1]
+	}
+	return out, nil
 }
 
 // UnmarshalJSON parses the TS-compatible encoding of Fingerprint and
@@ -150,9 +172,11 @@ func (f *Fingerprint) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// MarshalJSON for SectionFingerprint emits {size,contentHash}.
+// MarshalJSON for SectionFingerprint emits {size,contentHash}. HTML escape
+// disabled for byte-identity with JSON.stringify (the contentHash is hex so
+// no special chars, but we keep the discipline uniform).
 func (s SectionFingerprint) MarshalJSON() ([]byte, error) {
-	return json.Marshal(sectionFingerprintJSON{
+	return encodeNoHTMLEscape(sectionFingerprintJSON{
 		Size:        s.Size,
 		ContentHash: s.ContentHash,
 	})
@@ -168,9 +192,11 @@ func (s *SectionFingerprint) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// MarshalJSON for SourceFingerprint emits {fileCount,aggregateHash}.
+// MarshalJSON for SourceFingerprint emits {fileCount,aggregateHash}. HTML
+// escape disabled for byte-identity discipline (the aggregateHash is hex but
+// we apply the rule uniformly to all custom marshallers).
 func (s SourceFingerprint) MarshalJSON() ([]byte, error) {
-	return json.Marshal(sourceFingerprintJSON{
+	return encodeNoHTMLEscape(sourceFingerprintJSON{
 		FileCount:     s.FileCount,
 		AggregateHash: s.AggregateHash,
 	})
@@ -272,10 +298,18 @@ func ReadStateFile(paths StatePaths) (ReadStateResult, error) {
 	// shape validation runs. A schema-too-new file may legitimately have
 	// fields the current code doesn't model; refusing up front avoids a
 	// confusing "missing field" error message that obscures the real cause.
+	//
+	// Decode as json.Number first (preserves arbitrary precision) and parse
+	// as float64 — so 2.0, 1e2, and integer-overflow forms all compare
+	// correctly against StateFileSchemaVersion. PR28 says "refuse on schema
+	// strictly greater"; a future bin's value of 2 must always lose to a
+	// strictly-greater check regardless of how the JSON was rendered.
 	var peek struct {
-		SchemaVersion json.RawMessage `json:"schemaVersion"`
+		SchemaVersion json.Number `json:"schemaVersion"`
 	}
-	if err := json.Unmarshal(raw, &peek); err != nil {
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.UseNumber()
+	if err := dec.Decode(&peek); err != nil {
 		return ReadStateResult{
 			State: DefaultState(),
 			Warning: &StateReadWarning{
@@ -285,13 +319,18 @@ func ReadStateFile(paths StatePaths) (ReadStateResult, error) {
 			},
 		}, nil
 	}
-	if len(peek.SchemaVersion) > 0 {
-		var v int
-		if err := json.Unmarshal(peek.SchemaVersion, &v); err == nil {
-			if v > StateFileSchemaVersion {
+	if peek.SchemaVersion != "" {
+		// json.Number.Float64 accepts 2, 2.0, 1e2 — anything JSON.parse on
+		// the JS side would interpret as a number. We round to the nearest
+		// integer for the comparison (0.5 isn't a valid version anyway, but
+		// fractional versions in this slot would surface as a SchemaMismatch
+		// downstream).
+		if v, err := peek.SchemaVersion.Float64(); err == nil {
+			onDisk := int(v)
+			if v > float64(StateFileSchemaVersion) {
 				return ReadStateResult{}, &SchemaTooNewError{
 					Path:        paths.StateFile,
-					OnDisk:      v,
+					OnDisk:      onDisk,
 					BinMaxKnown: StateFileSchemaVersion,
 				}
 			}
@@ -489,17 +528,13 @@ func validateStateShape(raw []byte, path string) (StateFile, *StateReadWarning) 
 //
 // Order: schemaVersion, activeProfile, materializedAt, resolvedSources,
 // fingerprint, externalTrustNotices, rootClaudeMdSection, sourceFingerprint.
+//
+// Uses encodeNoHTMLEscape for inner field rendering so a profile name or
+// external path containing `<`, `>`, `&` round-trips byte-identical to JS
+// (Go's default Marshal escapes those to \u00XX). The encoder-with-
+// SetEscapeHTML-false path on the OUTER encoder doesn't help here because
+// our MarshalJSON's return value is inserted verbatim by the encoder.
 func (s StateFile) MarshalJSON() ([]byte, error) {
-	type alias struct {
-		SchemaVersion        int                   `json:"schemaVersion"`
-		ActiveProfile        *string               `json:"activeProfile"`
-		MaterializedAt       *string               `json:"materializedAt"`
-		ResolvedSources      []ResolvedSourceRef   `json:"resolvedSources"`
-		Fingerprint          Fingerprint           `json:"fingerprint"`
-		ExternalTrustNotices []ExternalTrustNotice `json:"externalTrustNotices"`
-		RootClaudeMdSection  *SectionFingerprint   `json:"rootClaudeMdSection"`
-		SourceFingerprint    *SourceFingerprint    `json:"sourceFingerprint"`
-	}
 	rs := s.ResolvedSources
 	if rs == nil {
 		rs = []ResolvedSourceRef{}
@@ -511,16 +546,42 @@ func (s StateFile) MarshalJSON() ([]byte, error) {
 	if s.Fingerprint.Files == nil {
 		s.Fingerprint.Files = map[string]FingerprintEntry{}
 	}
-	return json.Marshal(alias{
-		SchemaVersion:        s.SchemaVersion,
-		ActiveProfile:        s.ActiveProfile,
-		MaterializedAt:       s.MaterializedAt,
-		ResolvedSources:      rs,
-		Fingerprint:          s.Fingerprint,
-		ExternalTrustNotices: etn,
-		RootClaudeMdSection:  s.RootClaudeMdSection,
-		SourceFingerprint:    s.SourceFingerprint,
-	})
+
+	type field struct {
+		name string
+		v    interface{}
+	}
+	fields := []field{
+		{"schemaVersion", s.SchemaVersion},
+		{"activeProfile", s.ActiveProfile},
+		{"materializedAt", s.MaterializedAt},
+		{"resolvedSources", rs},
+		{"fingerprint", s.Fingerprint},
+		{"externalTrustNotices", etn},
+		{"rootClaudeMdSection", s.RootClaudeMdSection},
+		{"sourceFingerprint", s.SourceFingerprint},
+	}
+
+	var buf bytes.Buffer
+	buf.WriteByte('{')
+	for i, f := range fields {
+		if i > 0 {
+			buf.WriteByte(',')
+		}
+		nameJSON, err := encodeNoHTMLEscape(f.name)
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(nameJSON)
+		buf.WriteByte(':')
+		valueJSON, err := encodeNoHTMLEscape(f.v)
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(valueJSON)
+	}
+	buf.WriteByte('}')
+	return buf.Bytes(), nil
 }
 
 // WriteStateFile atomically writes state.json (R14a). Ensures .meta/tmp/
@@ -546,13 +607,22 @@ func WriteStateFile(paths StatePaths, state StateFile) error {
 // MarshalStateFileJSON returns the on-disk byte form of state.json. Exposed
 // for byte-identity tests and for any caller that wants to hash the canonical
 // form without going through disk.
+//
+// Uses json.Encoder with SetEscapeHTML(false) so output matches Node's
+// JSON.stringify byte-for-byte: Go's default encoder escapes <, >, & to
+// </>/&, while JS does not. The cross-language IV gate
+// requires byte-identity for any path/profile name containing those bytes.
+//
+// json.Encoder.Encode appends a trailing newline already; we don't add one.
 func MarshalStateFileJSON(state StateFile) ([]byte, error) {
-	out, err := json.MarshalIndent(state, "", "  ")
-	if err != nil {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(state); err != nil {
 		return nil, err
 	}
-	out = append(out, '\n')
-	return out, nil
+	return buf.Bytes(), nil
 }
 
 // FormatTimestamp produces a 3-decimal Z-suffixed ISO-8601 timestamp matching

@@ -86,6 +86,28 @@ func ReconcilePendingPrior(target, pendingDir, priorDir, targetLabel string) (Re
 			}
 		}
 		if err := AtomicRename(priorDir, target); err != nil {
+			// Restore failure: the canonical target is now absent and we
+			// hold scratch (the original live bytes). PR1 invariant is
+			// "live target is the last successful state"; if we return now
+			// without restoring scratch back to target, the user is left
+			// with a missing live tree AND a `.reconcile-*` dir that they
+			// must rename by hand. Try to restore — best-effort, since the
+			// underlying rename failure is real (FS error, permissions),
+			// the same syscall back may also fail.
+			if scratch != "" {
+				if restoreErr := AtomicRename(scratch, target); restoreErr != nil {
+					// Both renames failed. Surface both errors together so
+					// the operator can diagnose; the original prior-restore
+					// error is the primary because that's the unrecoverable
+					// step. Scratch is left in place — the user can rescue
+					// the bytes manually from `.reconcile-*`.
+					return ReconcileOutcome{}, fmt.Errorf("reconcile rename prior back to target: %w (scratch restore also failed: %v; live bytes preserved at %q for manual recovery)", err, restoreErr, scratch)
+				}
+				// Scratch restored to target. Live tree is back to its
+				// original state; .prior/ is still on disk; surface the
+				// original error so the operator can investigate the
+				// underlying FS fault before retrying.
+			}
 			return ReconcileOutcome{}, fmt.Errorf("reconcile rename prior back to target: %w", err)
 		}
 		if scratch != "" {
