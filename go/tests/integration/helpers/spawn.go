@@ -99,7 +99,7 @@ func CleanupBuiltBin() {
 // build because integration tests must run against the source tree, not a
 // stale `go install` artifact in $GOBIN.
 func buildBin() (string, error) {
-	module, err := findModuleRoot()
+	module, err := FindModuleRoot()
 	if err != nil {
 		return "", err
 	}
@@ -118,9 +118,12 @@ func buildBin() (string, error) {
 	return out, nil
 }
 
-// findModuleRoot walks up from the test source file's directory until it
+// FindModuleRoot walks up from the test source file's directory until it
 // finds a go.mod. Tests can run from any cwd, so os.Getwd() is unreliable.
-func findModuleRoot() (string, error) {
+// Exported so other tests in this directory (e.g. perf_test.go) can reuse
+// it instead of reimplementing the walk and drifting from the canonical
+// behavior.
+func FindModuleRoot() (string, error) {
 	_, file, _, ok := runtime.Caller(0)
 	if !ok {
 		return "", errors.New("runtime.Caller failed")

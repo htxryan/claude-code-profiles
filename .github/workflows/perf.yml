@@ -5,7 +5,8 @@ name: Perf
 # CI on every PR (.github/workflows/ci.yml::go) runs perf_test.go::TestBinarySize
 # and perf_test.go::TestLargeProfile because both are deterministic enough to
 # fire on per-PR cadence (size is byte-equal across runs; large-profile has a
-# 5 s budget that's well above CI variance on linux/darwin).
+# 7 s platform-class CI budget — vs 5 s on dev hardware — that absorbs typical
+# noisy-neighbour fsync variance on linux/darwin).
 #
 # perf_test.go::TestColdStart is gated behind C3P_PERF_COLDSTART=1 and skipped
 # on the standard go test invocation. This workflow opts in to that gate via
@@ -32,6 +33,11 @@ jobs:
   cold-start:
     name: cold-start (mean-of-middle-8)
     runs-on: ubuntu-latest
+    # 10 min cap is well above the expected ~1 s build + 10 spawns.
+    # Without an explicit cap the GitHub Actions default is 6 hours, so a
+    # hung `go build` (module fetch stall, toolchain bug) would silently
+    # burn the nightly slot. Set tight enough that a hang fails fast.
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v6
