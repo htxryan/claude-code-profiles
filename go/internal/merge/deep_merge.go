@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"strconv"
 	"strings"
 
 	pipelineerrors "github.com/htxryan/c3p/internal/errors"
@@ -33,8 +32,10 @@ import (
 //     contributor inputs (load-bearing for R18 drift content-hash gates).
 //   - Numbers are parsed as float64 (mirroring JSON.parse), so `1.0` →
 //     `1`, integers above 2^53 lose precision the same way they would in
-//     TS. Numbers serialize via `strconv.FormatFloat(_, 'g', -1, 64)` with
-//     JS-style exponent normalization (no zero-padded exponent).
+//     TS. Numbers serialize via `encoding/json`, which already implements
+//     ES6's fixed-vs-exponent rule (fixed in [1e-6, 1e21), exponential
+//     outside) and de-pads exponents — matching JS Number.prototype
+//     .toString byte-for-byte.
 //
 // Empty / whitespace-only contributors parse to an empty object — they
 // add nothing semantically but are retained in `Contributors` for E5
@@ -248,26 +249,28 @@ func encodeJSONValue(buf *bytes.Buffer, v any, indent int) error {
 	case string:
 		writeJSONString(buf, t)
 	case []any:
-		encodeJSONArray(buf, t, indent)
+		return encodeJSONArray(buf, t, indent)
 	case *orderedObject:
-		encodeJSONObject(buf, t, indent)
+		return encodeJSONObject(buf, t, indent)
 	default:
 		return fmt.Errorf("unsupported value type %T", v)
 	}
 	return nil
 }
 
-func encodeJSONArray(buf *bytes.Buffer, arr []any, indent int) {
+func encodeJSONArray(buf *bytes.Buffer, arr []any, indent int) error {
 	if len(arr) == 0 {
 		buf.WriteString("[]")
-		return
+		return nil
 	}
 	pad := strings.Repeat("  ", indent)
 	childPad := strings.Repeat("  ", indent+1)
 	buf.WriteString("[\n")
 	for i, el := range arr {
 		buf.WriteString(childPad)
-		_ = encodeJSONValue(buf, el, indent+1)
+		if err := encodeJSONValue(buf, el, indent+1); err != nil {
+			return err
+		}
 		if i < len(arr)-1 {
 			buf.WriteByte(',')
 		}
@@ -275,12 +278,13 @@ func encodeJSONArray(buf *bytes.Buffer, arr []any, indent int) {
 	}
 	buf.WriteString(pad)
 	buf.WriteByte(']')
+	return nil
 }
 
-func encodeJSONObject(buf *bytes.Buffer, obj *orderedObject, indent int) {
+func encodeJSONObject(buf *bytes.Buffer, obj *orderedObject, indent int) error {
 	if len(obj.keys) == 0 {
 		buf.WriteString("{}")
-		return
+		return nil
 	}
 	pad := strings.Repeat("  ", indent)
 	childPad := strings.Repeat("  ", indent+1)
@@ -289,7 +293,9 @@ func encodeJSONObject(buf *bytes.Buffer, obj *orderedObject, indent int) {
 		buf.WriteString(childPad)
 		writeJSONString(buf, k)
 		buf.WriteString(": ")
-		_ = encodeJSONValue(buf, obj.values[k], indent+1)
+		if err := encodeJSONValue(buf, obj.values[k], indent+1); err != nil {
+			return err
+		}
 		if i < len(obj.keys)-1 {
 			buf.WriteByte(',')
 		}
@@ -297,6 +303,7 @@ func encodeJSONObject(buf *bytes.Buffer, obj *orderedObject, indent int) {
 	}
 	buf.WriteString(pad)
 	buf.WriteByte('}')
+	return nil
 }
 
 // writeJSONString writes a JSON-escaped string. Uses encoding/json with
@@ -322,6 +329,12 @@ func writeJSONString(buf *bytes.Buffer, s string) {
 // formatJSNumber formats a float64 the way JS Number.prototype.toString
 // (and therefore JSON.stringify) does. NaN / +Inf / -Inf serialize as
 // "null" per the JSON.stringify spec.
+//
+// Go's `encoding/json` already implements the ES6 fixed-vs-exponent rule
+// (fixed in [1e-6, 1e21), exponential outside) and de-pads exponents
+// (e.g. `1e-07` → `1e-7`), so json.Marshal gives full byte parity with
+// JS for all finite floats. We short-circuit NaN/Inf (json.Marshal would
+// error) and -0 (json.Marshal preserves the sign; JS collapses to "0").
 func formatJSNumber(f float64) string {
 	if math.IsNaN(f) || math.IsInf(f, 0) {
 		return "null"
@@ -329,31 +342,13 @@ func formatJSNumber(f float64) string {
 	if f == 0 {
 		return "0" // collapse -0 → "0" like JS
 	}
-	s := strconv.FormatFloat(f, 'g', -1, 64)
-	return normalizeJSExponent(s)
-}
-
-// normalizeJSExponent strips Go's zero-padded exponent so the result
-// matches JS's representation (e.g. `1e-07` → `1e-7`, `1e+21` → `1e+21`).
-func normalizeJSExponent(s string) string {
-	idx := strings.IndexByte(s, 'e')
-	if idx < 0 {
-		return s
+	b, err := json.Marshal(f)
+	if err != nil {
+		// Unreachable: NaN/Inf are the only errors json.Marshal returns
+		// for float64, and we handled them above.
+		return "null"
 	}
-	mantissa := s[:idx]
-	exp := s[idx+1:]
-	sign := "+"
-	if len(exp) > 0 && (exp[0] == '+' || exp[0] == '-') {
-		if exp[0] == '-' {
-			sign = "-"
-		}
-		exp = exp[1:]
-	}
-	exp = strings.TrimLeft(exp, "0")
-	if exp == "" {
-		exp = "0"
-	}
-	return mantissa + "e" + sign + exp
+	return string(b)
 }
 
 // ─── clone helpers ──────────────────────────────────────────────────────

@@ -75,3 +75,21 @@ func TestLastWinsStrategy_NoInputsErrors(t *testing.T) {
 		t.Fatal("want error for empty inputs, got nil")
 	}
 }
+
+// A zero-byte winner must still produce a valid result with empty bytes
+// and the winner in provenance — distinct from "no inputs" (which errors).
+func TestLastWinsStrategy_ZeroByteWinner(t *testing.T) {
+	r, err := LastWinsStrategy("plugin.json", []ContributorBytes{
+		{ID: "a", Bytes: []byte("from-a\n")},
+		{ID: "empty", Bytes: []byte{}},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(r.Bytes) != 0 {
+		t.Fatalf("bytes: want empty, got %q", string(r.Bytes))
+	}
+	if len(r.Contributors) != 1 || r.Contributors[0] != "empty" {
+		t.Fatalf("contributors: want [empty], got %v", r.Contributors)
+	}
+}

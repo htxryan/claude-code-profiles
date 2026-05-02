@@ -195,17 +195,63 @@ func TestDeepMerge_PreservesKeyInsertionOrder(t *testing.T) {
 
 // Numbers must round-trip through float64 (mirroring JS JSON.parse), so
 // `1.0` collapses to `1` and the result matches TS byte-for-byte.
+//
+// Covers all four bands of JS's fixed-vs-exponent rule (ES6 §6.1.6.1.13):
+// fixed in [1e-6, 1e21), exponential outside. Settings.json values like
+// millisecond timestamps and byte sizes routinely fall in the fixed band
+// well past 1e6, so the band must be exercised concretely — not just at
+// the boundaries.
 func TestDeepMerge_NumbersFloat64Parity(t *testing.T) {
 	r, err := DeepMergeStrategy("settings.json", []ContributorBytes{
-		{ID: "a", Bytes: []byte(`{"int":1,"frac":1.0,"big":1e21,"small":1e-7,"neg":-0}`)},
+		{ID: "a", Bytes: []byte(`{` +
+			// Integers and small fractions (fixed band).
+			`"int":1,"frac":1.0,` +
+			// Fixed band (>= 1, < 1e21) — these are where Go's 'g' verb
+			// would have flipped to exponent notation but JS stays fixed.
+			`"e6":1000000,"e7":10000000,"e15":1000000000000000,` +
+			`"midFracBig":1234567890.123,` +
+			// Fixed band (< 1, >= 1e-6).
+			`"e-5":0.00001,"e-6":0.000001,` +
+			// Boundary cases — exponent on the way out.
+			`"big":1e21,"small":1e-7,` +
+			// Negative zero collapses to "0".
+			`"neg":-0` +
+			`}`)},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	got := string(r.Bytes)
-	want := "{\n  \"int\": 1,\n  \"frac\": 1,\n  \"big\": 1e+21,\n  \"small\": 1e-7,\n  \"neg\": 0\n}\n"
+	want := "{\n" +
+		"  \"int\": 1,\n" +
+		"  \"frac\": 1,\n" +
+		"  \"e6\": 1000000,\n" +
+		"  \"e7\": 10000000,\n" +
+		"  \"e15\": 1000000000000000,\n" +
+		"  \"midFracBig\": 1234567890.123,\n" +
+		"  \"e-5\": 0.00001,\n" +
+		"  \"e-6\": 0.000001,\n" +
+		"  \"big\": 1e+21,\n" +
+		"  \"small\": 1e-7,\n" +
+		"  \"neg\": 0\n" +
+		"}\n"
 	if got != want {
 		t.Fatalf("number parity broken.\n want: %q\n  got: %q", want, got)
+	}
+}
+
+// Single-input deep-merge: provenance must list exactly the sole
+// contributor so downstream E5 attribution does not drop or duplicate
+// the entry on degenerate chains.
+func TestDeepMerge_SingleInputContributorProvenance(t *testing.T) {
+	r, err := DeepMergeStrategy("settings.json", []ContributorBytes{
+		{ID: "solo", Bytes: []byte(`{"a":1}`)},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(r.Contributors) != 1 || r.Contributors[0] != "solo" {
+		t.Fatalf("contributors: want [solo], got %v", r.Contributors)
 	}
 }
 
