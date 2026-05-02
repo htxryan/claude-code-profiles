@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"os"
 	"testing"
 
 	"github.com/htxryan/c3p/internal/drift"
@@ -112,9 +111,7 @@ func TestParseDiffPositionals(t *testing.T) {
 }
 
 func TestParseCIEnvAutoDetect(t *testing.T) {
-	prev := os.Getenv("CI")
-	os.Setenv("CI", "true")
-	defer os.Setenv("CI", prev)
+	t.Setenv("CI", "true")
 	r := ParseArgs([]string{"list"}, "/")
 	if !r.Ok || !r.Invocation.Global.NonInteractive {
 		t.Fatalf("CI=true should set NonInteractive: %+v", r)

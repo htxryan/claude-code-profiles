@@ -21,7 +21,9 @@ import (
 )
 
 // Marshal returns the canonical wire bytes for a CLI envelope. Output is the
-// compact form WITHOUT a trailing newline; callers (output.JSON()) append the
+// compact form WITH a single trailing newline (json.Encoder.Encode appends
+// one and we keep it intact, so the result is "<compact JSON>\n"). Callers
+// (output.JSON()) write these bytes verbatim and MUST NOT append a second
 // newline. Errors propagate from the encoder — JSON marshal failures are
 // programmer errors and the CLI surfaces them via the OutputChannel.
 func Marshal(payload interface{}) ([]byte, error) {
@@ -31,15 +33,13 @@ func Marshal(payload interface{}) ([]byte, error) {
 	if err := enc.Encode(payload); err != nil {
 		return nil, err
 	}
-	out := buf.Bytes()
-	// json.Encoder.Encode appends a trailing newline; the line-form we want
-	// is "<compact JSON>\n", so we keep that newline intact.
-	return out, nil
+	return buf.Bytes(), nil
 }
 
-// MarshalLine is a convenience that returns the marshaled bytes already
-// terminated with a single \n. It exists so the OutputChannel never appends
-// a second newline by mistake (json.Encoder.Encode adds one already).
+// MarshalLine is currently an alias for Marshal — both already include the
+// terminating "\n" because json.Encoder.Encode appends one. Kept as a
+// distinct entry point for callers that want to make the line-terminated
+// contract explicit at the call site.
 func MarshalLine(payload interface{}) ([]byte, error) {
 	return Marshal(payload)
 }

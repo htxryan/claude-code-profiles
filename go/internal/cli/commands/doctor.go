@@ -215,8 +215,22 @@ func checkBackupRetention(paths state.StatePaths) doctorCheck {
 	c := doctorCheck{ID: "backup-retention", Label: "backup count <= 5"}
 	snaps, err := state.ListSnapshots(paths)
 	if err != nil {
+		// state.ListSnapshots returns (nil, nil) for a missing backup
+		// directory; an actual error means a real IO/permission fault and
+		// must be surfaced rather than masked as "no backups yet."
+		if errors.Is(err, os.ErrNotExist) {
+			c.Status = doctorOk
+			c.Detail = "no backup directory yet"
+			return c
+		}
+		c.Status = doctorFail
+		c.Detail = err.Error()
+		c.Remediation = "check filesystem permissions on the backup directory"
+		return c
+	}
+	if len(snaps) == 0 {
 		c.Status = doctorOk
-		c.Detail = "no backup directory yet"
+		c.Detail = "no backups yet"
 		return c
 	}
 	if len(snaps) > 5 {

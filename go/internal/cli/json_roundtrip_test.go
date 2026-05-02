@@ -85,9 +85,14 @@ func TestJSONEnvelopeIsSingleLine(t *testing.T) {
 // doesn't poison test scenarios that depend on TTY mode.
 func runCLI(t *testing.T, args ...string) (string, string, int) {
 	t.Helper()
-	prev := os.Getenv("CI")
-	os.Unsetenv("CI")
-	defer os.Setenv("CI", prev)
+	// t.Setenv("CI", "") records the prior value for restoration; we then
+	// Unsetenv to actually remove the var (auto-detection treats
+	// CI=="true" specially, so an empty CI is also fine, but Unsetenv is
+	// what matches the no-CI production scenario).
+	t.Setenv("CI", "")
+	if err := os.Unsetenv("CI"); err != nil {
+		t.Fatalf("unset CI: %v", err)
+	}
 	var stdout, stderr bytes.Buffer
 	code := Run(args, "0.0.0-test", &stdout, &stderr)
 	return stdout.String(), stderr.String(), code

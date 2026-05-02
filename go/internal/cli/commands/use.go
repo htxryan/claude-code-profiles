@@ -118,8 +118,11 @@ func reportSwapError(output OutputChannel, err error, target string, result serv
 		}
 		return 1, sa
 	}
-	// All other errors propagate verbatim — CLI Run() formats and exits.
-	return 0, err
+	// All other errors propagate verbatim. cli.Run() ignores the int when
+	// err is non-nil and routes through ExitCodeFor(err) to compute the
+	// real exit code; we still return a non-zero placeholder so any future
+	// caller that uses the int directly can't read it as success.
+	return 1, err
 }
 
 func enrichMissingProfile(err *pipelineerrors.MissingProfileError, projectRoot string) error {

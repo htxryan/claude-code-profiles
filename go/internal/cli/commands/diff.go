@@ -37,13 +37,17 @@ func RunDiff(opts DiffOptions) (int, error) {
 		bName = *st.State.ActiveProfile
 	}
 
+	// On resolve/merge failure we return a non-zero placeholder; cli.Run
+	// ignores it and routes through ExitCodeFor(err) for the real code,
+	// but we still avoid signalling success in case a future caller reads
+	// the int directly. (Matches status.go / drift.go convention.)
 	aMerged, err := resolveAndMerge(opts.A, opts.Cwd)
 	if err != nil {
-		return 0, err
+		return 2, err
 	}
 	bMerged, err := resolveAndMerge(bName, opts.Cwd)
 	if err != nil {
-		return 0, err
+		return 2, err
 	}
 
 	files := compareFileSets(aMerged, bMerged)

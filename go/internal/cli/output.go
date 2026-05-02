@@ -6,6 +6,7 @@
 package cli
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"runtime"
@@ -129,7 +130,8 @@ func writeSafe(w io.Writer, s string) {
 
 // escapeJSONString does just enough escaping for the json-serialize-failed
 // fallback to remain valid JSON when the error message contains a backslash
-// or quote. Imperfect for non-ASCII but never invoked in production paths.
+// or quote. Control chars below 0x20 are encoded as \uXXXX (JSON requires
+// them to be escaped — silently dropping would produce malformed JSON).
 func escapeJSONString(s string) string {
 	var b strings.Builder
 	for _, r := range s {
@@ -146,6 +148,7 @@ func escapeJSONString(s string) string {
 			b.WriteString(`\t`)
 		default:
 			if r < 0x20 {
+				fmt.Fprintf(&b, `\u%04x`, r)
 				continue
 			}
 			b.WriteRune(r)

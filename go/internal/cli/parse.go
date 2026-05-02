@@ -15,6 +15,7 @@ package cli
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -125,7 +126,7 @@ func ParseArgs(argv []string, defaultCwd string) ParseResult {
 			if err != nil || seconds < 0 {
 				return errResult(fmt.Sprintf(`--wait must be a non-negative number of seconds; got %q`, v), false)
 			}
-			g.WaitMs = int64(seconds*1000 + 0.5)
+			g.WaitMs = int64(math.Round(seconds * 1000))
 			g.WaitSet = true
 		case t == "--non-interactive":
 			g.NonInteractive = true

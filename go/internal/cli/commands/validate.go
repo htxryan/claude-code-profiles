@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	pipelineerrors "github.com/htxryan/c3p/internal/errors"
 	"github.com/htxryan/c3p/internal/merge"
@@ -183,18 +184,9 @@ func parseRootMarkers(content string) bool {
 }
 
 func containsMarker(s, suffix string) bool {
-	idx := indexSubstring(s, "<!-- c3p:v")
+	idx := strings.Index(s, "<!-- c3p:v")
 	if idx < 0 {
 		return false
 	}
-	return indexSubstring(s[idx:], suffix) >= 0
-}
-
-func indexSubstring(s, needle string) int {
-	for i := 0; i+len(needle) <= len(s); i++ {
-		if s[i:i+len(needle)] == needle {
-			return i
-		}
-	}
-	return -1
+	return strings.Index(s[idx:], suffix) >= 0
 }

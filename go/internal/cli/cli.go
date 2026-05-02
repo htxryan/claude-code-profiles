@@ -10,8 +10,6 @@ import (
 	"errors"
 	"io"
 	"os"
-
-	pipelineerrors "github.com/htxryan/c3p/internal/errors"
 )
 
 // Run is the testable entrypoint: argv (without the binary name), version,
@@ -52,19 +50,13 @@ func Run(argv []string, version string, stdout, stderr io.Writer) int {
 	if err != nil {
 		// Suppress duplicate emission of CliUserError messages — the
 		// orchestrator/handler may have already written user-facing text.
-		// Pipeline errors from the resolver/merge layer haven't been
-		// formatted yet, so we surface them here for visibility.
+		// Pipeline errors from the resolver/merge layer print via the
+		// generic branch above (CliUserError doesn't wrap them).
 		var cue *CliUserError
 		if !errors.As(err, &cue) {
 			output.Error("c3p: " + err.Error())
 		} else if cue.Message != "" {
 			output.Error("c3p: " + cue.Message)
-		}
-		// Pipeline errors print regardless of CliUserError.
-		var pe pipelineerrors.PipelineError
-		if errors.As(err, &pe) && cue == nil {
-			// already printed above
-			_ = pe
 		}
 		return ExitCodeFor(err)
 	}

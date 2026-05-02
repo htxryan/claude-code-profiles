@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/htxryan/c3p/internal/markers"
 	"github.com/htxryan/c3p/internal/resolver"
@@ -32,10 +33,16 @@ func RunInit(opts InitOptions) (int, error) {
 		return 2, err
 	} else if existsAlready {
 		// Allow the case where the dir exists but is empty.
-		entries, _ := os.ReadDir(paths.ProfilesDir)
+		// .meta is the bookkeeping subdir (not a profile); both it and any
+		// other dotfile entry are excluded by HasPrefix(".") alone — no
+		// need for an explicit ".meta" branch.
+		entries, readErr := os.ReadDir(paths.ProfilesDir)
+		if readErr != nil {
+			return 2, readErr
+		}
 		nonHidden := 0
 		for _, e := range entries {
-			if e.Name()[0] != '.' && e.Name() != ".meta" {
+			if !strings.HasPrefix(e.Name(), ".") {
 				nonHidden++
 			}
 		}

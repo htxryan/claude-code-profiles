@@ -203,12 +203,22 @@ func RunSwap(opts SwapOptions) (SwapResult, error) {
 			OnDriftFlag: opts.OnDriftFlag,
 		})
 		groundChoice := groundOutcome.Choice
-		// PR24 (drift snapshot immutability): if the user has already
-		// picked a choice in the outside-lock prompt, honour that even if
-		// ground says no-drift (e.g. a concurrent sync cleaned the tree
-		// while we were prompting). The user-authorised action wins.
-		if groundOutcome.Kind == drift.GateOutcomePrompt {
+		// PR24 (drift snapshot immutability): the user's outside-lock
+		// answer must survive a ground re-decide.
+		//   - outside.Kind == Prompt → user was actually shown a prompt
+		//     and picked discard/persist/abort. Honour that even if ground
+		//     now says no-drift (a concurrent sync cleaned the tree while
+		//     we were prompting). The user-authorised action wins.
+		//   - outside.Kind == NoDrift but ground.Kind == Prompt → drift
+		//     appeared in the gap between detect-outside and lock acquire.
+		//     The user was NOT prompted (we never showed them this drift),
+		//     so applying the no-drift "proceed" path would silently
+		//     destroy the new drift without a backup. Auto-abort instead.
+		if outcome.Kind == drift.GateOutcomePrompt {
 			groundChoice = choice
+		} else if outcome.Kind == drift.GateOutcomeNoDrift && groundOutcome.Kind == drift.GateOutcomePrompt {
+			result.Action = drift.ApplyActionAborted
+			return newSwapAbortError("drift appeared between pre-lock check and lock acquire; aborting to preserve uncommitted edits — re-run the swap (you'll see the drift gate)")
 		}
 		if groundChoice == drift.GateChoiceAbort {
 			result.Action = drift.ApplyActionAborted

@@ -28,6 +28,7 @@ GLOBAL OPTIONS
   --quiet, -q              silence human output; preserves errors + exit codes (mutually exclusive with --json)
   --cwd=<path>             project root (default: current working dir)
   --on-drift=<choice>      discard|persist|abort — required for non-TTY swap with drift
+  --non-interactive        force non-interactive mode (auto-set when CI=true)
   --wait[=<seconds>]       poll a held lock instead of failing fast (default 30s)
   --no-color               disable colour output (additive with NO_COLOR env)
   --help, -h               this message; "c3p <verb> --help" for verb-specific help
@@ -67,6 +68,7 @@ var commonGlobals = []string{
 
 var swapGlobals = append([]string{}, append(commonGlobals,
 	"--on-drift=<v>   discard|persist|abort (required in non-TTY when drift exists)",
+	"--non-interactive  force non-interactive mode (CI=true auto-detects)",
 	"--wait[=<sec>]   poll a held lock with backoff instead of failing fast (default 30s)",
 )...)
 

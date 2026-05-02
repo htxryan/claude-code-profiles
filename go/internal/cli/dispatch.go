@@ -135,7 +135,7 @@ func Dispatch(inv ParsedInvocation, ctx DispatchContext) (int, error) {
 			WaitMs:         g.WaitMs,
 			PromptIn:       os.Stdin,
 			PromptOut:      os.Stderr,
-			PromptFunc:     defaultPromptFunc(g.NoColor),
+			PromptFunc:     defaultPromptFunc(),
 		})
 
 	case KindSync:
@@ -149,7 +149,7 @@ func Dispatch(inv ParsedInvocation, ctx DispatchContext) (int, error) {
 			WaitMs:         g.WaitMs,
 			PromptIn:       os.Stdin,
 			PromptOut:      os.Stderr,
-			PromptFunc:     defaultPromptFunc(g.NoColor),
+			PromptFunc:     defaultPromptFunc(),
 		})
 
 	case KindInit:
@@ -192,8 +192,10 @@ func Dispatch(inv ParsedInvocation, ctx DispatchContext) (int, error) {
 
 // defaultPromptFunc returns a closure that drives the interactive prompt
 // against os.Stdin/os.Stderr. Returns nil for non-TTY contexts so the
-// orchestrator's defensive abort-fallback kicks in.
-func defaultPromptFunc(_ bool) func() drift.GateChoice {
+// orchestrator's defensive abort-fallback kicks in. Colour decisions are
+// made inside PromptGateChoice from its own io context, so noColor is not
+// threaded here.
+func defaultPromptFunc() func() drift.GateChoice {
 	return func() drift.GateChoice {
 		return PromptGateChoice(GatePromptOptions{
 			In:  os.Stdin,

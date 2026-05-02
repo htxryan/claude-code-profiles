@@ -35,7 +35,7 @@ _c3p_complete() {
   local prev=${COMP_WORDS[COMP_CWORD-1]}
   local verbs="init list use status drift diff new validate sync hook doctor completions help"
   case "$prev" in
-    use|diff|sync|validate)
+    use|diff|validate)
       if [ -d ".claude-profiles" ]; then
         COMPREPLY=( $(compgen -W "$(ls .claude-profiles 2>/dev/null | grep -v '^\\.\\|^_')" -- "$cur") )
         return 0
@@ -67,7 +67,7 @@ _c3p() {
     verb) _describe 'command' verbs ;;
     args)
       case $words[2] in
-        use|diff|sync|validate)
+        use|diff|validate)
           if [ -d .claude-profiles ]; then
             local -a profiles
             profiles=(${(f)"$(ls .claude-profiles 2>/dev/null | grep -v '^\.\|^_')"})
@@ -90,7 +90,7 @@ function __c3p_profiles
   end
 end
 complete -c c3p -n '__fish_use_subcommand' -a 'init list use status drift diff new validate sync hook doctor completions help'
-complete -c c3p -n '__fish_seen_subcommand_from use diff sync validate' -a '(__c3p_profiles)'
+complete -c c3p -n '__fish_seen_subcommand_from use diff validate' -a '(__c3p_profiles)'
 complete -c c3p -n '__fish_seen_subcommand_from hook' -a 'install uninstall'
 complete -c c3p -n '__fish_seen_subcommand_from completions' -a 'bash zsh fish'
 complete -c c3p -l json

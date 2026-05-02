@@ -4,6 +4,7 @@
 package cli
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"strings"
@@ -25,28 +26,35 @@ func IsBinary(data []byte) bool {
 // RenderHeadPreview returns the first PreviewMaxLines of data prefixed with
 // the given marker (e.g. "+ " for added, "- " for deleted). Long lines are
 // truncated to 200 chars to keep terminal output bounded.
+//
+// We use a bufio.Scanner and stop after PreviewMaxLines so a 50 MB added
+// file doesn't allocate ~150 MB just to print 20 lines.
 func RenderHeadPreview(data []byte, marker string) string {
 	if IsBinary(data) {
 		return "  (binary file omitted)"
 	}
-	lines := strings.SplitAfter(string(data), "\n")
-	if len(lines) > PreviewMaxLines {
-		lines = lines[:PreviewMaxLines]
-	}
+	scanner := bufio.NewScanner(bytes.NewReader(data))
+	// Cap any single line to a generous 1 MiB so absurdly long lines don't
+	// blow the default 64 KiB scanner buffer mid-preview.
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	var b strings.Builder
-	for _, ln := range lines {
-		hadNewline := strings.HasSuffix(ln, "\n")
-		if hadNewline {
-			ln = strings.TrimSuffix(ln, "\n")
+	count := 0
+	truncated := false
+	for scanner.Scan() {
+		if count >= PreviewMaxLines {
+			truncated = true
+			break
 		}
+		ln := scanner.Text()
 		if len(ln) > 200 {
 			ln = ln[:200] + "…"
 		}
 		b.WriteString(marker)
 		b.WriteString(ln)
 		b.WriteByte('\n')
+		count++
 	}
-	if len(lines) == PreviewMaxLines {
+	if truncated {
 		b.WriteString("  …\n")
 	}
 	return strings.TrimRight(b.String(), "\n")

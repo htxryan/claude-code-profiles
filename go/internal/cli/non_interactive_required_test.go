@@ -16,9 +16,12 @@ import (
 // Setup: init + use to materialize, then mutate live .claude/ to create
 // drift, then re-run `use` with --non-interactive (no --on-drift=).
 func TestNonInteractiveRequiresOnDriftWhenDrifted(t *testing.T) {
-	prev := os.Getenv("CI")
-	os.Unsetenv("CI")
-	defer os.Setenv("CI", prev)
+	// Use t.Setenv + Unsetenv after — t.Setenv records the prior value and
+	// restores it (Unsetenv when it was originally unset, Setenv otherwise).
+	t.Setenv("CI", "")
+	if err := os.Unsetenv("CI"); err != nil {
+		t.Fatalf("unset CI: %v", err)
+	}
 
 	tmp := t.TempDir()
 
@@ -58,9 +61,7 @@ func TestNonInteractiveRequiresOnDriftWhenDrifted(t *testing.T) {
 // TestCIEnvAutoDetectsNonInteractive is PR29's env-detection arm: CI=true
 // in the env should trigger the same hard-block as --non-interactive.
 func TestCIEnvAutoDetectsNonInteractive(t *testing.T) {
-	prev := os.Getenv("CI")
-	os.Setenv("CI", "true")
-	defer os.Setenv("CI", prev)
+	t.Setenv("CI", "true")
 
 	tmp := t.TempDir()
 	mustRun(t, ExitOK, "--cwd="+tmp, "init", "--no-hook")
