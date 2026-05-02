@@ -122,5 +122,5 @@ echo "Helper-parity audit OK — TS and Go test harness surfaces are in sync."
 #   internal setTimeout. Same semantic (deadline), different idiom.
 # - Go exposes BinPath() and a build-on-first-call cache; TS hard-codes
 #   dist/cli/bin.js. These are build-detail helpers, not public surface.
-# - Go exposes MakeFixtureNoT for benchmarks needing manual lifecycle;
-#   TS doesn't because Vitest has a different teardown model.
+# - Go exposes CleanupBuiltBin() for TestMain to remove the cached binary;
+#   TS doesn't need an analog because Vitest manages the dist/ artifact.

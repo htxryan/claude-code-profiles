@@ -81,6 +81,20 @@ func EnsureBuilt(t *testing.T) string {
 	return BinPath(t)
 }
 
+// CleanupBuiltBin removes the cached test binary, if one was built. Call
+// from TestMain after m.Run() so the binary doesn't accumulate in
+// os.TempDir() across `go test ./...` invocations.
+func CleanupBuiltBin() {
+	binMu.Lock()
+	defer binMu.Unlock()
+	if binBuilt && binPath != "" {
+		_ = os.Remove(binPath)
+	}
+	binBuilt = false
+	binPath = ""
+	binBuildErr = nil
+}
+
 // buildBin compiles cmd/c3p into a temp file. We don't reuse a workspace
 // build because integration tests must run against the source tree, not a
 // stale `go install` artifact in $GOBIN.

@@ -55,59 +55,28 @@ type FixtureSpec struct {
 
 // Fixture is the handle returned by MakeFixture. ProjectRoot is the
 // in-repo root the CLI runs against (the --cwd target); ExternalRoot is
-// the parallel tree for out-of-repo includes. Cleanup is idempotent.
+// the parallel tree for out-of-repo includes. The temp tree is cleaned up
+// automatically by t.Cleanup, including on test panic.
 type Fixture struct {
 	ProjectRoot  string
 	ExternalRoot string
-	cleanup      func() error
 }
 
-// Cleanup removes the temp tree. Idempotent — calling twice is safe;
-// subsequent calls are no-ops. t.Cleanup wires this automatically when
-// MakeFixture is given a *testing.T, but tests that need manual control
-// (e.g. assert state after cleanup) can call directly.
-func (f *Fixture) Cleanup() error {
-	if f.cleanup == nil {
-		return nil
-	}
-	err := f.cleanup()
-	f.cleanup = nil
-	return err
-}
-
-// MakeFixture materializes spec into a fresh temp tree and returns a
-// Fixture. If t is non-nil, t.Cleanup is wired so the tree is removed at
-// test end automatically; pass nil for tests that need manual lifecycle
-// control. Errors during creation are reported via t.Fatal when t is
-// non-nil and returned otherwise — matches the TS pattern of "throw and
-// the test bails".
+// MakeFixture materializes spec into a fresh t.TempDir() tree and returns
+// a Fixture. The tree is removed at test end automatically (including on
+// panic), since t.TempDir() registers its own cleanup. Errors during
+// creation surface via t.Fatal — matches the TS pattern of "throw and the
+// test bails".
 func MakeFixture(t *testing.T, spec FixtureSpec) *Fixture {
 	t.Helper()
-	f, err := makeFixture(spec)
+	f, err := makeFixtureAt(t.TempDir(), spec)
 	if err != nil {
 		t.Fatalf("makeFixture: %v", err)
 	}
-	t.Cleanup(func() {
-		if cerr := f.Cleanup(); cerr != nil {
-			t.Logf("fixture cleanup: %v", cerr)
-		}
-	})
 	return f
 }
 
-// MakeFixtureNoT is the manual-lifecycle variant for benchmarks and the
-// occasional test that needs to observe state after cleanup. Most tests
-// should use MakeFixture.
-func MakeFixtureNoT(spec FixtureSpec) (*Fixture, error) {
-	return makeFixture(spec)
-}
-
-func makeFixture(spec FixtureSpec) (*Fixture, error) {
-	tmp, err := os.MkdirTemp("", "ccp-fixture-")
-	if err != nil {
-		return nil, fmt.Errorf("mkdtemp: %w", err)
-	}
-
+func makeFixtureAt(tmp string, spec FixtureSpec) (*Fixture, error) {
 	projectRoot := filepath.Join(tmp, "project")
 	externalRoot := filepath.Join(tmp, "external")
 	if err := os.MkdirAll(projectRoot, 0o755); err != nil {
@@ -164,7 +133,6 @@ func makeFixture(spec FixtureSpec) (*Fixture, error) {
 	return &Fixture{
 		ProjectRoot:  projectRoot,
 		ExternalRoot: externalRoot,
-		cleanup:      func() error { return os.RemoveAll(tmp) },
 	}, nil
 }
 

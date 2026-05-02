@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	pipelineerrors "github.com/htxryan/c3p/internal/errors"
 	"github.com/spf13/cobra"
@@ -166,8 +167,10 @@ func exitCodeFor(err error) int {
 
 // isUsageError sniffs the cobra error string for the patterns it produces
 // on argv-shape failures. Cobra doesn't expose a typed sentinel for these,
-// so we match on the prefix it stamps on the error message. If cobra
-// changes its phrasing we'll discover it via the json_roundtrip test in IV.
+// so we match on the prefix it stamps on the error message. The cobra
+// version is pinned in go.mod and load-bearing for this match — if the
+// pin moves before IV lands a json_roundtrip parity test, re-verify these
+// prefixes against the new cobra release.
 func isUsageError(err error) bool {
 	msg := err.Error()
 	for _, prefix := range []string{
@@ -178,7 +181,7 @@ func isUsageError(err error) bool {
 		"flag needs an argument",
 		"invalid argument",
 	} {
-		if len(msg) >= len(prefix) && msg[:len(prefix)] == prefix {
+		if strings.HasPrefix(msg, prefix) {
 			return true
 		}
 	}

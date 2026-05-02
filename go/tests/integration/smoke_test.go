@@ -9,6 +9,7 @@ package integration_test
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -107,8 +108,8 @@ func TestFixtureCreatesProfileTree(t *testing.T) {
 
 	mustExist := func(p string) {
 		t.Helper()
-		if _, err := filepath.Abs(p); err != nil {
-			t.Fatalf("abs %q: %v", p, err)
+		if _, err := os.Stat(p); err != nil {
+			t.Fatalf("expected path %q to exist: %v", p, err)
 		}
 	}
 	mustExist(filepath.Join(fx.ProjectRoot, ".claude-profiles", "base", "profile.json"))
