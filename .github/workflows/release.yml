@@ -32,11 +32,16 @@ on:
       - '.goreleaser.yaml'
       - '.github/workflows/release.yml'
 
+# Workflow-level permissions are the floor for every job. id-token: write
+# (cosign keyless OIDC) is granted only to the release job, NOT here — fork
+# PRs run validate and must not inherit OIDC token-write.
 permissions:
-  contents: write   # GH Releases write
-  id-token: write   # cosign keyless OIDC
+  contents: read
 
 concurrency:
+  # A stuck release on a tag would block re-runs of the same tag. Manual
+  # cancel via the Actions UI ("Cancel workflow") is the escape hatch
+  # documented in docs/release-runbook.md.
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
@@ -48,6 +53,8 @@ jobs:
     name: validate (snapshot)
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v6
         with:
@@ -56,10 +63,29 @@ jobs:
         with:
           go-version-file: go/go.mod
           cache-dependency-path: go/go.sum
-      - uses: goreleaser/goreleaser-action@v6
+      - name: Goreleaser config check
+        # Schema-level validation. Catches deprecated-field regressions
+        # (e.g. brews→homebrew_casks rename) that snapshot tolerates but
+        # a real release-tag run would reject.
+        uses: goreleaser/goreleaser-action@v6
         with:
-          version: latest
+          version: '~> v2'
+          args: check
+      - name: Goreleaser snapshot
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: '~> v2'
           args: release --snapshot --clean --skip=publish,sign,announce
+      - name: Upload dist/ on failure
+        # Preserve partial archives, manifests, and cask file for
+        # debugging when the snapshot fails. if: always() so this also
+        # runs after a goreleaser non-zero exit.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-snapshot
+          path: dist/
+          if-no-files-found: ignore
 
   smoke:
     # PR8.5: cross-compile smoke test. Build for each target on a runner
@@ -76,8 +102,14 @@ jobs:
     # transparently forwards arm64 ELF execs).
     name: smoke ${{ matrix.goos }}/${{ matrix.goarch }}
     if: github.event_name == 'push'
+    permissions:
+      contents: read
     strategy:
-      fail-fast: true
+      # fail-fast: false trades a few runner-minutes for diagnostic clarity.
+      # If darwin/arm64 segfaults at startup, we want to know whether
+      # windows/arm64 also failed in the same release candidate, not just
+      # the first failure.
+      fail-fast: false
       matrix:
         include:
           - { runner: ubuntu-latest,    goos: linux,   goarch: amd64 }
@@ -129,6 +161,9 @@ jobs:
     needs: smoke
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # GH Releases upload
+      id-token: write   # cosign keyless OIDC — scoped to this job only
     steps:
       - uses: actions/checkout@v6
         with:
@@ -140,9 +175,12 @@ jobs:
       - name: Install cosign
         uses: sigstore/cosign-installer@v3
       - name: Run goreleaser
+        # Pin to the v2 major. `version: latest` would silently break the
+        # pipeline on a goreleaser v3 release (config-format breaks have
+        # historically gated each major bump).
         uses: goreleaser/goreleaser-action@v6
         with:
-          version: latest
+          version: '~> v2'
           args: release --clean
         env:
           # Default GITHUB_TOKEN: write access to *this* repo only.
@@ -156,3 +194,12 @@ jobs:
           # When unset, the winget step skips upload (skip_upload templated
           # in .goreleaser.yaml). The release does not abort.
           WINGET_PKGS_TOKEN: ${{ secrets.WINGET_PKGS_TOKEN }}
+      - name: Upload dist/ on failure
+        # Preserve partial archives + manifests for debugging when goreleaser
+        # exits non-zero between build and publish.
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-release
+          path: dist/
+          if-no-files-found: ignore

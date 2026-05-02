@@ -100,7 +100,11 @@ homebrew_casks:
       owner: htxryan
       name: homebrew-tap
       branch: "c3p-{{ .Version }}"
-      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+      # envOrDefault avoids template-eval failure on fork PRs that exercise
+      # this config (validate job) without access to the secret. The publish
+      # pipe is skipped via --skip=publish in validate, so an empty token is
+      # never used to actually push.
+      token: '{{ envOrDefault "HOMEBREW_TAP_TOKEN" "" }}'
       # PR8.1 contract: tap PRs are human-approved. We open the PR
       # (pull_request.enabled: true) but do NOT enable auto-merge. The
       # tap repo enforces "Require pull request review" at the branch
@@ -118,12 +122,11 @@ homebrew_casks:
     # quarantines downloaded binaries. The post-install hook strips the
     # quarantine xattr so `c3p` runs without the "damaged and cannot be
     # opened" dialog. Documented in docs/release-runbook.md.
+    # (Casks are macOS-only by definition — no platform guard needed.)
     hooks:
       post:
         install: |
-          if OS.mac?
-            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/c3p"]
-          end
+          system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/c3p"]
 
 # WinGet manifest. Spec contract:
 #   - manifest opened by release workflow as PR against microsoft/winget-pkgs
@@ -152,7 +155,9 @@ winget:
       owner: htxryan
       name: winget-pkgs
       branch: "c3p-{{ .Version }}"
-      token: "{{ .Env.WINGET_PKGS_TOKEN }}"
+      # envOrDefault matches the HOMEBREW_TAP_TOKEN pattern: avoids
+      # template-eval failure on fork PRs without secret access.
+      token: '{{ envOrDefault "WINGET_PKGS_TOKEN" "" }}'
       pull_request:
         enabled: true
         base:
@@ -167,6 +172,12 @@ release:
     name: claude-code-config-profiles
   draft: false
   prerelease: auto
+  # mode: replace — re-running the release workflow against an existing tag
+  # overwrites artifacts. Recovery for a partial-publish failure is a NEW
+  # patch tag (v1.2.4), NOT re-tagging v1.2.3 — see docs/release-runbook.md
+  # post-mortem section. `replace` exists only so a single workflow re-run
+  # after a transient failure (e.g. brew tap 503) can succeed without manual
+  # cleanup of half-uploaded artifacts.
   mode: replace
   name_template: "v{{ .Version }}"
   header: |

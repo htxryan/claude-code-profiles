@@ -18,7 +18,8 @@ first goreleaser-driven release.
 
 ### 1. Homebrew tap repo — `htxryan/homebrew-tap`
 
-- Create the repo (any layout; goreleaser writes `Formula/c3p.rb`).
+- Create the repo (any layout; goreleaser writes `Casks/c3p.rb` because
+  the config uses `homebrew_casks:`, not the deprecated `brews:`).
 - Settings → Branches → branch protection on `main`:
   - Require pull request review (≥ 1 approver)
   - Require status checks (none configured initially is OK)
@@ -64,7 +65,7 @@ The default `GITHUB_TOKEN` is reserved for GitHub Releases write on
 From a clean checkout of the release commit:
 
 ```
-goreleaser release --snapshot --clean --skip=publish,sign
+goreleaser release --snapshot --clean --skip=publish,sign,announce
 ```
 
 Inspect `dist/`. Confirm:
@@ -96,9 +97,21 @@ The push triggers `.github/workflows/release.yml`:
    `htxryan/homebrew-tap`, opens PR to `htxryan/winget-pkgs`.
 
 Cosign signing failure aborts the workflow (PR8.3 SHALL — no silent
-skip). If the workflow exits between sign and publish, the release tag
-exists but no artifacts were uploaded; delete the tag, fix the issue,
-re-tag.
+skip).
+
+**Recovery from partial-publish failure**: bump the patch version and
+re-tag (e.g. v1.2.3 failed → push v1.2.4 with the fix). Do **NOT** delete
+and re-push the same tag — re-tagging requires `git push --force` and
+mutates the audit trail for any consumer who already pulled the failed
+tag. The sole exception is a transient infra failure (e.g. tap repo 5xx)
+where the goreleaser run can simply be re-run from the Actions UI; the
+`mode: replace` setting in `.goreleaser.yaml` allows a re-run to overwrite
+the partial GitHub Release without manual cleanup.
+
+If the release workflow becomes stuck (no progress, no failure), cancel
+it manually via the Actions UI. The `concurrency.cancel-in-progress: false`
+setting blocks new workflow runs on the same tag until the stuck run is
+resolved one way or the other.
 
 ### Post-flight
 
