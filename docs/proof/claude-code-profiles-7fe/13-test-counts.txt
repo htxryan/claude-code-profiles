@@ -1,0 +1,16 @@
+=== Test counts (top-level test functions per package) ===
+  28  github.com/htxryan/claude-code-config-profiles/internal/cli
+  20  github.com/htxryan/claude-code-config-profiles/internal/cli/commands
+  4  github.com/htxryan/claude-code-config-profiles/internal/cli/jsonout
+  3  github.com/htxryan/claude-code-config-profiles/internal/cli/service
+  66  github.com/htxryan/claude-code-config-profiles/internal/drift
+  9  github.com/htxryan/claude-code-config-profiles/internal/errors
+  42  github.com/htxryan/claude-code-config-profiles/internal/markers
+  66  github.com/htxryan/claude-code-config-profiles/internal/merge
+  99  github.com/htxryan/claude-code-config-profiles/internal/resolver
+  100  github.com/htxryan/claude-code-config-profiles/internal/state
+  240  github.com/htxryan/claude-code-config-profiles/tests/integration
+
+=== Subtests included (running all tests verbose, counting RUN events) ===
+840
+ (total RUN events including subtests)

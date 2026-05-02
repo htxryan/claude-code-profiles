@@ -1,0 +1,31 @@
+=== c3p hook uninstall (PR15: clean removal) ===
+uninstalled: /var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/c3p-proof2.XXXXXX.0tBHFE40cz/.git/hooks/pre-commit
+exit code: 0
+
+=== git pre-commit hook removed ===
+ls: /var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/c3p-proof2.XXXXXX.0tBHFE40cz/.git/hooks/pre-commit: No such file or directory
+
+=== c3p hook install (atomic re-install) ===
+installed: /var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/c3p-proof2.XXXXXX.0tBHFE40cz/.git/hooks/pre-commit
+exit code: 0
+
+=== Pre-commit hook content (should call c3p drift --check) ===
+#!/usr/bin/env sh
+# c3p pre-commit drift warner. Fail-open: never blocks a commit.
+# Managed by 'c3p hook install'. To uninstall: 'c3p hook uninstall'.
+if command -v c3p >/dev/null 2>&1; then
+  c3p drift --pre-commit-warn 2>&1 || true
+fi
+exit 0
+
+=== c3p sync (R4: re-materialize active profile) ===
+synced strict
+exit code: 0
+
+=== c3p new minimal (scaffold a new profile) ===
+created profile "minimal" at /var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/c3p-proof2.XXXXXX.0tBHFE40cz/.claude-profiles/minimal
+Edit profile.json to set extends/includes/tags. Add files under .claude/.
+exit code: 0
+
+=== File tree of new profile ===
+/var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/c3p-proof2.XXXXXX.0tBHFE40cz/.claude-profiles/minimal/profile.json

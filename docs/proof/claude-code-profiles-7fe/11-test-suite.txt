@@ -1,0 +1,22 @@
+=== task vet (Go static analysis) ===
+task: [vet] go vet ./...
+
+=== task lint-jsonout (D7 PR3 gate) ===
+task: [lint-jsonout] bash scripts/jsonout_lint.sh
+OK: no json.Marshal calls outside internal/cli/jsonout/
+
+=== task test (unit + integration suite) ===
+task: [test] go test ./...
+?   	github.com/htxryan/claude-code-config-profiles/cmd/c3p	[no test files]
+ok  	github.com/htxryan/claude-code-config-profiles/internal/cli	(cached)
+ok  	github.com/htxryan/claude-code-config-profiles/internal/cli/commands	(cached)
+ok  	github.com/htxryan/claude-code-config-profiles/internal/cli/jsonout	(cached)
+ok  	github.com/htxryan/claude-code-config-profiles/internal/cli/service	(cached)
+ok  	github.com/htxryan/claude-code-config-profiles/internal/drift	(cached)
+ok  	github.com/htxryan/claude-code-config-profiles/internal/errors	(cached)
+ok  	github.com/htxryan/claude-code-config-profiles/internal/markers	(cached)
+ok  	github.com/htxryan/claude-code-config-profiles/internal/merge	(cached)
+ok  	github.com/htxryan/claude-code-config-profiles/internal/resolver	(cached)
+ok  	github.com/htxryan/claude-code-config-profiles/internal/state	(cached)
+ok  	github.com/htxryan/claude-code-config-profiles/tests/integration	(cached)
+?   	github.com/htxryan/claude-code-config-profiles/tests/integration/helpers	[no test files]

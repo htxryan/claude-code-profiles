@@ -1,0 +1,51 @@
+=== c3p use nonexistent (PR6 #1: missing profile → exit 1 with suggestion) ===
+resolving plan...
+c3p: Profile "stricter" does not exist (I do beg your pardon. Did you perhaps mean: strict?)
+exit code: 1
+
+=== c3p use stric (PR6 typo suggestion) ===
+resolving plan...
+c3p: Profile "stric" does not exist (I do beg your pardon. Did you perhaps mean: strict?)
+exit code: 1
+
+=== c3p doctor (R7 health check) ===
+CHECK                           STATUS  DETAIL
+profiles directory exists       OK      /var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/c3p-proof2.XXXXXX.0tBHFE40cz/.claude-profiles
+state.json schema               OK      active=strict
+project lock                    OK      lock file present but free
+.gitignore entries              OK      all required entries present
+git pre-commit hook             OK      installed and canonical
+backup count <= 5               OK      1 snapshots
+project-root CLAUDE.md markers  OK      markers valid
+active profile resolves         OK      strict
+exit code: 0
+
+=== c3p doctor --json ===
+{"pass":true,"checks":[{"id":"profiles-dir","label":"profiles directory exists","status":"ok","detail":"/var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/c3p-proof2.XXXXXX.0tBHFE40cz/.claude-profiles"},{"id":"state-file","label":"state.json schema","status":"ok","detail":"active=strict"},{"id":"lock","label":"project lock","status":"ok","detail":"lock file present but free"},{"id":"gitignore","label":".gitignore entries","status":"ok","detail":"all required entries present"},{"id":"pre-commit-hook","label":"git pre-commit hook","status":"ok","detail":"installed and canonical"},{"id":"backup-retention","label":"backup count <= 5","status":"ok","detail":"1 snapshots"},{"id":"root-claude-md","label":"project-root CLAUDE.md markers","status":"ok","detail":"markers valid"},{"id":"active-resolves","label":"active profile resolves","status":"ok","detail":"strict"}]}
+
+=== c3p diff default strict (compare profiles) ===
+diff: default vs strict
+  ~  CLAUDE.md
+  ~  settings.json
+
+=== c3p completions bash (snippet) ===
+# c3p bash completion. Source this file or eval its output:
+#   eval "$(c3p completions bash)"
+_c3p_complete() {
+  local cur=${COMP_WORDS[COMP_CWORD]}
+  local prev=${COMP_WORDS[COMP_CWORD-1]}
+  local verbs="init list use status drift diff new validate sync hook doctor completions help"
+  case "$prev" in
+    use|diff|validate)
+      if [ -d ".claude-profiles" ]; then
+        COMPREPLY=( $(compgen -W "$(ls .claude-profiles 2>/dev/null | grep -v '^\\.\\|^_')" -- "$cur") )
+        return 0
+      fi
+      ;;
+    hook)
+      COMPREPLY=( $(compgen -W "install uninstall" -- "$cur") )
+      return 0
+      ;;
+    completions)
+      COMPREPLY=( $(compgen -W "bash zsh fish" -- "$cur") )
+      return 0

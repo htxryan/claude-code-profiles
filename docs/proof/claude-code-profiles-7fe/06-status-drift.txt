@@ -1,0 +1,22 @@
+=== c3p status (active=default, no drift) ===
+active profile: default
+materialized:   2026-05-02T11:30:51.363Z
+drift:          none
+
+=== c3p status --json ===
+{"activeProfile":"default","materializedAt":"2026-05-02T11:30:51.363Z","drift":{"fingerprintOk":true,"modified":0,"added":0,"deleted":0,"unrecoverable":0,"total":0},"sourceFresh":null,"sourceFingerprint":{"fileCount":2,"aggregateHash":"d2d875140afed8ce60487d610b6c05c9eb45edf53963a92d55ae24859d239d3b"},"warnings":[]}
+
+=== c3p drift (clean — no edits) ===
+drift: clean (active=default, scanned=1)
+exit code: 0
+
+=== Now we modify .claude/settings.json (simulate drift) ===
+{"permissions":{"allow":["Read","Edit","Bash","NewTool"]}}
+
+=== c3p drift (modified file detected, R20) ===
+drift: 1 file(s) in .claude/ vs active profile "default"
+  M  settings.json
+exit code: 0
+
+=== c3p drift --json (PR3 — null Active when no drift; populated otherwise) ===
+{"schemaVersion":1,"active":"default","fingerprintOk":true,"entries":[{"relPath":"settings.json","status":"modified","provenance":[{"id":"default","kind":"profile","rootPath":"/var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/c3p-proof2.XXXXXX.0tBHFE40cz/.claude-profiles/default","external":false}],"destination":".claude"}],"scannedFiles":1,"fastPathHits":0,"slowPathHits":1,"addedBytes":0,"removedBytes":0,"changedBytes":0}

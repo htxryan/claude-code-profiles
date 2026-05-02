@@ -1,0 +1,44 @@
+=== c3p use strict (drift exists, non-TTY without --on-drift → exit 1, PR29) ===
+resolving plan...
+merging contributors...
+checking drift...
+drift detected and no --on-drift= passed in non-interactive mode (R21 hard-block); pass --on-drift=discard|persist|abort or run interactively
+c3p: drift detected and no --on-drift= passed in non-interactive mode (R21 hard-block); pass --on-drift=discard|persist|abort or run interactively
+exit code: 1
+
+=== c3p use strict --on-drift=discard (R23: drop drifted edits, swap profile) ===
+switched to strict
+backup: /var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/c3p-proof2.XXXXXX.0tBHFE40cz/.claude-profiles/.meta/backup/2026-05-02T11-31-15.361Z
+exit code: 0
+
+=== Materialized .claude/settings.json (now strict) ===
+{
+  "permissions": {
+    "allow": [
+      "Read"
+    ],
+    "deny": [
+      "Bash",
+      "Write"
+    ]
+  }
+}
+
+=== Root CLAUDE.md (now strict context) ===
+<!-- c3p:v1:begin -->
+<!-- Managed block. Do not edit between markers — changes are overwritten on next `c3p use`. -->
+
+# Strict profile
+Read-only context for review sessions.
+
+<!-- c3p:v1:end -->
+
+=== c3p status (active=strict) ===
+active profile: strict
+materialized:   2026-05-02T11:31:15.366Z
+drift:          none
+
+=== c3p list (* indicates active) ===
+NAME       DESCRIPTION                            TAGS       META
+  default  starter profile created by `c3p init`             
+* strict   read-only review profile               review,ci  last 2026-05-02T11:31:15.366Z
