@@ -70,12 +70,12 @@ jobs:
         # a real release-tag run would reject.
         uses: goreleaser/goreleaser-action@v6
         with:
-          version: '~> v2'
+          version: '~> v2.15'
           args: check
       - name: Goreleaser snapshot
         uses: goreleaser/goreleaser-action@v6
         with:
-          version: '~> v2'
+          version: '~> v2.15'
           args: release --snapshot --clean --skip=publish,sign,announce
       - name: Upload dist/ on failure
         # Preserve partial archives, manifests, and cask file for
@@ -187,7 +187,7 @@ jobs:
         # historically gated each major bump).
         uses: goreleaser/goreleaser-action@v6
         with:
-          version: '~> v2'
+          version: '~> v2.15'
           args: release --clean
         env:
           # Default GITHUB_TOKEN: write access to *this* repo only.
