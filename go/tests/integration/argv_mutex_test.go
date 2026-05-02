@@ -291,8 +291,11 @@ func TestArgvMutex_DiffTooManyPositionals(t *testing.T) {
 
 func TestArgvMutex_HelpUnknownVerb(t *testing.T) {
 	helpers.EnsureBuilt(t)
+	// Go bin prints a friendly "no specific help for X" then the global
+	// help text and exits 0. Pinned exactly so a regression to "die with
+	// exit 1 on unknown verb" surfaces here, not silently.
 	r := mustRun(t, helpers.SpawnOptions{Args: []string{"help", "bogus-verb"}})
-	if r.ExitCode != 0 && r.ExitCode != 1 {
-		t.Fatalf("help bogus-verb: want exit in {0,1}, got %d (stderr=%q)", r.ExitCode, r.Stderr)
+	if r.ExitCode != 0 {
+		t.Fatalf("help bogus-verb: want 0, got %d (stderr=%q)", r.ExitCode, r.Stderr)
 	}
 }

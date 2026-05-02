@@ -1,7 +1,6 @@
 package integration_test
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -43,15 +42,9 @@ func TestVersionWorksThroughSymlink(t *testing.T) {
 		t.Fatalf("symlink: %v", err)
 	}
 
-	res, err := helpers.RunCli(context.Background(), helpers.SpawnOptions{
-		Args: []string{"--version"},
-	}, t)
-	_ = res
-	_ = err
-	// Re-spawn through the symlink directly (RunCli would reuse the cached
-	// real path). We use the helpers.RunCliExternal-style approach via
-	// exec.Command; but to stay within the helper surface, just shell
-	// the symlink target with our binary path replaced.
+	// Spawn through the symlink directly (helpers.RunCli would resolve to
+	// the cached real binary path, which would skip the symlink entirely
+	// and miss the regression we want to pin).
 	r := runBin(t, linked, []string{"--version"}, nil, "")
 	if r.ExitCode != 0 {
 		t.Fatalf("symlink --version exit: want 0, got %d (stderr=%q)", r.ExitCode, r.Stderr)

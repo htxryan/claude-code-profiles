@@ -38,6 +38,8 @@ func runWithSigintAfter(t *testing.T, args []string, dur time.Duration) helpers.
 	if err := cmd.Process.Signal(syscall.SIGINT); err != nil {
 		t.Fatalf("signal: %v", err)
 	}
+	// Wait err is expected (process killed by signal); ProcessState below
+	// carries the exit code we actually assert on.
 	_ = cmd.Wait()
 	res := helpers.SpawnResult{Stdout: stdout.String(), Stderr: stderr.String()}
 	if cmd.ProcessState != nil {
@@ -85,7 +87,11 @@ func TestSigintBin_DuringUseExitsCleanly(t *testing.T) {
 	helpers.EnsureBuilt(t)
 	root := buildSigintFixture(t)
 
-	res := runWithSigintAfter(t, []string{"--cwd", root, "use", "big"}, 50*time.Millisecond)
+	// 250ms gives the bin time to clear execve + Go runtime init + initial
+	// resolve/merge phases on a cold/loaded CI runner before the signal
+	// arrives, so we exercise the materialize-path signal handler rather
+	// than the startup path. 50ms was insufficient on shared runners.
+	res := runWithSigintAfter(t, []string{"--cwd", root, "use", "big"}, 250*time.Millisecond)
 
 	// The bin must exit either with code 130 (128+SIGINT) or be reported as
 	// signal-killed (ExitCode -1 in Go's exec.ProcessState shape). Both
@@ -109,7 +115,9 @@ func TestSigintBin_NoStateCorruptionAfterSigint(t *testing.T) {
 	helpers.EnsureBuilt(t)
 	root := buildSigintFixture(t)
 
-	_ = runWithSigintAfter(t, []string{"--cwd", root, "use", "big"}, 30*time.Millisecond)
+	// 200ms — slightly shorter than the prior test (we want to interrupt
+	// closer to mid-materialize) but still well past startup-path overhead.
+	_ = runWithSigintAfter(t, []string{"--cwd", root, "use", "big"}, 200*time.Millisecond)
 
 	// Follow-up swap must succeed — reconcile sweeps any orphaned
 	// pending/prior left by the killed predecessor.

@@ -336,17 +336,25 @@ func TestStatus_R43_ConcurrentReadsNoLock(t *testing.T) {
 
 	const N = 4
 	results := make([]helpers.SpawnResult, N)
+	errs := make([]error, N)
 	var wg sync.WaitGroup
 	for i := 0; i < N; i++ {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
-			results[idx] = mustRun(t, helpers.SpawnOptions{
+			res, err := goRun(helpers.SpawnOptions{
 				Args: []string{"--cwd", fx.ProjectRoot, "status"},
-			})
+			}, t)
+			results[idx] = res
+			errs[idx] = err
 		}(i)
 	}
 	wg.Wait()
+	for i, err := range errs {
+		if err != nil {
+			t.Fatalf("worker %d RunCli: %v", i, err)
+		}
+	}
 
 	for i, r := range results {
 		if r.ExitCode != 0 {

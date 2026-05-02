@@ -17,6 +17,15 @@ import (
 // EPIPE can fire on the underlying socket. With proper handling, the
 // pipeline exits cleanly under `set -o pipefail`.
 
+// shellSingleQuote wraps s in single quotes safe for POSIX sh, escaping
+// embedded single quotes as '\''. Naive `"'" + s + "'"` wrapping breaks
+// on any single-quote-bearing argument and would be a shell-injection
+// hazard if a future caller ever passes user-controlled or fixture-derived
+// strings into runPipeline.
+func shellSingleQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
+
 // runPipeline runs `c3p <args> | head -1` via bash with pipefail. With
 // pipefail set, the pipeline's exit code is the first non-zero stage's
 // exit code, so 0 means c3p AND head both exited cleanly. If c3p crashed
@@ -27,9 +36,9 @@ func runPipeline(t *testing.T, args []string) (exitCode int, stdout, stderr stri
 
 	argString := make([]string, len(args))
 	for i, a := range args {
-		argString[i] = "'" + a + "'"
+		argString[i] = shellSingleQuote(a)
 	}
-	body := fmt.Sprintf("set -o pipefail; %q %s | head -1", bin, strings.Join(argString, " "))
+	body := fmt.Sprintf("set -o pipefail; %s %s | head -1", shellSingleQuote(bin), strings.Join(argString, " "))
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

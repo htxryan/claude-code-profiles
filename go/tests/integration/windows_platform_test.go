@@ -1,3 +1,5 @@
+//go:build windows
+
 package integration_test
 
 import (
@@ -82,18 +84,26 @@ func TestWindowsPlatform_FileLockRaceOnWindows(t *testing.T) {
 	}
 
 	results := make([]helpers.SpawnResult, 2)
+	errs := make([]error, 2)
 	var wg sync.WaitGroup
 	for idx, prof := range []string{"a", "b"} {
 		wg.Add(1)
 		go func(i int, p string) {
 			defer wg.Done()
-			results[i] = mustRun(t, helpers.SpawnOptions{
+			res, err := goRun(helpers.SpawnOptions{
 				Args:      []string{"--cwd", fx.ProjectRoot, "--on-drift=discard", "use", p},
 				TimeoutMs: 25000,
-			})
+			}, t)
+			results[i] = res
+			errs[i] = err
 		}(idx, prof)
 	}
 	wg.Wait()
+	for i, err := range errs {
+		if err != nil {
+			t.Fatalf("worker %d RunCli: %v", i, err)
+		}
+	}
 
 	for _, res := range results {
 		if res.ExitCode != 0 && res.ExitCode != 3 {

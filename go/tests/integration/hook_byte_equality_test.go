@@ -1,3 +1,11 @@
+// hook_byte_equality_test.go — narrow exemption to the spawn-only contract
+// documented in scenarios_test.go. The byte-equality tests below are E6
+// fitness functions that pin the EXACT hook-script bytes against a known
+// constant; importing the constants from internal/cli/commands is the only
+// way to spell "the bytes the bin would write" without copying them (which
+// would defeat the regression purpose). This is the only test file allowed
+// to import internal product packages — every other test in this directory
+// must drive the bin via spawn.
 package integration_test
 
 import (

@@ -18,6 +18,10 @@ import (
 // harness-level failures and returns the SpawnResult on c3p-level errors
 // (nonzero exits surface as result.ExitCode, never as an err). Cuts the
 // noise floor in tests that don't need to introspect the err.
+//
+// MUST be called only from the test goroutine (t.Fatalf calls Goexit, which
+// only correctly unwinds the test goroutine — see goRun for the worker
+// shape that surfaces errors back to the test goroutine via channel).
 func mustRun(t *testing.T, opts helpers.SpawnOptions) helpers.SpawnResult {
 	t.Helper()
 	r, err := helpers.RunCli(context.Background(), opts, t)
@@ -25,6 +29,16 @@ func mustRun(t *testing.T, opts helpers.SpawnOptions) helpers.SpawnResult {
 		t.Fatalf("RunCli: %v", err)
 	}
 	return r
+}
+
+// goRun is the goroutine-safe sibling of mustRun: it returns (result, error)
+// instead of t.Fatalf-ing on harness failure, so worker goroutines can
+// surface a harness error back to the test goroutine via a channel. The
+// test goroutine is then responsible for calling t.Fatal/t.Errorf — Go's
+// testing contract requires Fatal/Skip to be invoked only from the
+// goroutine running the test (https://pkg.go.dev/testing#T).
+func goRun(opts helpers.SpawnOptions, t *testing.T) (helpers.SpawnResult, error) {
+	return helpers.RunCli(context.Background(), opts, t)
 }
 
 // runBin spawns an arbitrary binary path with args, env, and stdin —

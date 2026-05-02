@@ -181,9 +181,16 @@ func TestManifestMalformed_PathTraversal(t *testing.T) {
 }
 
 func TestManifestMalformed_TildeMissingInclude(t *testing.T) {
-	// Tilde-form resolves to homedir; pointing at a non-existent dir
-	// produces MissingInclude (exit 3) with raw "~/..." preserved.
+	// Tilde-form resolves to $HOME; pointing at a guaranteed-nonexistent
+	// path under $HOME produces MissingInclude (exit 3) with raw "~/..."
+	// preserved. We override $HOME to a fresh t.TempDir() so the test
+	// doesn't accidentally pass / fail based on whatever the runner's
+	// real homedir happens to contain — without this, a developer with a
+	// directory named "c3p-test-nonexistent-dir-xyzzy" in $HOME would
+	// silently flip the assertion.
 	helpers.EnsureBuilt(t)
+	fakeHome := t.TempDir()
+	t.Setenv("HOME", fakeHome)
 	fx := helpers.MakeFixture(t, helpers.FixtureSpec{
 		Profiles: map[string]helpers.ProfileSpec{
 			"outside": {

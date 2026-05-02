@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -45,6 +46,7 @@ func TestConcurrent_RaceUseLockSerialization(t *testing.T) {
 
 	const N = 20
 	results := make([]helpers.SpawnResult, N)
+	errs := make([]error, N)
 	var wg sync.WaitGroup
 	for i := 0; i < N; i++ {
 		wg.Add(1)
@@ -54,13 +56,20 @@ func TestConcurrent_RaceUseLockSerialization(t *testing.T) {
 		}
 		go func(idx int, profile string) {
 			defer wg.Done()
-			results[idx] = mustRun(t, helpers.SpawnOptions{
+			res, err := goRun(helpers.SpawnOptions{
 				Args:      []string{"--cwd", fx.ProjectRoot, "--on-drift=discard", "use", profile},
 				TimeoutMs: 25000,
-			})
+			}, t)
+			results[idx] = res
+			errs[idx] = err
 		}(i, target)
 	}
 	wg.Wait()
+	for i, err := range errs {
+		if err != nil {
+			t.Fatalf("worker %d RunCli: %v", i, err)
+		}
+	}
 
 	var winners, losers []helpers.SpawnResult
 	for _, res := range results {
@@ -82,7 +91,7 @@ func TestConcurrent_RaceUseLockSerialization(t *testing.T) {
 			if len(s) > 200 {
 				s = s[:200]
 			}
-			sample = append(sample, "exit="+itoa(l.ExitCode)+"  stderr="+s)
+			sample = append(sample, "exit="+strconv.Itoa(l.ExitCode)+"  stderr="+s)
 		}
 		t.Fatalf("0 winners across %d races — first 3 losers:\n  %s", N, strings.Join(sample, "\n  "))
 	}
@@ -188,26 +197,3 @@ func TestConcurrent_FollowupUseSucceeds(t *testing.T) {
 	}
 }
 
-// itoa is a tiny dependency-free int→string helper for the diagnostic
-// sample in TestConcurrent_RaceUseLockSerialization.
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	neg := n < 0
-	if neg {
-		n = -n
-	}
-	var b [20]byte
-	i := len(b)
-	for n > 0 {
-		i--
-		b[i] = byte('0' + n%10)
-		n /= 10
-	}
-	if neg {
-		i--
-		b[i] = '-'
-	}
-	return string(b[i:])
-}

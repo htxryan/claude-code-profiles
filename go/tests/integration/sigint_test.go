@@ -121,13 +121,13 @@ func TestSigint_DuringLockWaitExitsCleanly(t *testing.T) {
 		"use", "a",
 	}, 500*time.Millisecond)
 
-	// SIGINT-killed processes on POSIX exit 130 (128 + SIGINT(2)) when they
-	// install handlers, or are reported with WIFSIGNALED. Go's ProcessState
-	// reports -1 for unhandled signals. We accept either: (a) a clean
-	// 128+signo exit (handler ran), (b) -1 (raw signal-kill). Both prove
-	// the process did not hang or clobber the lock.
-	if r.ExitCode != 130 && r.ExitCode != -1 && r.ExitCode != 1 {
-		t.Errorf("SIGINT exit: want 130 / -1 / 1, got %d (stderr=%q)", r.ExitCode, r.Stderr)
+	// SIGINT-killed processes on POSIX exit 130 (128 + SIGINT(2)) when the
+	// signal handler ran (lock was held → registerSignalRelease was wired);
+	// otherwise Go's ProcessState reports -1 for raw signal-kill. We accept
+	// only those two — explicitly NOT exit 1, which would mask a genuine
+	// failure (panic, user-error path) as a clean signal exit.
+	if r.ExitCode != 130 && r.ExitCode != -1 {
+		t.Errorf("SIGINT exit: want 130 or -1, got %d (stderr=%q)", r.ExitCode, r.Stderr)
 	}
 	// Lock file we hold must still exist.
 	if _, err := os.Stat(lockPath); err != nil {
@@ -152,8 +152,9 @@ func TestSigterm_DuringLockWaitExitsCleanly(t *testing.T) {
 		"use", "a",
 	}, 500*time.Millisecond)
 
-	if r.ExitCode != 143 && r.ExitCode != -1 && r.ExitCode != 1 {
-		t.Errorf("SIGTERM exit: want 143 / -1 / 1, got %d (stderr=%q)", r.ExitCode, r.Stderr)
+	// Same justification as SIGINT case above; exit 1 explicitly excluded.
+	if r.ExitCode != 143 && r.ExitCode != -1 {
+		t.Errorf("SIGTERM exit: want 143 or -1, got %d (stderr=%q)", r.ExitCode, r.Stderr)
 	}
 	if _, err := os.Stat(lockPath); err != nil {
 		t.Errorf("peer lock disappeared after SIGTERM: %v", err)

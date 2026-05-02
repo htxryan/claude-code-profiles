@@ -47,7 +47,7 @@ func TestLargeProfilePerf_StatusOnLargeProfile(t *testing.T) {
 	useRes, err := helpers.RunCli(context.Background(), helpers.SpawnOptions{
 		Cwd:       root,
 		Args:      []string{"use", "big", "--non-interactive"},
-		TimeoutMs: int(largeProfileSecondaryBudget * 2 / time.Millisecond),
+		TimeoutMs: int((largeProfileSecondaryBudget * 2).Milliseconds()),
 	}, t)
 	if err != nil {
 		t.Fatalf("use big setup: %v (stderr=%q)", err, useRes.Stderr)
@@ -60,7 +60,7 @@ func TestLargeProfilePerf_StatusOnLargeProfile(t *testing.T) {
 	res, err := helpers.RunCli(context.Background(), helpers.SpawnOptions{
 		Cwd:       root,
 		Args:      []string{"status"},
-		TimeoutMs: int(largeProfileSecondaryBudget * 2 / time.Millisecond),
+		TimeoutMs: int((largeProfileSecondaryBudget * 2).Milliseconds()),
 	}, t)
 	elapsed := time.Since(t0)
 	if err != nil {
@@ -92,7 +92,7 @@ func TestLargeProfilePerf_StatusJsonOnLargeProfile(t *testing.T) {
 	useRes, err := helpers.RunCli(context.Background(), helpers.SpawnOptions{
 		Cwd:       root,
 		Args:      []string{"use", "big", "--non-interactive"},
-		TimeoutMs: int(largeProfileSecondaryBudget * 2 / time.Millisecond),
+		TimeoutMs: int((largeProfileSecondaryBudget * 2).Milliseconds()),
 	}, t)
 	if err != nil || useRes.ExitCode != 0 {
 		t.Fatalf("use big setup: err=%v exit=%d stderr=%q", err, useRes.ExitCode, useRes.Stderr)
@@ -102,7 +102,7 @@ func TestLargeProfilePerf_StatusJsonOnLargeProfile(t *testing.T) {
 	res, err := helpers.RunCli(context.Background(), helpers.SpawnOptions{
 		Cwd:       root,
 		Args:      []string{"--json", "status"},
-		TimeoutMs: int(largeProfileSecondaryBudget * 2 / time.Millisecond),
+		TimeoutMs: int((largeProfileSecondaryBudget * 2).Milliseconds()),
 	}, t)
 	elapsed := time.Since(t0)
 	if err != nil {
