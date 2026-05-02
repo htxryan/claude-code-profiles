@@ -88,10 +88,10 @@ func TestPR24_ApplyGate_DoesNotReDetectInternally(t *testing.T) {
 	// The discard branch took a snapshot — even though there's nothing
 	// "drifted" right now. That's the immutability contract.
 	// Specifically: SnapshotForDiscard always runs on the discard branch.
-	// Our snapshot path returns "" iff .claude/ doesn't exist; here it does,
-	// so the snapshot is non-empty.
-	if res.BackupSnapshot == "" {
-		t.Errorf("backupSnapshot empty; ApplyGate(discard) must always run SnapshotForDiscard")
+	// Our snapshot path returns nil iff .claude/ doesn't exist; here it does,
+	// so the snapshot is non-nil.
+	if res.BackupSnapshot == nil {
+		t.Errorf("backupSnapshot nil; ApplyGate(discard) must always run SnapshotForDiscard")
 	}
 	// And the materialize succeeded (live tree is the new profile).
 	live, err := os.ReadFile(filepath.Join(paths.ClaudeDir, "CLAUDE.md"))

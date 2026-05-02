@@ -37,7 +37,7 @@ type PreCommitWarnResult struct {
 // PR25 (backup notice on non-interactive discard): not relevant here —
 // pre-commit never discards; it only warns. The PR25 contract lives in
 // ApplyGate's discard path, where SnapshotForDiscard's return path is
-// surfaced via ApplyGateResult.BackupSnapshot.
+// surfaced via ApplyGateResult.BackupSnapshot (*string, nil = no snapshot).
 //
 // Output discipline (non-blocking quality bar §7):
 //   - When no drift: silent (no output). The hook is invisible in the happy

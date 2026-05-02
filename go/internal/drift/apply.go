@@ -30,9 +30,14 @@ type ApplyGateOptions struct {
 
 // ApplyGateResult is the structured outcome so the orchestrator can build
 // user-facing messages without re-deriving state.
+//
+// BackupSnapshot is *string (TS parity with `string | null`): nil signals
+// "no snapshot taken" (abort, no-drift, persist, or discard with no live
+// .claude/ to back up). Non-nil holds the absolute path of the snapshot dir.
+// D7's JSON output emits `null` vs `"<path>"` to surface the distinction.
 type ApplyGateResult struct {
 	Action            ApplyGateAction
-	BackupSnapshot    string
+	BackupSnapshot    *string
 	MaterializeResult *state.MaterializeResult
 }
 
@@ -58,18 +63,18 @@ func ApplyGate(choice GateChoice, opts ApplyGateOptions) (ApplyGateResult, error
 	case GateChoiceAbort:
 		return ApplyGateResult{
 			Action:            ApplyActionAborted,
-			BackupSnapshot:    "",
+			BackupSnapshot:    nil,
 			MaterializeResult: nil,
 		}, nil
 
 	case GateChoiceNoDriftProceed:
-		r, err := state.Materialize(opts.Paths, opts.Plan, opts.Merged, state.MaterializeOptions{}, "")
+		r, err := state.Materialize(opts.Paths, opts.Plan, opts.Merged, state.MaterializeOptions{}, nil)
 		if err != nil {
 			return ApplyGateResult{}, err
 		}
 		return ApplyGateResult{
 			Action:            ApplyActionMaterialized,
-			BackupSnapshot:    "",
+			BackupSnapshot:    nil,
 			MaterializeResult: &r,
 		}, nil
 
@@ -77,6 +82,9 @@ func ApplyGate(choice GateChoice, opts ApplyGateOptions) (ApplyGateResult, error
 		// Snapshot BEFORE the rename so the backup captures pre-swap content
 		// (R23a). Materialize then performs the pending/prior rename — by
 		// the time .claude/ is overwritten, the snapshot is already on disk.
+		// SnapshotForDiscard returns nil when .claude/ doesn't exist (NoActive
+		// or active-with-deleted-tree drift): there's nothing to back up, and
+		// nil is propagated to the caller as "no snapshot taken" (TS parity).
 		backup, err := state.SnapshotForDiscard(opts.Paths)
 		if err != nil {
 			return ApplyGateResult{}, err
@@ -84,10 +92,11 @@ func ApplyGate(choice GateChoice, opts ApplyGateOptions) (ApplyGateResult, error
 		r, err := state.Materialize(opts.Paths, opts.Plan, opts.Merged, state.MaterializeOptions{}, backup)
 		if err != nil {
 			// PR25: surface the backup path even when Materialize fails after
-			// snapshot. The user's edits are on disk at `backup`; D7 needs the
+			// snapshot. The user's edits are on disk at `*backup`; D7 needs the
 			// path to render "your edits were saved at <path>" alongside the
 			// failure. Returning a zero-value result here would orphan the
-			// snapshot dir without any caller able to find it.
+			// snapshot dir without any caller able to find it. When backup is
+			// nil (nothing to back up), pass nil through unchanged.
 			return ApplyGateResult{
 				Action:         ApplyActionAborted,
 				BackupSnapshot: backup,
@@ -118,7 +127,7 @@ func ApplyGate(choice GateChoice, opts ApplyGateOptions) (ApplyGateResult, error
 		}
 		return ApplyGateResult{
 			Action:            ApplyActionPersistedAndMaterialized,
-			BackupSnapshot:    "",
+			BackupSnapshot:    nil,
 			MaterializeResult: &r,
 		}, nil
 

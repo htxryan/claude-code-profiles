@@ -46,7 +46,7 @@ func makeBaseFixture(t *testing.T) state.StatePaths {
 			SchemaVersion: merge.MergedFileSchemaVersion,
 		},
 	}
-	if _, err := state.Materialize(paths, plan, merged, state.MaterializeOptions{}, ""); err != nil {
+	if _, err := state.Materialize(paths, plan, merged, state.MaterializeOptions{}, nil); err != nil {
 		t.Fatalf("Materialize: %v", err)
 	}
 	return paths
@@ -201,7 +201,7 @@ func TestPreCommitWarn_UnrecoverableEntryRendersX(t *testing.T) {
 			SchemaVersion: merge.MergedFileSchemaVersion,
 		},
 	}
-	if _, err := state.Materialize(paths, plan, merged, state.MaterializeOptions{}, ""); err != nil {
+	if _, err := state.Materialize(paths, plan, merged, state.MaterializeOptions{}, nil); err != nil {
 		t.Fatalf("Materialize: %v", err)
 	}
 	// User strips the markers — DetectDrift should report unrecoverable.

@@ -12,19 +12,22 @@ import "fmt"
 // Decision table (priority order):
 //  1. report.FingerprintOk == false                → no-drift
 //  2. len(report.Entries) == 0                     → no-drift
-//  3. all entries unrecoverable                    → auto (abort, run init)
-//  4. OnDriftFlag set                              → auto (use flag)
-//  5. mode == non-interactive (no flag)            → auto (abort)
-//  6. mode == interactive (drift, no flag)         → prompt
+//  3. OnDriftFlag set                              → auto (use flag)
+//  4. mode == non-interactive (no flag)            → auto (abort)
+//  5. mode == interactive (drift, no flag)         → prompt
 //
-// The flag wins over interactive mode (rule 4 before rule 6): a user who
+// The flag wins over interactive mode (rule 3 before rule 5): a user who
 // passed --on-drift=discard doesn't want to be re-prompted "are you sure".
 //
-// Rule 3 (all-unrecoverable auto-abort) sits BEFORE the flag check because
-// neither discard nor persist can succeed when project-root markers are gone:
-// Materialize would fail at preflight regardless of the user's choice. Auto-
-// aborting with a "run init" reason produces an actionable diagnostic instead
-// of a confusing post-prompt failure.
+// We deliberately do NOT short-circuit on "all entries are unrecoverable":
+// the gate doesn't know the target plan, so it can't tell whether the new
+// plan even contributes a project-root section. When the new plan has no
+// projectRoot file, Materialize treats missing/malformed root markers as a
+// documented opt-out (preflightEmptyRootSplice returns nil and the splice
+// is skipped) — preempting that here would block legitimate `use` flows
+// switching to a profile with no root section. If markers are gone AND the
+// new plan needs them, Materialize's preflight (R45) will refuse. That's
+// the right place for the failure to land.
 //
 // Hard-block invariants (tested):
 //   - Gate never returns prompt without drift to gate on.
@@ -40,14 +43,6 @@ func DecideGate(input GateInput) GateOutcome {
 			Kind:   GateOutcomeNoDrift,
 			Choice: GateChoiceNoDriftProceed,
 			Reason: reason,
-		}
-	}
-
-	if allUnrecoverable(input.Report.Entries) {
-		return GateOutcome{
-			Kind:   GateOutcomeAuto,
-			Choice: GateChoiceAbort,
-			Reason: "all drift entries are unrecoverable (markers missing/malformed); run `c3p init` to repair",
 		}
 	}
 
@@ -96,19 +91,4 @@ func isValidOnDriftFlag(c GateChoice) bool {
 		return true
 	}
 	return false
-}
-
-// allUnrecoverable reports true iff every entry has Status ==
-// DriftStatusUnrecoverable. Empty input returns false (caller must already
-// have handled the no-drift case).
-func allUnrecoverable(entries []DriftEntry) bool {
-	if len(entries) == 0 {
-		return false
-	}
-	for _, e := range entries {
-		if e.Status != DriftStatusUnrecoverable {
-			return false
-		}
-	}
-	return true
 }

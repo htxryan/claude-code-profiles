@@ -37,8 +37,8 @@ func TestIntegration_S3_DiscardReplacesAndSnapshots(t *testing.T) {
 	if res.Action != drift.ApplyActionMaterialized {
 		t.Errorf("action = %q, want materialized", res.Action)
 	}
-	if res.BackupSnapshot == "" {
-		t.Fatalf("backupSnapshot empty")
+	if res.BackupSnapshot == nil {
+		t.Fatalf("backupSnapshot nil")
 	}
 	live, err := os.ReadFile(filepath.Join(paths.ClaudeDir, "CLAUDE.md"))
 	if err != nil {
@@ -47,7 +47,7 @@ func TestIntegration_S3_DiscardReplacesAndSnapshots(t *testing.T) {
 	if string(live) != "OTHER\n" {
 		t.Errorf("live = %q, want OTHER\\n", live)
 	}
-	got, err := os.ReadFile(filepath.Join(res.BackupSnapshot, "CLAUDE.md"))
+	got, err := os.ReadFile(filepath.Join(*res.BackupSnapshot, "CLAUDE.md"))
 	if err != nil {
 		t.Fatalf("ReadFile snapshot: %v", err)
 	}
@@ -254,8 +254,8 @@ func TestIntegration_CleanSwapNoDriftProceed(t *testing.T) {
 	if res.Action != drift.ApplyActionMaterialized {
 		t.Errorf("action = %q, want materialized", res.Action)
 	}
-	if res.BackupSnapshot != "" {
-		t.Errorf("backupSnapshot = %q, want empty", res.BackupSnapshot)
+	if res.BackupSnapshot != nil {
+		t.Errorf("backupSnapshot = %q, want nil", *res.BackupSnapshot)
 	}
 	r, err := state.ReadStateFile(paths)
 	if err != nil {

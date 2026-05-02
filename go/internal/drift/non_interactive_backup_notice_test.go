@@ -35,14 +35,14 @@ func TestPR25_NonInteractiveDiscardSurfacesBackupPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ApplyGate: %v", err)
 	}
-	if res.BackupSnapshot == "" {
-		t.Fatalf("BackupSnapshot is empty; PR25 requires the discard path to surface a backup path even in non-interactive mode")
+	if res.BackupSnapshot == nil {
+		t.Fatalf("BackupSnapshot is nil; PR25 requires the discard path to surface a backup path even in non-interactive mode")
 	}
-	if exists, _ := state.PathExists(res.BackupSnapshot); !exists {
-		t.Errorf("BackupSnapshot dir does not exist on disk: %q", res.BackupSnapshot)
+	if exists, _ := state.PathExists(*res.BackupSnapshot); !exists {
+		t.Errorf("BackupSnapshot dir does not exist on disk: %q", *res.BackupSnapshot)
 	}
 	// The backup must contain the user's pre-discard content.
-	got, err := os.ReadFile(filepath.Join(res.BackupSnapshot, "CLAUDE.md"))
+	got, err := os.ReadFile(filepath.Join(*res.BackupSnapshot, "CLAUDE.md"))
 	if err != nil {
 		t.Fatalf("ReadFile snapshot: %v", err)
 	}
@@ -51,10 +51,11 @@ func TestPR25_NonInteractiveDiscardSurfacesBackupPath(t *testing.T) {
 	}
 }
 
-// PR25: discard with no live .claude/ produces an empty BackupSnapshot
-// (nothing to back up — NoActive case). The CLI should still emit the
-// (empty) BackupSnapshot field in JSON for shape consistency.
-func TestPR25_NonInteractiveDiscardWithNoActiveProducesEmptyBackup(t *testing.T) {
+// PR25: discard with no live .claude/ produces a nil BackupSnapshot
+// (nothing to back up — NoActive case, or active drift where the live tree
+// was deleted). The CLI emits the BackupSnapshot field in JSON as `null`
+// for shape consistency with TS (`string | null`).
+func TestPR25_NonInteractiveDiscardWithNoActiveProducesNilBackup(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	paths := state.BuildStatePaths(root)
@@ -65,18 +66,18 @@ func TestPR25_NonInteractiveDiscardWithNoActiveProducesEmptyBackup(t *testing.T)
 		Merged:            nil,
 		ActiveProfileName: "",
 	}
-	// No prior materialize → no .claude/. SnapshotForDiscard returns "".
+	// No prior materialize → no .claude/. SnapshotForDiscard returns nil.
 	res, err := drift.ApplyGate(drift.GateChoiceDiscard, otherOpts)
 	if err != nil {
 		t.Fatalf("ApplyGate: %v", err)
 	}
-	// The empty case is fine: there was nothing to back up, so the JSON
-	// will carry an empty backupPath. The action should still be
+	// The nil case is fine: there was nothing to back up, so the JSON
+	// will carry `"backupSnapshot": null`. The action should still be
 	// "materialized".
 	if res.Action != drift.ApplyActionMaterialized {
 		t.Errorf("action = %q, want materialized", res.Action)
 	}
-	if res.BackupSnapshot != "" {
-		t.Errorf("BackupSnapshot = %q, want empty (nothing to back up)", res.BackupSnapshot)
+	if res.BackupSnapshot != nil {
+		t.Errorf("BackupSnapshot = %q, want nil (nothing to back up)", *res.BackupSnapshot)
 	}
 }

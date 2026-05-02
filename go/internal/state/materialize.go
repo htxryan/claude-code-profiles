@@ -34,9 +34,13 @@ var testPreSpliceHook func()
 // disk and the discard-backup snapshot path (passed through from the caller
 // — D6's snapshotForDiscard runs BEFORE materialize on the discard-gate path
 // so the path lands in the state record).
+//
+// BackupSnapshot is *string (TS parity with `string | null`): nil signals
+// "no snapshot taken" (clean swap, sync, no-active). Non-nil holds the
+// absolute path of the snapshot dir.
 type MaterializeResult struct {
 	State          StateFile
-	BackupSnapshot string
+	BackupSnapshot *string
 }
 
 // rootSplicePlan captures the in-memory parsed slices of the live root
@@ -77,13 +81,13 @@ type rootSplicePlan struct {
 //
 // discardBackup is the path returned by SnapshotForDiscard (D6 calls that
 // before materialize on the discard-gate path so it lands in the state
-// record). Pass "" when no snapshot was taken (clean swap, sync, etc.).
+// record). Pass nil when no snapshot was taken (clean swap, sync, etc.).
 func Materialize(
 	paths StatePaths,
 	plan resolver.ResolvedPlan,
 	merged []merge.MergedFile,
 	opts MaterializeOptions,
-	discardBackup string,
+	discardBackup *string,
 ) (MaterializeResult, error) {
 	// Reconcile any leftover .pending/.prior from a prior crashed run BEFORE
 	// we start writing. After reconcile, live .claude/ is consistent with

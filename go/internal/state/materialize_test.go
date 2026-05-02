@@ -70,7 +70,7 @@ func TestMaterialize_HappyPath_ClaudeOnly(t *testing.T) {
 		mergedFile("settings.json", `{"a":1}`),
 		mergedFile("CLAUDE.md", "hello"),
 	}
-	res, err := state.Materialize(paths, plan, merged, state.MaterializeOptions{}, "")
+	res, err := state.Materialize(paths, plan, merged, state.MaterializeOptions{}, nil)
 	if err != nil {
 		t.Fatalf("Materialize: %v", err)
 	}
@@ -106,7 +106,7 @@ func TestMaterialize_OverwritesExistingClaudeDir(t *testing.T) {
 	}
 	plan := makePlan("dev")
 	merged := []merge.MergedFile{mergedFile("new", "NEW")}
-	if _, err := state.Materialize(paths, plan, merged, state.MaterializeOptions{}, ""); err != nil {
+	if _, err := state.Materialize(paths, plan, merged, state.MaterializeOptions{}, nil); err != nil {
 		t.Fatalf("Materialize: %v", err)
 	}
 	if exists, _ := state.PathExists(filepath.Join(paths.ClaudeDir, "old")); exists {
@@ -139,7 +139,7 @@ func TestMaterialize_R45_AbortsWhenRootClaudeMdMarkersMissing(t *testing.T) {
 		mergedFile("settings.json", `{"a":1}`),
 		mergedRootClaudeMd("section body"),
 	}
-	_, err := state.Materialize(paths, plan, merged, state.MaterializeOptions{}, "")
+	_, err := state.Materialize(paths, plan, merged, state.MaterializeOptions{}, nil)
 	if err == nil {
 		t.Fatalf("expected RootClaudeMdMarkersMissingError, got nil")
 	}
@@ -171,7 +171,7 @@ func TestMaterialize_RootSplice_HappyPath(t *testing.T) {
 	}
 	plan := makePlan("dev")
 	merged := []merge.MergedFile{mergedRootClaudeMd("PROFILE BODY\n")}
-	res, err := state.Materialize(paths, plan, merged, state.MaterializeOptions{}, "")
+	res, err := state.Materialize(paths, plan, merged, state.MaterializeOptions{}, nil)
 	if err != nil {
 		t.Fatalf("Materialize: %v", err)
 	}
@@ -206,11 +206,11 @@ func TestMaterialize_RootSplice_Idempotent(t *testing.T) {
 	}
 	plan := makePlan("dev")
 	merged := []merge.MergedFile{mergedRootClaudeMd("BODY\n")}
-	if _, err := state.Materialize(paths, plan, merged, state.MaterializeOptions{}, ""); err != nil {
+	if _, err := state.Materialize(paths, plan, merged, state.MaterializeOptions{}, nil); err != nil {
 		t.Fatalf("first materialize: %v", err)
 	}
 	first, _ := os.ReadFile(paths.RootClaudeMdFile)
-	if _, err := state.Materialize(paths, plan, merged, state.MaterializeOptions{}, ""); err != nil {
+	if _, err := state.Materialize(paths, plan, merged, state.MaterializeOptions{}, nil); err != nil {
 		t.Fatalf("second materialize: %v", err)
 	}
 	second, _ := os.ReadFile(paths.RootClaudeMdFile)
@@ -233,7 +233,7 @@ func TestMaterialize_EmptySpliceClearsPriorBytes(t *testing.T) {
 	// First: a plan WITH a projectRoot contribution.
 	plan1 := makePlan("withRoot")
 	merged1 := []merge.MergedFile{mergedRootClaudeMd("OLDBODY\n")}
-	if _, err := state.Materialize(paths, plan1, merged1, state.MaterializeOptions{}, ""); err != nil {
+	if _, err := state.Materialize(paths, plan1, merged1, state.MaterializeOptions{}, nil); err != nil {
 		t.Fatalf("first materialize: %v", err)
 	}
 	mid, _ := os.ReadFile(paths.RootClaudeMdFile)
@@ -244,7 +244,7 @@ func TestMaterialize_EmptySpliceClearsPriorBytes(t *testing.T) {
 	// must be cleared; user bytes preserved.
 	plan2 := makePlan("noRoot")
 	merged2 := []merge.MergedFile{mergedFile("a.md", "x")}
-	res, err := state.Materialize(paths, plan2, merged2, state.MaterializeOptions{}, "")
+	res, err := state.Materialize(paths, plan2, merged2, state.MaterializeOptions{}, nil)
 	if err != nil {
 		t.Fatalf("second materialize: %v", err)
 	}
@@ -303,7 +303,7 @@ func TestMaterialize_RootSplice_StateWrittenBeforeSplice(t *testing.T) {
 
 	plan := makePlan("dev")
 	merged := []merge.MergedFile{mergedRootClaudeMd("PROFILE BODY\n")}
-	res, err := state.Materialize(paths, plan, merged, state.MaterializeOptions{}, "")
+	res, err := state.Materialize(paths, plan, merged, state.MaterializeOptions{}, nil)
 	if err != nil {
 		t.Fatalf("Materialize: %v", err)
 	}
@@ -351,7 +351,7 @@ func TestMaterialize_PreservesExternalTrustNotices(t *testing.T) {
 		{Raw: "/abs/new", ResolvedPath: "/abs/new"},           // new
 	}
 	merged := []merge.MergedFile{mergedFile("a", "x")}
-	res, err := state.Materialize(paths, plan, merged, state.MaterializeOptions{}, "")
+	res, err := state.Materialize(paths, plan, merged, state.MaterializeOptions{}, nil)
 	if err != nil {
 		t.Fatalf("Materialize: %v", err)
 	}

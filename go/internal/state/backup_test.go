@@ -30,13 +30,13 @@ func TestSnapshotForDiscard_Basic(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SnapshotForDiscard: %v", err)
 	}
-	if dest == "" {
-		t.Fatalf("dest empty; expected snapshot path")
+	if dest == nil {
+		t.Fatalf("dest nil; expected snapshot path")
 	}
-	if !strings.HasPrefix(dest, paths.BackupDir) {
-		t.Fatalf("dest %q not under %q", dest, paths.BackupDir)
+	if !strings.HasPrefix(*dest, paths.BackupDir) {
+		t.Fatalf("dest %q not under %q", *dest, paths.BackupDir)
 	}
-	got, err := os.ReadFile(filepath.Join(dest, "settings.json"))
+	got, err := os.ReadFile(filepath.Join(*dest, "settings.json"))
 	if err != nil {
 		t.Fatalf("read snapshot: %v", err)
 	}
@@ -45,9 +45,9 @@ func TestSnapshotForDiscard_Basic(t *testing.T) {
 	}
 }
 
-// TestSnapshotForDiscard_NoLiveDirReturnsEmpty covers the NoActive corner: no
-// live .claude/ → return "" with no error.
-func TestSnapshotForDiscard_NoLiveDirReturnsEmpty(t *testing.T) {
+// TestSnapshotForDiscard_NoLiveDirReturnsNil covers the NoActive corner: no
+// live .claude/ → return nil (TS-parity with `null`) with no error.
+func TestSnapshotForDiscard_NoLiveDirReturnsNil(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	paths := state.BuildStatePaths(root)
@@ -55,8 +55,8 @@ func TestSnapshotForDiscard_NoLiveDirReturnsEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SnapshotForDiscard: %v", err)
 	}
-	if dest != "" {
-		t.Fatalf("dest = %q, want empty", dest)
+	if dest != nil {
+		t.Fatalf("dest = %q, want nil", *dest)
 	}
 }
 
@@ -93,7 +93,10 @@ func TestSnapshotForDiscard_NoColonsInName(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SnapshotForDiscard: %v", err)
 	}
-	base := filepath.Base(dest)
+	if dest == nil {
+		t.Fatalf("dest nil; expected snapshot path")
+	}
+	base := filepath.Base(*dest)
 	if strings.Contains(base, ":") {
 		t.Fatalf("snapshot name %q contains a colon (invalid on Windows)", base)
 	}

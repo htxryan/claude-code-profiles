@@ -52,7 +52,7 @@ func setupWithRootSection(t *testing.T, sectionBody string) state.StatePaths {
 	}
 	paths := state.BuildStatePaths(root)
 	plan := makeRootSectionPlan("leaf")
-	if _, err := state.Materialize(paths, plan, []merge.MergedFile{mergedRoot(sectionBody)}, state.MaterializeOptions{}, ""); err != nil {
+	if _, err := state.Materialize(paths, plan, []merge.MergedFile{mergedRoot(sectionBody)}, state.MaterializeOptions{}, nil); err != nil {
 		t.Fatalf("Materialize: %v", err)
 	}
 	return paths
@@ -331,7 +331,7 @@ func TestDetectDrift_NoSectionFingerprintProducesNoRootEntry(t *testing.T) {
 			SchemaVersion: merge.MergedFileSchemaVersion,
 		},
 	}
-	if _, err := state.Materialize(paths, plan, merged, state.MaterializeOptions{}, ""); err != nil {
+	if _, err := state.Materialize(paths, plan, merged, state.MaterializeOptions{}, nil); err != nil {
 		t.Fatalf("Materialize: %v", err)
 	}
 	if err := os.WriteFile(paths.RootClaudeMdFile, []byte("# Random user file, never managed by us.\n"), 0o644); err != nil {

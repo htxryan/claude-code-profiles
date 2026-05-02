@@ -173,14 +173,37 @@ func TestDecideGate_NonInteractiveNeverPrompts(t *testing.T) {
 	}
 }
 
-// All-unrecoverable entries auto-abort in EVERY mode — neither discard nor
-// persist can succeed when project-root markers are gone, so prompting the
-// user (or honoring a flag) only produces a confusing post-prompt failure.
-// The reason text points at the remediation command.
-func TestDecideGate_AllUnrecoverableAutoAborts(t *testing.T) {
+// All-unrecoverable entries are NOT special-cased at the gate. The gate
+// doesn't know the target plan: a switch to a profile with no projectRoot
+// contributor can legitimately recover from missing markers via Materialize's
+// preflightEmptyRootSplice opt-out path. So the unrecoverable-only report
+// flows through the normal decision table — interactive without a flag still
+// prompts, the flag is honored, non-interactive auto-aborts. If markers are
+// gone AND the new plan needs them, Materialize's R45 preflight refuses;
+// gating doesn't need to duplicate that check.
+func TestDecideGate_AllUnrecoverableFlowsNormalPath(t *testing.T) {
 	t.Parallel()
+	// Interactive + no flag → prompt (let the user choose; Materialize will
+	// surface a clear error on apply if the new plan needed the markers).
+	out := drift.DecideGate(drift.GateInput{
+		Report: unrecoverableReport(),
+		Mode:   drift.GateModeInteractive,
+	})
+	if out.Kind != drift.GateOutcomePrompt {
+		t.Errorf("interactive no-flag: kind = %q, want prompt", out.Kind)
+	}
+	// Non-interactive + no flag → auto abort (the regular hard-block).
+	out = drift.DecideGate(drift.GateInput{
+		Report: unrecoverableReport(),
+		Mode:   drift.GateModeNonInteractive,
+	})
+	if out.Kind != drift.GateOutcomeAuto || out.Choice != drift.GateChoiceAbort {
+		t.Errorf("non-interactive no-flag: kind=%q choice=%q, want auto/abort", out.Kind, out.Choice)
+	}
+	// Flag is honored across both modes — including discard/persist (the
+	// caller authorized the choice; Materialize gets to decide if it can land).
 	for _, mode := range []drift.GateMode{drift.GateModeInteractive, drift.GateModeNonInteractive} {
-		for _, flag := range []drift.GateChoice{"", drift.GateChoiceDiscard, drift.GateChoicePersist, drift.GateChoiceAbort} {
+		for _, flag := range []drift.GateChoice{drift.GateChoiceDiscard, drift.GateChoicePersist, drift.GateChoiceAbort} {
 			out := drift.DecideGate(drift.GateInput{
 				Report:      unrecoverableReport(),
 				Mode:        mode,
@@ -189,21 +212,19 @@ func TestDecideGate_AllUnrecoverableAutoAborts(t *testing.T) {
 			if out.Kind != drift.GateOutcomeAuto {
 				t.Errorf("mode=%q flag=%q: kind = %q, want auto", mode, flag, out.Kind)
 			}
-			if out.Choice != drift.GateChoiceAbort {
-				t.Errorf("mode=%q flag=%q: choice = %q, want abort", mode, flag, out.Choice)
-			}
-			if !strings.Contains(out.Reason, "init") {
-				t.Errorf("mode=%q flag=%q: reason = %q, want substring 'init'", mode, flag, out.Reason)
+			if out.Choice != flag {
+				t.Errorf("mode=%q flag=%q: choice = %q, want %q", mode, flag, out.Choice, flag)
 			}
 		}
 	}
 }
 
-// Mixed entries (one unrecoverable + one regular) still hit the normal path —
-// the auto-abort only short-circuits when EVERY entry is unrecoverable. This
-// guards against an over-broad guard that would suppress legitimate drift
-// gating just because one section-marker row appears.
-func TestDecideGate_MixedEntriesDoNotAutoAbort(t *testing.T) {
+// Mixed entries (one unrecoverable + one regular) flow through the normal
+// path. This is symmetric with the all-unrecoverable case now that the gate
+// no longer special-cases the section-markers-missing terminal — the gate is
+// plan-agnostic and Materialize's preflight is the source of truth for
+// "can this resolution actually land".
+func TestDecideGate_MixedEntriesPrompt(t *testing.T) {
 	t.Parallel()
 	leaf := "leaf"
 	mixed := drift.DriftReport{
@@ -217,7 +238,7 @@ func TestDecideGate_MixedEntriesDoNotAutoAbort(t *testing.T) {
 	}
 	out := drift.DecideGate(drift.GateInput{Report: mixed, Mode: drift.GateModeInteractive})
 	if out.Kind != drift.GateOutcomePrompt {
-		t.Errorf("kind = %q, want prompt (mixed drift should not auto-abort)", out.Kind)
+		t.Errorf("kind = %q, want prompt (mixed drift should reach prompt)", out.Kind)
 	}
 }
 

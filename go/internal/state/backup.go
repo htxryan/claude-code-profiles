@@ -17,18 +17,22 @@ const MaxRetainedSnapshots = 5
 // SnapshotForDiscard copies the live .claude/ tree to
 // .claude-profiles/.meta/backup/<ISO>/ and prunes to keep at most
 // MaxRetainedSnapshots (R23a). Returns the absolute path of the new snapshot
-// for the one-line CLI notice; returns "" with no error when .claude/ doesn't
+// for the one-line CLI notice; returns nil with no error when .claude/ doesn't
 // exist (NoActive state being discarded — nothing to back up).
-func SnapshotForDiscard(paths StatePaths) (string, error) {
+//
+// The pointer return mirrors TS's `string | null` shape: callers serializing
+// the result to JSON for D7's structured output get `null` rather than `""`,
+// distinguishing "no backup taken" from "backup at empty path".
+func SnapshotForDiscard(paths StatePaths) (*string, error) {
 	exists, err := PathExists(paths.ClaudeDir)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if !exists {
-		return "", nil
+		return nil, nil
 	}
 	if err := os.MkdirAll(paths.BackupDir, 0o755); err != nil {
-		return "", err
+		return nil, err
 	}
 	// ISO timestamps are millisecond-precise so two snapshots within the same
 	// ms collide; copyTree's silent merge would corrupt retention accounting.
@@ -44,23 +48,23 @@ func SnapshotForDiscard(paths StatePaths) (string, error) {
 	for i := 1; ; i++ {
 		exists, err := PathExists(dest)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 		if !exists {
 			break
 		}
 		if i > maxProbe {
-			return "", fmt.Errorf("snapshot for discard: exhausted %d collision suffixes for base %q in %q", maxProbe, baseStamp, paths.BackupDir)
+			return nil, fmt.Errorf("snapshot for discard: exhausted %d collision suffixes for base %q in %q", maxProbe, baseStamp, paths.BackupDir)
 		}
 		dest = filepath.Join(paths.BackupDir, fmt.Sprintf("%s.%d", baseStamp, i))
 	}
 	if err := CopyTree(paths.ClaudeDir, dest); err != nil {
-		return "", err
+		return nil, err
 	}
 	if err := pruneOldSnapshots(paths.BackupDir, MaxRetainedSnapshots); err != nil {
-		return "", err
+		return nil, err
 	}
-	return dest, nil
+	return &dest, nil
 }
 
 // isoStampSafeForFs returns an ISO-8601 timestamp safe to use as a directory

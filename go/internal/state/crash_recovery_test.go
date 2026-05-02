@@ -42,7 +42,7 @@ func TestCrashRecovery_PostPendingPreRenameB(t *testing.T) {
 
 	plan := makePlan("leaf")
 	merged := crashInjectionMerged("LEAF-V1")
-	if _, err := state.Materialize(paths, plan, merged, state.MaterializeOptions{}, ""); err != nil {
+	if _, err := state.Materialize(paths, plan, merged, state.MaterializeOptions{}, nil); err != nil {
 		t.Fatalf("Materialize: %v", err)
 	}
 	got, err := os.ReadFile(filepath.Join(paths.ClaudeDir, "CLAUDE.md"))
@@ -88,7 +88,7 @@ func TestCrashRecovery_MidPriorRenameB(t *testing.T) {
 
 	plan := makePlan("leaf")
 	merged := crashInjectionMerged("LEAF-V1")
-	if _, err := state.Materialize(paths, plan, merged, state.MaterializeOptions{}, ""); err != nil {
+	if _, err := state.Materialize(paths, plan, merged, state.MaterializeOptions{}, nil); err != nil {
 		t.Fatalf("Materialize: %v", err)
 	}
 	// After reconcile + materialize: live tree is the new plan. Neither
@@ -136,7 +136,7 @@ func TestCrashRecovery_StaleStateFile(t *testing.T) {
 	}
 
 	plan := makePlan("leaf")
-	if _, err := state.Materialize(paths, plan, crashInjectionMerged("LEAF-V1"), state.MaterializeOptions{}, ""); err != nil {
+	if _, err := state.Materialize(paths, plan, crashInjectionMerged("LEAF-V1"), state.MaterializeOptions{}, nil); err != nil {
 		t.Fatalf("Materialize: %v", err)
 	}
 	res, err := state.ReadStateFile(paths)
@@ -157,7 +157,7 @@ func TestCrashRecovery_RepeatedSwapsConverge(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		plan := makePlan("leaf")
 		merged := crashInjectionMerged("V" + strconv.Itoa(i))
-		if _, err := state.Materialize(paths, plan, merged, state.MaterializeOptions{}, ""); err != nil {
+		if _, err := state.Materialize(paths, plan, merged, state.MaterializeOptions{}, nil); err != nil {
 			t.Fatalf("Materialize #%d: %v", i, err)
 		}
 	}
@@ -190,7 +190,7 @@ func TestCrashRecovery_TmpStateWriteCrash(t *testing.T) {
 		t.Fatalf("write: %v", err)
 	}
 	plan := makePlan("leaf")
-	if _, err := state.Materialize(paths, plan, crashInjectionMerged("LEAF-V1"), state.MaterializeOptions{}, ""); err != nil {
+	if _, err := state.Materialize(paths, plan, crashInjectionMerged("LEAF-V1"), state.MaterializeOptions{}, nil); err != nil {
 		t.Fatalf("Materialize: %v", err)
 	}
 	res, err := state.ReadStateFile(paths)

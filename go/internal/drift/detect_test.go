@@ -50,7 +50,7 @@ func materializeBaseTree(t *testing.T) (state.StatePaths, resolver.ResolvedPlan,
 		driftMergedFile("CLAUDE.md", "BASE\nLEAF\n"),
 		driftMergedFile("agents/a.md", "AGENT-A"),
 	}
-	if _, err := state.Materialize(paths, plan, merged, state.MaterializeOptions{}, ""); err != nil {
+	if _, err := state.Materialize(paths, plan, merged, state.MaterializeOptions{}, nil); err != nil {
 		t.Fatalf("Materialize: %v", err)
 	}
 	return paths, plan, merged

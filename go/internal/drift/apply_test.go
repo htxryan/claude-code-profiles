@@ -53,7 +53,7 @@ func setupTwoProfiles(t *testing.T) (state.StatePaths, drift.ApplyGateOptions, d
 		driftMergedFile("CLAUDE.md", "OTHER\n"),
 	}
 	// Materialize leaf as the starting state.
-	if _, err := state.Materialize(paths, leafPlan, leafMerged, state.MaterializeOptions{}, ""); err != nil {
+	if _, err := state.Materialize(paths, leafPlan, leafMerged, state.MaterializeOptions{}, nil); err != nil {
 		t.Fatalf("Materialize leaf: %v", err)
 	}
 	leafOpts := drift.ApplyGateOptions{
@@ -105,8 +105,8 @@ func TestApplyGate_NoDriftProceedMaterializesWithoutSnapshot(t *testing.T) {
 	if res.Action != drift.ApplyActionMaterialized {
 		t.Errorf("action = %q, want materialized", res.Action)
 	}
-	if res.BackupSnapshot != "" {
-		t.Errorf("backupSnapshot = %q, want empty on no-drift", res.BackupSnapshot)
+	if res.BackupSnapshot != nil {
+		t.Errorf("backupSnapshot = %q, want nil on no-drift", *res.BackupSnapshot)
 	}
 	live, err := os.ReadFile(filepath.Join(paths.ClaudeDir, "CLAUDE.md"))
 	if err != nil {
@@ -140,14 +140,14 @@ func TestApplyGate_R23_DiscardBacksUpBeforeMaterialize(t *testing.T) {
 	if res.Action != drift.ApplyActionMaterialized {
 		t.Errorf("action = %q, want materialized", res.Action)
 	}
-	if res.BackupSnapshot == "" {
-		t.Fatalf("backupSnapshot empty; expected discard to record one")
+	if res.BackupSnapshot == nil {
+		t.Fatalf("backupSnapshot nil; expected discard to record one")
 	}
-	if exists, _ := state.PathExists(res.BackupSnapshot); !exists {
-		t.Errorf("backup dir does not exist on disk: %q", res.BackupSnapshot)
+	if exists, _ := state.PathExists(*res.BackupSnapshot); !exists {
+		t.Errorf("backup dir does not exist on disk: %q", *res.BackupSnapshot)
 	}
 	// Snapshot must contain the drifted content (taken before materialize).
-	snapshotClaudeMd, err := os.ReadFile(filepath.Join(res.BackupSnapshot, "CLAUDE.md"))
+	snapshotClaudeMd, err := os.ReadFile(filepath.Join(*res.BackupSnapshot, "CLAUDE.md"))
 	if err != nil {
 		t.Fatalf("ReadFile snapshot: %v", err)
 	}
@@ -262,7 +262,7 @@ func TestApplyGate_DiscardSurfacesBackupOnMaterializeFailure(t *testing.T) {
 			SchemaVersion: merge.MergedFileSchemaVersion,
 		},
 	}
-	if _, err := state.Materialize(paths, plan, merged, state.MaterializeOptions{}, ""); err != nil {
+	if _, err := state.Materialize(paths, plan, merged, state.MaterializeOptions{}, nil); err != nil {
 		t.Fatalf("Materialize initial: %v", err)
 	}
 	// User adds drift to .claude/ AND strips the project-root markers — the
@@ -285,14 +285,14 @@ func TestApplyGate_DiscardSurfacesBackupOnMaterializeFailure(t *testing.T) {
 	if res.Action != drift.ApplyActionAborted {
 		t.Errorf("action = %q, want aborted on post-snapshot failure", res.Action)
 	}
-	if res.BackupSnapshot == "" {
-		t.Fatalf("BackupSnapshot empty on Materialize failure; user's edits are orphaned")
+	if res.BackupSnapshot == nil {
+		t.Fatalf("BackupSnapshot nil on Materialize failure; user's edits are orphaned")
 	}
-	if exists, _ := state.PathExists(res.BackupSnapshot); !exists {
-		t.Errorf("backup dir missing on disk: %q", res.BackupSnapshot)
+	if exists, _ := state.PathExists(*res.BackupSnapshot); !exists {
+		t.Errorf("backup dir missing on disk: %q", *res.BackupSnapshot)
 	}
 	// And the user's drift.md must be inside the backup so they can recover it.
-	if _, rerr := os.Stat(filepath.Join(res.BackupSnapshot, "drift.md")); rerr != nil {
+	if _, rerr := os.Stat(filepath.Join(*res.BackupSnapshot, "drift.md")); rerr != nil {
 		t.Errorf("backup missing user file drift.md: %v", rerr)
 	}
 }

@@ -107,7 +107,7 @@ func TestReconcileUnderLock_FirstActionGuard(t *testing.T) {
 	plan := makePlan("dev")
 	merged := crashInjectionMerged("LEAF-V1")
 	err := state.WithLock(context.Background(), paths, state.AcquireOptions{}, func(_ *state.LockHandle) error {
-		_, err := state.Materialize(paths, plan, merged, state.MaterializeOptions{}, "")
+		_, err := state.Materialize(paths, plan, merged, state.MaterializeOptions{}, nil)
 		return err
 	})
 	if err != nil {

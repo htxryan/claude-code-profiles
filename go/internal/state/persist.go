@@ -57,7 +57,7 @@ func PersistAndMaterialize(paths StatePaths, opts PersistOptions) (MaterializeRe
 		return MaterializeResult{}, err
 	}
 
-	return Materialize(paths, opts.NewPlan, opts.NewMerged, MaterializeOptions{}, "")
+	return Materialize(paths, opts.NewPlan, opts.NewMerged, MaterializeOptions{}, nil)
 }
 
 // PersistLiveIntoProfile is the persist half of the pair, exposed for tests
