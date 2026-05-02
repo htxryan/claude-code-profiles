@@ -173,6 +173,47 @@ func NewPathTraversalError(raw, resolvedPath, referencedBy string) *PathTraversa
 	}
 }
 
+// MissingIncludeError reports an includes entry that does not resolve to an
+// existing directory. Names the raw entry, the canonicalized path that was
+// looked up, and the referencing profile so the user can locate the bad
+// manifest entry.
+type MissingIncludeError struct {
+	ResolverError
+	Raw          string
+	ResolvedPath string
+	ReferencedBy string
+}
+
+func NewMissingIncludeError(raw, resolvedPath, referencedBy string) *MissingIncludeError {
+	msg := fmt.Sprintf(
+		"Include %q (resolved to %q) referenced by %q does not exist",
+		raw, resolvedPath, referencedBy,
+	)
+	return &MissingIncludeError{
+		ResolverError: ResolverError{base{code: CodeMissingInclude, phase: PhaseResolver, message: msg}},
+		Raw:           raw,
+		ResolvedPath:  resolvedPath,
+		ReferencedBy:  referencedBy,
+	}
+}
+
+// InvalidManifestError reports an unparseable or schema-invalid profile.json
+// (distinct from R36 unknown-field warnings, which are recoverable).
+type InvalidManifestError struct {
+	ResolverError
+	Path   string
+	Detail string
+}
+
+func NewInvalidManifestError(path, detail string) *InvalidManifestError {
+	msg := fmt.Sprintf("Manifest at %q is invalid: %s", path, detail)
+	return &InvalidManifestError{
+		ResolverError: ResolverError{base{code: CodeInvalidManifest, phase: PhaseResolver, message: msg}},
+		Path:          path,
+		Detail:        detail,
+	}
+}
+
 // AsPipelineError unwraps err and returns the first PipelineError in the
 // chain, or nil if none is present. Equivalent to errors.As with the
 // PipelineError interface but spelled as a single call site for the CLI
