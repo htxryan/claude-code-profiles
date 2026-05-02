@@ -1,0 +1,158 @@
+name: release
+
+# W2 — Distribution Pipeline.
+#
+# Triggers on v[1-9]*.*.* tags (post-cutover Go releases). Pre-1.0 v0.x
+# tags belong to the legacy npm package and are handled by
+# release-please.yml; this workflow deliberately does not match them so
+# the two pipelines never collide on the same tag.
+#
+# On PRs that touch this file or .goreleaser.yaml, the validate job runs
+# `goreleaser release --snapshot` (PR8 fitness function: dry-run on tag
+# candidate before push).
+#
+# Smoke test (PR8.5): each native target builds + runs `c3p --version`
+# on its native runner; linux/arm64 runs via qemu-user-static on
+# ubuntu-latest. Smoke gates the release job — a binary that cannot
+# start never reaches a release artifact.
+#
+# Cosign keyless signing (PR8.3 SHALL): id-token: write enables OIDC
+# token access for sigstore. Goreleaser propagates a non-zero cosign exit,
+# which fails the workflow — there is no silent skip path.
+#
+# Tap publication (PR8.1): HOMEBREW_TAP_TOKEN is a fine-grained PAT
+# scoped to tap-write only, NOT the default GITHUB_TOKEN.
+
+on:
+  push:
+    tags:
+      - 'v[1-9]*.*.*'
+  pull_request:
+    paths:
+      - '.goreleaser.yaml'
+      - '.github/workflows/release.yml'
+
+permissions:
+  contents: write   # GH Releases write
+  id-token: write   # cosign keyless OIDC
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    # PR-time dry-run: snapshot build + checksum, no sign/publish (signing
+    # needs OIDC which only the tag-push event has on this branch). Catches
+    # goreleaser config regressions before they hit a real release tag.
+    name: validate (snapshot)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: latest
+          args: release --snapshot --clean --skip=publish,sign,announce
+
+  smoke:
+    # PR8.5: cross-compile smoke test. Build for each target on a runner
+    # that can execute the resulting binary, then run `c3p --version`.
+    # A binary that segfaults at startup will fail this job and gate the
+    # release. Goreleaser will rebuild from the same source commit in the
+    # release job below — the only delta is `-ldflags -X main.version=`,
+    # which cannot break process startup.
+    #
+    # Coverage: every target the release artifact set ships:
+    #   linux amd64+arm64, darwin amd64+arm64, windows amd64+arm64.
+    # All run on native runners except linux/arm64, which uses qemu on an
+    # x86_64 ubuntu runner (works because Linux binfmt_misc + qemu-user
+    # transparently forwards arm64 ELF execs).
+    name: smoke ${{ matrix.goos }}/${{ matrix.goarch }}
+    if: github.event_name == 'push'
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { runner: ubuntu-latest,    goos: linux,   goarch: amd64 }
+          - { runner: ubuntu-latest,    goos: linux,   goarch: arm64, qemu: true }
+          - { runner: macos-15-intel,   goos: darwin,  goarch: amd64 }
+          - { runner: macos-14,         goos: darwin,  goarch: arm64 }
+          - { runner: windows-latest,   goos: windows, goarch: amd64 }
+          - { runner: windows-11-arm,   goos: windows, goarch: arm64 }
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+      - name: Setup QEMU (cross-arch smoke for non-native targets)
+        if: matrix.qemu == true
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+      - name: Build c3p for ${{ matrix.goos }}/${{ matrix.goarch }}
+        working-directory: go
+        env:
+          CGO_ENABLED: "0"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          out="../c3p"
+          if [ "$GOOS" = "windows" ]; then
+            out="$out.exe"
+          fi
+          go build -trimpath -ldflags '-s -w' -o "$out" ./cmd/c3p
+      - name: Smoke ./c3p --version
+        run: |
+          bin="./c3p"
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            bin="./c3p.exe"
+          fi
+          "$bin" --version
+
+  release:
+    # Canonical build + sign + publish. Runs only on tag push, only after
+    # smoke passes. Goreleaser handles cross-compile, archives, checksums,
+    # cosign keyless signing, GH Release upload, brew tap PR, winget PR.
+    name: release
+    needs: smoke
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0  # full history needed for goreleaser changelog
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+      - name: Run goreleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: latest
+          args: release --clean
+        env:
+          # Default GITHUB_TOKEN: write access to *this* repo only.
+          # Used for the GH Releases upload.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # PR8.1 + PR27: fine-grained PAT scoped to htxryan/homebrew-tap
+          # writes only; ≤90-day expiration. NEVER the default GITHUB_TOKEN
+          # (whose scope would extend to this repo's full contents).
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          # Optional: WINGET_PKGS_TOKEN scoped to htxryan/winget-pkgs.
+          # When unset, the winget step skips upload (skip_upload templated
+          # in .goreleaser.yaml). The release does not abort.
+          WINGET_PKGS_TOKEN: ${{ secrets.WINGET_PKGS_TOKEN }}

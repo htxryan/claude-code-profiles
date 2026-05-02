@@ -94,6 +94,19 @@ tasks:
     dir: go
     cmd: bash scripts/jsonout_lint.sh
 
+  # ── release (W2) ───────────────────────────────────────────────────────────
+  # Local pre-flight hooks for the W2 release pipeline. The actual release
+  # runs in .github/workflows/release.yml on a v[1-9]*.*.* tag push; these
+  # tasks are the PR8 fitness-function "dry-run on tag candidate before push".
+
+  release:check:
+    desc: W2 — validate .goreleaser.yaml without building
+    cmd: goreleaser check
+
+  release:dry-run:
+    desc: W2 — local snapshot build (no publish/sign) — pre-tag pre-flight
+    cmd: goreleaser release --snapshot --clean --skip=publish,sign,announce
+
   # ── ci ─────────────────────────────────────────────────────────────────────
 
   ci:
