@@ -56,10 +56,9 @@ func IsValidProfileName(name string) bool {
 	if strings.HasPrefix(name, "_") || strings.HasPrefix(name, ".") {
 		return false
 	}
+	// Both POSIX and Windows separators rejected on every host so a manifest
+	// authored on either platform behaves identically.
 	if strings.ContainsAny(name, "/\\") {
-		return false
-	}
-	if strings.ContainsRune(name, os.PathSeparator) {
 		return false
 	}
 	if strings.ContainsRune(name, 0) {
@@ -82,7 +81,8 @@ func IsWindowsReservedName(name string) bool {
 }
 
 // IsExternal returns true iff absPath is outside projectRoot. Both arguments
-// must already be absolute; the function does not canonicalize.
+// must already be absolute; the function does not canonicalize and does not
+// follow symlinks (textual containment only — security boundary doc note).
 func IsExternal(absPath, projectRoot string) bool {
 	rel, err := filepath.Rel(projectRoot, absPath)
 	if err != nil {
@@ -91,7 +91,10 @@ func IsExternal(absPath, projectRoot string) bool {
 	if rel == "." {
 		return false
 	}
-	if strings.HasPrefix(rel, "..") {
+	// `..` alone, or `../something`, signals escape. Guard against a bare
+	// filename like `..hidden` (legitimate) being mistaken for traversal —
+	// match only `..` or a `..` segment followed by the path separator.
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 		return true
 	}
 	if filepath.IsAbs(rel) {
@@ -104,6 +107,20 @@ func IsExternal(absPath, projectRoot string) bool {
 // PR16a. Returns InvalidManifestError for syntactically invalid forms,
 // PathTraversalError for relative-form (`./` / `../`) entries that resolve
 // outside projectRoot.
+//
+// PR16a is enforced via TEXTUAL canonicalization (filepath.Join) only —
+// the function does NOT follow symlinks. A relative include that points at
+// a symlink whose target lives outside projectRoot will pass classification
+// (the textual path is inside) and the link will be followed by os.Stat at
+// resolve time. v1 accepts that boundary; D5 (state) and D6 (drift) trust
+// the resolver's classification.
+//
+// TS deviation note: the TS resolver tracks `../`-outside-projectRoot
+// includes as `external=true` and surfaces them as MissingInclude only
+// when the directory does not exist. The Go resolver rejects up-front with
+// PathTraversalError per the spec strengthening in PR16a. Downstream
+// consumers (D2/D5/D7) will therefore never see a relative-kind include
+// with `external=true` on Go output.
 func ClassifyInclude(raw, referencingProfileDir string, paths ResolverPaths, referencedBy string) (IncludeRef, error) {
 	if raw == "" {
 		return IncludeRef{}, pipelineerrors.NewInvalidManifestError(

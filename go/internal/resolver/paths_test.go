@@ -85,6 +85,36 @@ func TestClassifyInclude_TildeExpands(t *testing.T) {
 	}
 }
 
+func TestClassifyInclude_TildeInsideProjectRoot(t *testing.T) {
+	// When projectRoot itself happens to live under $HOME, a tilde include
+	// whose expanded path falls inside projectRoot must be flagged
+	// non-external. Coverage gap surfaced by the D1 review.
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skipf("no home dir: %v", err)
+	}
+	projectRoot := filepath.Join(home)
+	referencingDir := filepath.Join(projectRoot, ".claude-profiles", "myprofile")
+	paths := resolver.BuildPaths(projectRoot)
+
+	ref, err := resolver.ClassifyInclude("~", referencingDir, paths, "p")
+	if err != nil {
+		t.Fatalf("classify ~: %v", err)
+	}
+	if ref.External {
+		t.Fatalf("expected external=false when ~ resolves inside projectRoot, got external=%v", ref.External)
+	}
+}
+
+func TestIsExternal_DotDotPrefixedFilename(t *testing.T) {
+	// A filename whose first component begins with `..` characters but
+	// is not a path-traversal segment must not be flagged external.
+	// Regression guard for the prefix-vs-segment bug.
+	if resolver.IsExternal("/proj/..hidden", "/proj") {
+		t.Fatalf(`"/proj/..hidden" must not be external`)
+	}
+}
+
 func TestClassifyInclude_AbsoluteExternal(t *testing.T) {
 	projectRoot := mustAbs(t, "/tmp/some-project")
 	referencingDir := filepath.Join(projectRoot, ".claude-profiles", "myprofile")

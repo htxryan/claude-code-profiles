@@ -34,13 +34,11 @@ func Resolve(profileName string, opts ResolveOptions) (*ResolvedPlan, error) {
 	}
 
 	// 3. Build contributors in canonical order.
-	var (
-		contributors           []Contributor
-		includes               []IncludeRef
-		externalPaths          []ExternalTrustEntry
-		seenExternal           = map[string]struct{}{}
-		seenContributorPaths   = map[string]struct{}{}
-	)
+	contributors := []Contributor{}
+	includes := []IncludeRef{}
+	externalPaths := []ExternalTrustEntry{}
+	seenExternal := map[string]struct{}{}
+	seenContributorPaths := map[string]struct{}{}
 	leafIndex := len(oldestFirst) - 1
 	for i, entry := range oldestFirst {
 		isLeaf := i == leafIndex
@@ -63,6 +61,9 @@ func Resolve(profileName string, opts ResolveOptions) (*ResolvedPlan, error) {
 	files, err := collectFiles(contributors)
 	if err != nil {
 		return nil, err
+	}
+	if files == nil {
+		files = []PlanFile{}
 	}
 
 	// 5. Conflict detection (R11). Group by (destination, relPath).
@@ -196,6 +197,10 @@ func emitIncludes(
 		if err != nil {
 			return err
 		}
+		// Append before the existence check so partial-progress shapes match
+		// the TS resolver: on error, *includes is discarded by the caller
+		// (Resolve returns nil, err). Do not switch this to a partial-plan
+		// return without auditing every consumer for the new shape.
 		*includes = append(*includes, ref)
 
 		if !IsDirectory(ref.ResolvedPath) {

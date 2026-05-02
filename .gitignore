@@ -31,3 +31,6 @@ site/test-baselines/**/*.actual.png
 go/c3p
 go/c3p.exe
 go/**/*.test
+
+# compound-agent / lessons cache scoped per-tree (also exists at repo root).
+go/.claude/
