@@ -1,0 +1,61 @@
+name: Perf
+
+# W3 (epic claude-code-profiles-94o) — performance gates.
+#
+# CI on every PR (.github/workflows/ci.yml::go) runs perf_test.go::TestBinarySize
+# and perf_test.go::TestLargeProfile because both are deterministic enough to
+# fire on per-PR cadence (size is byte-equal across runs; large-profile has a
+# 5 s budget that's well above CI variance on linux/darwin).
+#
+# perf_test.go::TestColdStart is gated behind C3P_PERF_COLDSTART=1 and skipped
+# on the standard go test invocation. This workflow opts in to that gate via
+# the env var. We run nightly + on demand:
+#   - schedule:  03:00 UTC daily — outside US/EU work hours so spawn-time
+#                noise from CI runner activity is at its lowest.
+#   - workflow_dispatch: manual trigger for ad-hoc perf-impacting PR checks.
+#
+# Why not on every PR: cold-start measures wall-clock spawn time of the
+# binary. A noisy-neighbour CI runner can double the mean of an otherwise
+# fast spawn. The platform-class threshold (50 ms on CI) absorbs typical
+# noise; running once per day rather than per-PR keeps the regression
+# signal strong without flaking on shared infra.
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cold-start:
+    name: cold-start (mean-of-middle-8)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Task
+        uses: arduino/setup-task@v2
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: true
+          cache-dependency-path: go/go.sum
+
+      - name: Cold start (PR18)
+        env:
+          C3P_PERF_COLDSTART: "1"
+          # CI=true triggers the 50 ms platform-class budget inside the
+          # test (vs the 25 ms developer budget). GitHub Actions sets CI
+          # automatically; setting it explicitly here makes the threshold
+          # selection auditable.
+          CI: "true"
+        working-directory: go
+        run: go test -run TestColdStart -v ./tests/integration/...
