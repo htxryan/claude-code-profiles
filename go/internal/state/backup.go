@@ -18,7 +18,19 @@ const MaxRetainedSnapshots = 5
 // .claude-profiles/.meta/backup/<ISO>/ and prunes to keep at most
 // MaxRetainedSnapshots (R23a). Returns the absolute path of the new snapshot
 // for the one-line CLI notice; returns nil with no error when .claude/ doesn't
-// exist (NoActive state being discarded — nothing to back up).
+// exist. Two scenarios produce nil:
+//   - NoActive: profile never materialized — the directory was never created.
+//   - Active-with-deleted-tree drift: profile was active and materialized
+//     once, but the user removed .claude/ between then and this discard
+//     (drift kind = DeletedAll). There is no live content to capture, so
+//     no recovery channel is offered — emitting an empty dir would only
+//     consume a retention slot and mislead the user into thinking there
+//     was something to recover.
+//
+// Both cases are intentional. PR25's "non-interactive discard surfaces a
+// backupPath in JSON" contract is satisfied by nil being serialized to
+// `null` (TS-parity `string | null`); the CLI emits the field unconditionally
+// and the user reads `null` as "no recovery channel available".
 //
 // The pointer return mirrors TS's `string | null` shape: callers serializing
 // the result to JSON for D7's structured output get `null` rather than `""`,

@@ -81,3 +81,53 @@ func TestPR25_NonInteractiveDiscardWithNoActiveProducesNilBackup(t *testing.T) {
 		t.Errorf("BackupSnapshot = %q, want nil (nothing to back up)", *res.BackupSnapshot)
 	}
 }
+
+// PR25: active profile with deleted live .claude/ — the user materialized
+// once, then removed the entire tree (drift kind = DeletedAll). When discard
+// is selected, SnapshotForDiscard MUST return nil because there is no live
+// content to capture; nil is the correct surface for "no recovery channel
+// available" rather than a faux empty snapshot. Pins the behavior carved
+// out by SnapshotForDiscard's "no live tree → nil" contract so a future
+// refactor can't quietly start emitting empty backup dirs (which would make
+// retention accounting noisy and confuse users into thinking there's something
+// to recover).
+func TestPR25_NonInteractiveDiscardWithActiveProfileAndDeletedTreeProducesNilBackup(t *testing.T) {
+	t.Parallel()
+	paths, _, otherOpts := setupTwoProfiles(t)
+	// Simulate active-profile-with-deleted-tree drift: the user removed
+	// .claude/ outright between materialize and the next swap.
+	if err := os.RemoveAll(paths.ClaudeDir); err != nil {
+		t.Fatalf("RemoveAll live tree: %v", err)
+	}
+	if exists, _ := state.PathExists(paths.ClaudeDir); exists {
+		t.Fatalf("precondition: live .claude/ still exists after RemoveAll")
+	}
+
+	res, err := drift.ApplyGate(drift.GateChoiceDiscard, otherOpts)
+	if err != nil {
+		t.Fatalf("ApplyGate: %v", err)
+	}
+	if res.Action != drift.ApplyActionMaterialized {
+		t.Errorf("action = %q, want materialized (discard proceeds even with empty tree)", res.Action)
+	}
+	if res.BackupSnapshot != nil {
+		t.Errorf("BackupSnapshot = %q, want nil (deleted tree → nothing to back up)", *res.BackupSnapshot)
+	}
+	// And no snapshot dirs were created on disk (the contract is "no copy
+	// taken", not "empty dir created").
+	snaps, err := state.ListSnapshots(paths)
+	if err != nil {
+		t.Fatalf("ListSnapshots: %v", err)
+	}
+	if len(snaps) != 0 {
+		t.Errorf("snapshots taken when nothing to back up: %v", snaps)
+	}
+	// And the new profile was materialized into the live tree.
+	live, err := os.ReadFile(filepath.Join(paths.ClaudeDir, "CLAUDE.md"))
+	if err != nil {
+		t.Fatalf("ReadFile live: %v", err)
+	}
+	if string(live) != "OTHER\n" {
+		t.Errorf("live CLAUDE.md = %q, want OTHER\\n", live)
+	}
+}

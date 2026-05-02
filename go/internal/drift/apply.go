@@ -85,6 +85,10 @@ func ApplyGate(choice GateChoice, opts ApplyGateOptions) (ApplyGateResult, error
 		// SnapshotForDiscard returns nil when .claude/ doesn't exist (NoActive
 		// or active-with-deleted-tree drift): there's nothing to back up, and
 		// nil is propagated to the caller as "no snapshot taken" (TS parity).
+		// PR25 contract is preserved — the CLI emits BackupSnapshot
+		// unconditionally; nil serializes to `null`, which the user reads as
+		// "no recovery channel available". Pinned by
+		// TestPR25_NonInteractiveDiscardWithActiveProfileAndDeletedTreeProducesNilBackup.
 		backup, err := state.SnapshotForDiscard(opts.Paths)
 		if err != nil {
 			return ApplyGateResult{}, err
