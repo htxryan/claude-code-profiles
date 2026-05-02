@@ -46,6 +46,25 @@ afterEach(async () => {
   fx = undefined;
 });
 
+// Production command handlers route through `resolveNoColor(opts.noColor)`
+// which reads `process.env.NO_COLOR`. If a developer or CI runner has
+// `NO_COLOR=1` exported in their shell, the TTY-color assertions in this
+// file (which expect ANSI escapes) collapse to plain text and fail.
+//
+// Strip NO_COLOR at the file level so every test starts from a clean env.
+// The dedicated `NO_COLOR env — zero ANSI escapes (3yy AC-4)` describe block
+// sets it explicitly in its own beforeEach (vitest runs outer→inner for
+// beforeEach and inner→outer for afterEach, so this nests correctly).
+let savedFileNoColor: string | undefined;
+beforeEach(() => {
+  savedFileNoColor = process.env["NO_COLOR"];
+  delete process.env["NO_COLOR"];
+});
+afterEach(() => {
+  if (savedFileNoColor === undefined) delete process.env["NO_COLOR"];
+  else process.env["NO_COLOR"] = savedFileNoColor;
+});
+
 /**
  * ANSI-stripping helper. The test channel doesn't go through a TTY so the
  * non-ANSI cases are already plain text, but the in-process channel can't
