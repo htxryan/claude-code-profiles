@@ -62,6 +62,16 @@ type Fixture struct {
 	ExternalRoot string
 }
 
+// Cleanup mirrors the TS fixture.cleanup surface to keep the F1 explicit
+// contract (Fixture{ProjectRoot, ExternalRoot, Cleanup() error}) honest
+// across both languages — the helper-parity audit (PR4) checks for this
+// method by name. The Go implementation is intentionally a no-op: every
+// MakeFixture caller owns a t.TempDir() root, and Go's testing runtime
+// removes that tree at test end (including on panic), so re-running rm
+// here would be redundant. Returns nil for symmetry with the TS Promise
+// surface; never returns an error.
+func (*Fixture) Cleanup() error { return nil }
+
 // MakeFixture materializes spec into a fresh t.TempDir() tree and returns
 // a Fixture. The tree is removed at test end automatically (including on
 // panic), since t.TempDir() registers its own cleanup. Errors during

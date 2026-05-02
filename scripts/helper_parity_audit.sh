@@ -63,6 +63,11 @@ declare -a CHECKS=(
   $'export async function makeFixture\tfunc MakeFixture\tmakeFixture/MakeFixture entrypoint'
   $'export async function runCli\tfunc RunCli\trunCli/RunCli entrypoint'
   $'export async function ensureBuilt\tfunc EnsureBuilt\tensureBuilt/EnsureBuilt entrypoint'
+  # Fixture lifecycle parity — TS exposes a cleanup callback on the Fixture
+  # object; Go exposes a Cleanup() method on *Fixture. The Go impl is a
+  # no-op (t.TempDir handles real removal) but the surface match is
+  # load-bearing for the F1 epic's explicit Fixture contract.
+  $'cleanup:[[:space:]]+\\(\\)[[:space:]]+=>\tfunc[[:space:]]+\\(\\*Fixture\\)[[:space:]]+Cleanup\\(\\)[[:space:]]+error\tFixture.cleanup/Cleanup'
   # ProfileSpec field parity
   $'manifest\\?\tManifest[[:space:]]+any\tProfileSpec.manifest'
   $'files\\?\tFiles[[:space:]]+map\\[string\\]string\tProfileSpec.files'
