@@ -100,11 +100,15 @@ homebrew_casks:
       owner: htxryan
       name: homebrew-tap
       branch: "c3p-{{ .Version }}"
-      # envOrDefault avoids template-eval failure on fork PRs that exercise
-      # this config (validate job) without access to the secret. The publish
-      # pipe is skipped via --skip=publish in validate, so an empty token is
-      # never used to actually push.
-      token: '{{ envOrDefault "HOMEBREW_TAP_TOKEN" "" }}'
+      # The homebrew_casks.repository.token field on goreleaser v2.15.x uses
+      # a minimal template registry that does NOT include `env` or
+      # `envOrDefault`. `.Env.NAME` (direct env-map access) works and
+      # returns "" when the var is unset — which is the behavior we want:
+      # validate jobs run with --skip=publish so this template is never
+      # evaluated against a real publish; release jobs always have the
+      # secret set in env. Even if it ever IS evaluated empty, the publish
+      # would fail at HTTP-auth time, not at template parse time.
+      token: '{{ .Env.HOMEBREW_TAP_TOKEN }}'
       # PR8.1 contract: tap PRs are human-approved. We open the PR
       # (pull_request.enabled: true) but do NOT enable auto-merge. The
       # tap repo enforces "Require pull request review" at the branch
@@ -155,16 +159,23 @@ winget:
       owner: htxryan
       name: winget-pkgs
       branch: "c3p-{{ .Version }}"
-      # envOrDefault matches the HOMEBREW_TAP_TOKEN pattern: avoids
-      # template-eval failure on fork PRs without secret access.
-      token: '{{ envOrDefault "WINGET_PKGS_TOKEN" "" }}'
+      # See the homebrew_casks token comment above — same template-registry
+      # constraint applies here. `.Env.NAME` is the only env access that
+      # works in this field on goreleaser v2.15.x.
+      token: '{{ .Env.WINGET_PKGS_TOKEN }}'
       pull_request:
         enabled: true
         base:
           owner: microsoft
           name: winget-pkgs
           branch: master
-    skip_upload: '{{ if eq (envOrDefault "WINGET_PKGS_TOKEN" "") "" }}true{{ else }}false{{ end }}'
+    # Hardcoded skip until WINGET_PKGS_TOKEN is bootstrapped per
+    # docs/release-runbook.md (PR8.1, fine-grained PAT scoped to the
+    # winget-pkgs fork only). Flip to 'false' once the secret exists in
+    # this repo's Actions secrets. The `env` template function isn't
+    # available in this field on goreleaser v2.15.x so we can't gate the
+    # value dynamically the way the original config attempted.
+    skip_upload: 'true'
 
 release:
   github:
