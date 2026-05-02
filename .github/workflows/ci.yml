@@ -81,12 +81,23 @@ jobs:
     # PR17 (W1): the matrix includes windows-latest so windows_test.go cells
     # (cross-drive rename, LockFileEx, .bat companion) run on every PR. No
     # skipIf(win32) is allowed in the Go test tree.
+    #
+    # IV (epic claude-code-profiles-ijw) PR7 — 5-platform CI matrix on
+    # every PR. The five rows mirror the goreleaser target set:
+    #   - ubuntu-latest      (linux/amd64)
+    #   - ubuntu-24.04-arm   (linux/arm64)  — GitHub-hosted arm64 runner
+    #   - macos-latest       (darwin/arm64) — M-series
+    #   - macos-13           (darwin/amd64) — Intel; pinned because
+    #                                          macos-latest moved to arm64
+    #   - windows-latest     (windows/amd64)
+    # Each row builds + tests + (on ubuntu) runs the helper-parity audit.
+    # If any row reds on a PR, merge is blocked.
     name: go (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, macos-13, windows-latest]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
