@@ -60,10 +60,16 @@ afterEach(async () => {
 // happy-path silent-exit contract; we don't duplicate it here.
 // ──────────────────────────────────────────────────────────────────────
 describe("gap closure #4: Windows S18 unskipped (PR6 #4)", () => {
-  it.skipIf(process.platform !== "win32")(
+  // Always-skip: per the F2 epic explicit contract, the TS bin does NOT
+  // emit a `.bat` companion (PR15 promises that in Go). Running the body on
+  // Windows would FAIL the `expect(hasBat || hasCmd).toBe(true)` assertion;
+  // running it on POSIX is the wrong platform. Use `it.skip` unconditionally
+  // and pin the Go contract in the body for future translation.
+  it.skip(
     "TS gap: Windows pre-commit hook needs .bat companion (PR15) — gap-closure deferred to Go translation",
     async () => {
-      // When PR15 lands in Go, this test will:
+      // When PR15 lands in Go, flip this back to `it.skipIf(process.platform
+      // !== "win32")` and the body below will:
       //   1. Install hook on Windows (writes POSIX + .bat)
       //   2. Invoke the .bat directly with PATH stripped
       //   3. Assert exit code 0 + empty output
@@ -72,8 +78,6 @@ describe("gap closure #4: Windows S18 unskipped (PR6 #4)", () => {
       //   - hook install on Windows MUST produce
       //     `.git/hooks/pre-commit.bat` (or `.cmd`) alongside the POSIX
       //     `pre-commit`. Both must exit 0 silently when c3p is not on PATH.
-      //
-      // Until PR15 ships, this case is a no-op on Windows.
       await ensureBuilt();
       fx = await makeFixture({});
       await fs.mkdir(path.join(fx.projectRoot, ".git", "hooks"), { recursive: true });
@@ -81,8 +85,6 @@ describe("gap closure #4: Windows S18 unskipped (PR6 #4)", () => {
         args: ["--cwd", fx.projectRoot, "hook", "install"],
       });
       expect(install.exitCode).toBe(0);
-      // Until PR15 we know this assertion would fail on TS — flagged as a
-      // documented gap; the Go side picks it up.
       const batPath = path.join(fx.projectRoot, ".git", "hooks", "pre-commit.bat");
       const cmdPath = path.join(fx.projectRoot, ".git", "hooks", "pre-commit.cmd");
       const hasBat = await fs

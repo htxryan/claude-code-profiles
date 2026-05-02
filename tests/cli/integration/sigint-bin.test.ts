@@ -158,6 +158,10 @@ describePosix("gap closure #2: SIGINT delivered to bin under held lock (PR6 #2)"
           resolve();
         }
       });
+      holder!.on("error", (err) => {
+        clearTimeout(t);
+        reject(err);
+      });
     });
 
     const lockBefore = await fs.readFile(paths.lockFile, "utf8");
@@ -169,11 +173,16 @@ describePosix("gap closure #2: SIGINT delivered to bin under held lock (PR6 #2)"
     );
 
     const exitInfo = await new Promise<{ code: number | null }>((resolve) => {
-      c3p.on("close", (code) => resolve({ code }));
-      // SIGINT in case c3p hasn't already exited.
-      setTimeout(() => {
+      // SIGINT in case c3p hasn't already exited. Capture the timer handle
+      // and clear it inside `close` so a slow vitest run never delivers a
+      // post-test signal to a recycled PID.
+      const sigintTimer = setTimeout(() => {
         if (c3p.exitCode === null) c3p.kill("SIGINT");
       }, 100);
+      c3p.on("close", (code) => {
+        clearTimeout(sigintTimer);
+        resolve({ code });
+      });
     });
 
     // Either path is acceptable: 3 (LockHeldError) if c3p won the race

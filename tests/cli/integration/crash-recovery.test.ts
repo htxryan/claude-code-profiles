@@ -152,7 +152,14 @@ describe("gap closure #3: crash recovery — 2 mandatory cases (PR6 #3)", () => 
 
     // Simulate: rename live → prior happened, but the next rename never did.
     await fs.rename(live, prior);
-    await fs.access(prior);
+    // Use idiomatic assertions (existence-as-bool) rather than the implicit
+    // `fs.access` throw, so a regression surfaces as a Vitest failure with
+    // the asserted value rather than a raw ENOENT stack.
+    const priorExistsBefore = await fs
+      .access(prior)
+      .then(() => true)
+      .catch(() => false);
+    expect(priorExistsBefore).toBe(true);
     const liveExistsBefore = await fs
       .access(live)
       .then(() => true)
@@ -161,6 +168,12 @@ describe("gap closure #3: crash recovery — 2 mandatory cases (PR6 #3)", () => 
 
     // Run a swap. reconcile fires before materialize and restores live
     // from prior; the new materialize then writes b's bytes.
+    //
+    // NB: opus review suggested an intermediate `c3p status` to prove
+    // reconcile ran *before* the next swap. The TS bin reconciles only on
+    // write paths (`use`/`sync`), not on read verbs — so an intermediate
+    // status check would falsely fail. The contract pinned here is
+    // intentionally "next invocation recovers", matching the spec wording.
     const r = await runCli({ args: ["--cwd", fx.projectRoot, "use", "b"] });
     expect(r.exitCode).toBe(0);
     expect(await fs.readFile(path.join(live, "CLAUDE.md"), "utf8")).toBe("B\n");

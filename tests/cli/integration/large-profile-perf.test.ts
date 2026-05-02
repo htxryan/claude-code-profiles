@@ -37,7 +37,12 @@ afterEach(async () => {
 });
 
 const FILE_COUNT = 1000;
-const CI_BUDGET_MS = 5_000;
+// Wall-clock cap for `c3p use` against the 1000-file fixture. R38 mandates
+// ≤2s on a developer laptop; we hold 10s here because GitHub-hosted CI
+// runners are typically 2–3× slower than a dev laptop on FS-heavy work and
+// a tighter budget flakes under shared-runner load. A local pass that
+// trends toward 8–10s is the early signal to investigate before CI flakes.
+const CI_BUDGET_MS = 10_000;
 
 async function buildLargeProfileFixture(): Promise<string> {
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "ccp-perf-"));

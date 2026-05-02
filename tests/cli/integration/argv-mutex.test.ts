@@ -175,25 +175,35 @@ describe("gap closure #9: argv mutex + parse-error exhaustive (PR6 #9)", () => {
   // ──────────────────────────────────────────────────────────────────────
   // Argless verbs reject extra positionals
   // ──────────────────────────────────────────────────────────────────────
-  it("status with extra positional → exit 1, says no arguments", async () => {
+  // Pin the actual contract: parse.ts emits
+  //   `<verb> takes no arguments; got "<positional>"`
+  // — assert *both* halves so a regression that changed the error to
+  // `"status: unknown error"` (which still contains "status") would fail.
+  it("status with extra positional → exit 1, says 'takes no arguments' + names the extra", async () => {
     await ensureBuilt();
     const r = await runCli({ args: ["status", "extra"] });
     expect(r.exitCode).toBe(1);
     expect(r.stderr).toContain("status");
+    expect(r.stderr).toContain("takes no arguments");
+    expect(r.stderr).toContain('"extra"');
   });
 
-  it("sync with extra positional → exit 1", async () => {
+  it("sync with extra positional → exit 1, says 'takes no arguments' + names the extra", async () => {
     await ensureBuilt();
     const r = await runCli({ args: ["sync", "extra"] });
     expect(r.exitCode).toBe(1);
     expect(r.stderr).toContain("sync");
+    expect(r.stderr).toContain("takes no arguments");
+    expect(r.stderr).toContain('"extra"');
   });
 
-  it("list with extra positional → exit 1", async () => {
+  it("list with extra positional → exit 1, says 'takes no arguments' + names the extra", async () => {
     await ensureBuilt();
     const r = await runCli({ args: ["list", "extra"] });
     expect(r.exitCode).toBe(1);
     expect(r.stderr).toContain("list");
+    expect(r.stderr).toContain("takes no arguments");
+    expect(r.stderr).toContain('"extra"');
   });
 
   // ──────────────────────────────────────────────────────────────────────

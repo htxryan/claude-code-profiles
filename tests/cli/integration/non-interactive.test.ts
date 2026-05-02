@@ -120,6 +120,11 @@ describe("gap closure #1: non-interactive drift gate (PR6 #1)", () => {
   });
 
   it("non-interactive --on-drift=abort surfaces a discriminable abort message (not a generic 'failed')", async () => {
+    // The explicit-abort wording MUST differ from the no-flag auto-abort
+    // wording — a CI script differentiates the two paths on stderr text.
+    // We exercise both paths from the same fixture to compare the messages
+    // directly, rather than asserting a generic /abort/ match (which any
+    // abort-related stderr would satisfy).
     await ensureBuilt();
     fx = await makeFixture({
       profiles: {
@@ -132,12 +137,23 @@ describe("gap closure #1: non-interactive drift gate (PR6 #1)", () => {
     await materialize(buildStatePaths(fx.projectRoot), planA, m);
     await fs.writeFile(path.join(fx.projectRoot, ".claude", "x.md"), "EDIT\n");
 
-    const r = await runCli({
+    const noFlag = await runCli({ args: ["--cwd", fx.projectRoot, "use", "b"] });
+    expect(noFlag.exitCode).toBe(1);
+    expect(noFlag.stderr.length).toBeGreaterThan(0);
+
+    // Re-stage drift for the second invocation (the failed `use` may have
+    // left the live tree in any state — the no-flag abort path doesn't
+    // promise to leave drift untouched).
+    await fs.writeFile(path.join(fx.projectRoot, ".claude", "x.md"), "EDIT\n");
+
+    const explicit = await runCli({
       args: ["--cwd", fx.projectRoot, "--on-drift=abort", "use", "b"],
     });
-    expect(r.exitCode).toBe(1);
-    // The "explicit abort" message must be different from the "no flag
-    // supplied" message — a CI script differentiates them on the wording.
-    expect(r.stderr.toLowerCase()).toMatch(/abort/);
+    expect(explicit.exitCode).toBe(1);
+    expect(explicit.stderr.toLowerCase()).toMatch(/abort/);
+    // The two abort paths must produce *different* stderr — that's the
+    // discriminability contract. A regression that collapsed both to the
+    // same message would silently break CI consumers.
+    expect(explicit.stderr).not.toBe(noFlag.stderr);
   });
 });

@@ -89,16 +89,24 @@ describe("gap closure #10: output-mode combinatorics (PR6 #10)", () => {
     expect(r.stdout).not.toMatch(ANSI_ESC);
   });
 
-  it("NO_COLOR env empty string still disables ANSI (per no-color.org)", async () => {
-    await ensureBuilt();
-    fx = await makeFixture({});
-    const r = await runCli({
-      args: ["--cwd", fx.projectRoot, "init", "--no-seed", "--no-hook"],
-      env: { NO_COLOR: "", FORCE_COLOR: "1" },
-    });
-    expect(r.exitCode).toBe(0);
-    expect(r.stdout).not.toMatch(ANSI_ESC);
-  });
+  // Windows skip: empty-string env values are dropped or transformed by
+  // the Win32 process-creation API (Node falls through to CreateProcessW,
+  // which collapses `""` to "unset" in the child's block). The NO_COLOR
+  // contract under empty-string is therefore unobservable on Windows.
+  // Posix runners exercise it.
+  it.skipIf(process.platform === "win32")(
+    "NO_COLOR env empty string still disables ANSI (per no-color.org)",
+    async () => {
+      await ensureBuilt();
+      fx = await makeFixture({});
+      const r = await runCli({
+        args: ["--cwd", fx.projectRoot, "init", "--no-seed", "--no-hook"],
+        env: { NO_COLOR: "", FORCE_COLOR: "1" },
+      });
+      expect(r.exitCode).toBe(0);
+      expect(r.stdout).not.toMatch(ANSI_ESC);
+    },
+  );
 
   // ──────────────────────────────────────────────────────────────────────
   // --quiet silences print() + warn(), preserves error() + exit codes
