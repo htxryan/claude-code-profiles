@@ -5,6 +5,8 @@ package cli
 import (
 	"errors"
 
+	"github.com/htxryan/c3p/internal/cli/commands"
+	"github.com/htxryan/c3p/internal/cli/service"
 	pipelineerrors "github.com/htxryan/c3p/internal/errors"
 	"github.com/htxryan/c3p/internal/state"
 )
@@ -58,6 +60,18 @@ func ExitCodeFor(err error) int {
 	var cue *CliUserError
 	if errors.As(err, &cue) {
 		return cue.ExitCode
+	}
+	// Swap-orchestrator abort signal — mirrors TS CliUserError default.
+	if service.IsSwapAbort(err) {
+		return ExitUser
+	}
+	// Per-command user error (commands package can't import cli/).
+	var ue *commands.UserError
+	if errors.As(err, &ue) {
+		if ue.ExitCode != 0 {
+			return ue.ExitCode
+		}
+		return ExitUser
 	}
 	var nie *CliNotImplementedError
 	if errors.As(err, &nie) {

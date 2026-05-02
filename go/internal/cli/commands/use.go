@@ -26,7 +26,7 @@ func RunUse(opts UseOptions) (int, error) {
 	// Pre-validate profile name. A path-like name never reaches the
 	// resolver — surface a clear user-error message.
 	if !resolver.IsValidProfileName(opts.Profile) {
-		return 1, fmt.Errorf("invalid profile name %q — names must be a bare directory name (no slashes, no leading dot, no '..')", opts.Profile)
+		return 1, userErrorf("invalid profile name %q — names must be a bare directory name (no slashes, no leading dot, no '..')", opts.Profile)
 	}
 
 	result, err := service.RunSwap(service.SwapOptions{

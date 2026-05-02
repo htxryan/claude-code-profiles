@@ -56,36 +56,42 @@ func TestHelpListsSubcommands(t *testing.T) {
 	}
 }
 
-func TestStubVerbReturnsNotImplemented(t *testing.T) {
+func TestHelloVerbPrintsGreeting(t *testing.T) {
 	helpers.EnsureBuilt(t)
 
+	// D7 promoted hello from a stub to a real (hidden) verb that prints a
+	// greeting. Exit 0 with "Hello" on stdout.
 	res, err := helpers.RunCli(context.Background(), helpers.SpawnOptions{
 		Args: []string{"hello"},
 	}, t)
 	if err != nil {
 		t.Fatalf("run hello: %v", err)
 	}
-	// Internal-error exit (3) — F1 stubs deliberately route through
-	// ErrNotImplemented so an accidentally-shipped stub fails loudly.
-	if res.ExitCode != 3 {
-		t.Fatalf("hello stub: want exit 3, got %d (stderr=%q)", res.ExitCode, res.Stderr)
+	if res.ExitCode != 0 {
+		t.Fatalf("hello: want exit 0, got %d (stderr=%q)", res.ExitCode, res.Stderr)
 	}
-	if !strings.Contains(res.Stderr, "not implemented") {
-		t.Fatalf("hello stub: stderr missing not-implemented marker: %q", res.Stderr)
+	if !strings.Contains(res.Stdout, "Hello") {
+		t.Fatalf("hello: stdout missing greeting: %q", res.Stdout)
 	}
 }
 
-func TestUnknownCommandIsUsageError(t *testing.T) {
+func TestUnknownCommandExitsUserError(t *testing.T) {
 	helpers.EnsureBuilt(t)
 
+	// D7 hand-rolled parser surfaces argv-shape errors as user-error (1),
+	// matching the TS bin. Cobra's exit-2 "usage" code is gone with
+	// the parser rewrite.
 	res, err := helpers.RunCli(context.Background(), helpers.SpawnOptions{
 		Args: []string{"nonexistent-verb"},
 	}, t)
 	if err != nil {
 		t.Fatalf("run unknown: %v", err)
 	}
-	if res.ExitCode != 2 {
-		t.Fatalf("unknown verb: want exit 2 (usage), got %d", res.ExitCode)
+	if res.ExitCode != 1 {
+		t.Fatalf("unknown verb: want exit 1 (user error), got %d (stderr=%q)", res.ExitCode, res.Stderr)
+	}
+	if !strings.Contains(res.Stderr, "unknown command") {
+		t.Fatalf("stderr missing 'unknown command': %q", res.Stderr)
 	}
 }
 

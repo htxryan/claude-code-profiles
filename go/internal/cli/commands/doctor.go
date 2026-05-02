@@ -104,6 +104,13 @@ func readStateForDoctor(paths state.StatePaths) (doctorCheck, state.StateFile) {
 		return c, state.DefaultState()
 	}
 	if st.Warning != nil {
+		// "Missing" is the normal pre-`use` state for a fresh project — not
+		// degradation. Only ParseError / SchemaMismatch warrant a warn here.
+		if st.Warning.Code == state.StateReadWarningMissing {
+			c.Status = doctorOk
+			c.Detail = "no state.json yet (no `c3p use` has run)"
+			return c, st.State
+		}
 		c.Status = doctorWarn
 		c.Detail = string(st.Warning.Code) + ": " + st.Warning.Detail
 		c.Remediation = "run `c3p use <name>` to rewrite a clean state file"
@@ -125,12 +132,16 @@ func checkLock(paths state.StatePaths) doctorCheck {
 		c.Detail = "no lock held"
 		return c
 	}
-	body, err := os.ReadFile(paths.LockFile)
-	if err != nil {
-		c.Status = doctorWarn
-		c.Detail = err.Error()
+	// Try a non-blocking acquire — if it succeeds, no peer holds the
+	// advisory lock (the file just persists from a prior release).
+	handle, err := state.AcquireLock(paths, state.AcquireOptions{})
+	if err == nil {
+		_ = handle.Release()
+		c.Status = doctorOk
+		c.Detail = "lock file present but free"
 		return c
 	}
+	body, _ := os.ReadFile(paths.LockFile)
 	c.Status = doctorWarn
 	c.Detail = "held: " + strings.TrimSpace(string(body))
 	c.Remediation = "if PID is dead, remove " + paths.LockFile

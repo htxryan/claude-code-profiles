@@ -37,7 +37,7 @@ func RunHook(opts HookOptions) (int, error) {
 	case "uninstall":
 		return runHookUninstall(opts, hookPath)
 	}
-	return 1, fmt.Errorf("hook: action must be install|uninstall")
+	return 1, userErrorf("hook: action must be install|uninstall")
 }
 
 func runHookInstall(opts HookOptions, hookPath string) (int, error) {
@@ -52,7 +52,7 @@ func runHookInstall(opts HookOptions, hookPath string) (int, error) {
 			return 0, nil
 		}
 		if !opts.Force {
-			return 1, fmt.Errorf("hook: %q already exists; pass --force to overwrite", hookPath)
+			return 1, userErrorf("hook: %q already exists; pass --force to overwrite", hookPath)
 		}
 	}
 	if err := os.MkdirAll(filepath.Dir(hookPath), 0o755); err != nil {

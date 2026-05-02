@@ -47,7 +47,10 @@ func RunStatus(opts StatusOptions) (int, error) {
 		SourceFingerprint: st.State.SourceFingerprint,
 		Warnings:          []string{},
 	}
-	if st.Warning != nil {
+	// Skip the Missing warning for fresh projects: a state.json that
+	// doesn't exist is the normal "init hasn't run" path, not a degraded
+	// file. ParseError / SchemaMismatch still surfaces.
+	if st.Warning != nil && st.Warning.Code != state.StateReadWarningMissing {
 		payload.Warnings = append(payload.Warnings, fmt.Sprintf("%s: %s", st.Warning.Code, st.Warning.Detail))
 	}
 

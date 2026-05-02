@@ -32,7 +32,7 @@ func RunDiff(opts DiffOptions) (int, error) {
 			return 2, err
 		}
 		if st.State.ActiveProfile == nil {
-			return 1, fmt.Errorf("diff: <b> not given and no profile is currently active")
+			return 1, userErrorf("diff: <b> not given and no profile is currently active")
 		}
 		bName = *st.State.ActiveProfile
 	}

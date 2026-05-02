@@ -40,7 +40,7 @@ func RunInit(opts InitOptions) (int, error) {
 			}
 		}
 		if nonHidden > 0 {
-			return 1, fmt.Errorf("init: %q already exists with profiles inside — refusing to overwrite", paths.ProfilesDir)
+			return 1, userErrorf("init: %q already exists with profiles inside — refusing to overwrite", paths.ProfilesDir)
 		}
 	}
 
@@ -49,7 +49,7 @@ func RunInit(opts InitOptions) (int, error) {
 		starter = "default"
 	}
 	if !resolver.IsValidProfileName(starter) {
-		return 1, fmt.Errorf("invalid starter profile name %q", starter)
+		return 1, userErrorf("invalid starter profile name %q", starter)
 	}
 
 	payload := initPayload{ProfilesDir: paths.ProfilesDir, Starter: starter}

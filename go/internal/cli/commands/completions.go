@@ -1,6 +1,5 @@
 package commands
 
-import "fmt"
 
 // RunCompletions emits a static completion script for the requested shell.
 // Mirrors src/cli/commands/completions.ts (simplified — the TS reference
@@ -16,7 +15,7 @@ func RunCompletions(opts CompletionsOptions) (int, error) {
 	case "fish":
 		script = fishScript
 	default:
-		return 1, fmt.Errorf("unsupported shell %q", opts.Shell)
+		return 1, userErrorf("unsupported shell %q", opts.Shell)
 	}
 	if opts.Output.JSONMode() {
 		opts.Output.JSON(struct {

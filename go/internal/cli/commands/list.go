@@ -70,7 +70,9 @@ func RunList(opts ListOptions) (int, error) {
 	}
 
 	stateWarning := ""
-	if st.Warning != nil {
+	// "Missing" is the normal pre-init path; only surface degradation we
+	// can't recover from (parse / schema mismatch).
+	if st.Warning != nil && st.Warning.Code != state.StateReadWarningMissing {
 		stateWarning = string(st.Warning.Code)
 		if st.Warning.Detail != "" {
 			stateWarning = stateWarning + ": " + st.Warning.Detail

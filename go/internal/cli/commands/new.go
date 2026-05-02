@@ -23,7 +23,7 @@ type newPayload struct {
 // Mirrors src/cli/commands/new.ts.
 func RunNew(opts NewOptions) (int, error) {
 	if !resolver.IsValidProfileName(opts.Profile) {
-		return 1, fmt.Errorf("invalid profile name %q — names must be a bare directory name (no slashes, no leading dot, no '..')", opts.Profile)
+		return 1, userErrorf("invalid profile name %q — names must be a bare directory name (no slashes, no leading dot, no '..')", opts.Profile)
 	}
 	paths := state.BuildStatePaths(opts.Cwd)
 	if err := os.MkdirAll(paths.ProfilesDir, 0o755); err != nil {
@@ -34,7 +34,7 @@ func RunNew(opts NewOptions) (int, error) {
 	if exists, err := pathExists(dir); err != nil {
 		return 2, err
 	} else if exists {
-		return 1, fmt.Errorf("profile %q already exists at %q", opts.Profile, dir)
+		return 1, userErrorf("profile %q already exists at %q", opts.Profile, dir)
 	}
 
 	err := state.WithLock(context.Background(), paths, state.AcquireOptions{}, func(_ *state.LockHandle) error {

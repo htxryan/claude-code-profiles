@@ -1,8 +1,6 @@
 package commands
 
 import (
-	"fmt"
-
 	"github.com/htxryan/c3p/internal/cli/service"
 	"github.com/htxryan/c3p/internal/state"
 )
@@ -16,7 +14,7 @@ func RunSync(opts SyncOptions) (int, error) {
 		return 2, err
 	}
 	if st.State.ActiveProfile == nil {
-		return 1, fmt.Errorf("sync: no profile is currently active — run `c3p use <name>` first")
+		return 1, userErrorf("sync: no profile is currently active — run `c3p use <name>` first")
 	}
 	target := *st.State.ActiveProfile
 
