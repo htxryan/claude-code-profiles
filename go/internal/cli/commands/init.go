@@ -222,11 +222,19 @@ func unsafeProjectRoot(projectRoot string) string {
 	// audit too. strings.FieldsFunc collapses adjacent separators (treats
 	// `//` and `\\` as a single split), which is the right behaviour: we're
 	// validating segment names, not preserving the path's textual shape.
+	//
+	// Per-segment we also reject trailing dot/space — Windows strips them
+	// silently when opening a path, so `repo.` and `repo ` would alias to
+	// `repo` and break c3p's directory bookkeeping. filepath.Clean does
+	// not normalize these, so we have to catch them ourselves here.
 	for _, seg := range strings.FieldsFunc(body, func(r rune) bool {
 		return r == '/' || r == '\\'
 	}) {
 		if resolver.IsWindowsReservedName(seg) {
 			return fmt.Sprintf("path segment %q is a Windows reserved name", seg)
+		}
+		if strings.HasSuffix(seg, ".") || strings.HasSuffix(seg, " ") {
+			return fmt.Sprintf("path segment %q ends with %q (Windows strips trailing dots/spaces)", seg, seg[len(seg)-1:])
 		}
 	}
 	return ""

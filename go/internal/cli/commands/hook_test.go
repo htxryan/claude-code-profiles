@@ -197,6 +197,112 @@ func TestRunHook_Uninstall_LeavesForeignBatAlone(t *testing.T) {
 	}
 }
 
+// TestRunHook_Install_AtomicWhenBatBlocksMissingPosix is the D8 regression:
+// when POSIX is missing AND a foreign .bat exists without --force, the
+// install must refuse without writing the POSIX hook to disk. Earlier
+// (8ac93b8) the POSIX write happened before the bat pre-flight, leaving a
+// half-installed state.
+func TestRunHook_Install_AtomicWhenBatBlocksMissingPosix(t *testing.T) {
+	withBatCompanionEnabled(t, true)
+	repo := makeGitRepo(t)
+	bat := filepath.Join(repo, ".git", "hooks", "pre-commit.bat")
+	if err := os.WriteFile(bat, []byte("@echo foreign\r\n"), 0o755); err != nil {
+		t.Fatalf("seed foreign bat: %v", err)
+	}
+	hook := filepath.Join(repo, ".git", "hooks", "pre-commit")
+	out := &captureOutput{}
+	code, err := RunHook(HookOptions{Cwd: repo, Output: out, Action: "install"})
+	if code != 1 {
+		t.Fatalf("exit = %d, want 1", code)
+	}
+	var ue *UserError
+	if !errors.As(err, &ue) {
+		t.Fatalf("want UserError, got %v", err)
+	}
+	if _, statErr := os.Stat(hook); !errors.Is(statErr, os.ErrNotExist) {
+		t.Errorf("POSIX hook written despite bat refusal — install was non-atomic: %v", statErr)
+	}
+}
+
+// TestRunHook_Uninstall_AtomicWhenBatReadFails mirrors the install
+// atomicity guarantee: if the bat read fails with a non-ErrNotExist error,
+// neither file is removed. We simulate by chmod-ing the bat to be
+// unreadable; on POSIX a directory the test owns can be made unreadable
+// without root.
+func TestRunHook_Uninstall_AtomicWhenBatReadFails(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("chmod-based unreadable simulation does not apply on Windows")
+	}
+	withBatCompanionEnabled(t, true)
+	repo := makeGitRepo(t)
+	if _, err := RunHook(HookOptions{Cwd: repo, Output: &captureOutput{}, Action: "install"}); err != nil {
+		t.Fatalf("install: %v", err)
+	}
+	hook := filepath.Join(repo, ".git", "hooks", "pre-commit")
+	// Make the hooks directory non-readable so opening the bat returns
+	// EACCES instead of ErrNotExist. Restore in cleanup so t.TempDir can
+	// clean up.
+	hooksDir := filepath.Dir(hook)
+	if err := os.Chmod(hooksDir, 0o111); err != nil {
+		t.Fatalf("chmod hooks dir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(hooksDir, 0o755) })
+
+	out := &captureOutput{}
+	code, _ := RunHook(HookOptions{Cwd: repo, Output: out, Action: "uninstall"})
+	// Restore so we can stat — the hook should still be present.
+	if err := os.Chmod(hooksDir, 0o755); err != nil {
+		t.Fatalf("restore chmod: %v", err)
+	}
+	if code == 0 {
+		t.Fatalf("expected non-zero exit on bat read failure, got 0")
+	}
+	if _, err := os.Stat(hook); err != nil {
+		t.Errorf("POSIX hook removed despite bat read failure — uninstall was non-atomic: %v", err)
+	}
+}
+
+// TestEmitHookResultWithBat_FullNoopSuppressesBatLine pins the human-mode
+// formatting decision: when the install path concludes with both POSIX and
+// bat at noop, the note line summarises the full state and the bat line is
+// suppressed.
+func TestEmitHookResultWithBat_FullNoopSuppressesBatLine(t *testing.T) {
+	t.Parallel()
+	out := &captureOutput{}
+	emitHookResultWithBat(
+		HookOptions{Output: out},
+		"noop", "/path/pre-commit",
+		"noop", "/path/pre-commit.bat",
+		"hook is already installed",
+	)
+	if len(out.prints) != 1 {
+		t.Fatalf("want 1 line, got %d: %v", len(out.prints), out.prints)
+	}
+	if !strings.Contains(out.prints[0], "hook is already installed") {
+		t.Errorf("note missing from line: %q", out.prints[0])
+	}
+}
+
+// TestEmitHookResultWithBat_AsymmetricKeepsBatLine pins the contrasting
+// case: when posix is noop and bat is "installed" (or vice-versa), keep
+// the bat line so the user sees the asymmetry.
+func TestEmitHookResultWithBat_AsymmetricKeepsBatLine(t *testing.T) {
+	t.Parallel()
+	out := &captureOutput{}
+	emitHookResultWithBat(
+		HookOptions{Output: out},
+		"noop", "/path/pre-commit",
+		"installed", "/path/pre-commit.bat",
+		"",
+	)
+	if len(out.prints) != 2 {
+		t.Fatalf("want 2 lines, got %d: %v", len(out.prints), out.prints)
+	}
+	if !strings.Contains(out.prints[1], "installed: /path/pre-commit.bat") {
+		t.Errorf("bat line missing or malformed: %q", out.prints[1])
+	}
+}
+
 // TestRunHook_HostDefaultMatchesGOOS confirms the default predicate keys
 // off runtime.GOOS == "windows" so the production path is correct without
 // ever calling withBatCompanionEnabled.

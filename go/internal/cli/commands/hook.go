@@ -89,19 +89,48 @@ var shouldInstallBatCompanion = func() bool {
 }
 
 func runHookInstall(opts HookOptions, hookPath string) (int, error) {
+	// Pre-flight: read both POSIX hook and (when applicable) the .bat
+	// companion, decide install/noop/refuse for each, and only commit any
+	// writes once both decisions have succeeded. This avoids the partial-
+	// install state where a foreign .bat was rejected after the POSIX hook
+	// had already been written to disk (D8 review fix).
 	existing, err := os.ReadFile(hookPath)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return 2, err
 	}
 	posixAction := "installed"
 	if err == nil {
-		// Existing hook — leave alone unless --force or it's already ours.
 		if string(existing) == HookScriptContent {
 			posixAction = "noop"
 		} else if !opts.Force {
 			return 1, userErrorf("hook: %q already exists; pass --force to overwrite", hookPath)
 		}
 	}
+
+	// PR15: include the .bat companion in pre-flight when running on a
+	// Windows host. We do NOT write it on POSIX even with --force — the bat
+	// file would never be consulted by git on POSIX, and silently emitting
+	// it would mislead users into thinking it's a managed artifact on every
+	// platform.
+	batPath, batAction := "", ""
+	writeBat := false
+	if shouldInstallBatCompanion() {
+		batPath = filepath.Join(filepath.Dir(hookPath), hookBatFilename)
+		batExisting, berr := os.ReadFile(batPath)
+		if berr != nil && !errors.Is(berr, os.ErrNotExist) {
+			return 2, berr
+		}
+		if berr == nil && string(batExisting) == HookScriptContentBat {
+			batAction = "noop"
+		} else if berr == nil && !opts.Force {
+			return 1, userErrorf("hook: %q already exists; pass --force to overwrite", batPath)
+		} else {
+			batAction = "installed"
+			writeBat = true
+		}
+	}
+
+	// All preconditions passed — commit writes.
 	if err := os.MkdirAll(filepath.Dir(hookPath), 0o755); err != nil {
 		return 2, err
 	}
@@ -110,30 +139,12 @@ func runHookInstall(opts HookOptions, hookPath string) (int, error) {
 			return 2, err
 		}
 	}
-
-	// PR15: write the .bat companion when running on a Windows host. We do
-	// NOT write it on POSIX even with --force — the bat file would never be
-	// consulted by git on POSIX, and silently emitting it would mislead users
-	// into thinking it's a managed artifact on every platform.
-	batPath, batAction := "", ""
-	if shouldInstallBatCompanion() {
-		batPath = filepath.Join(filepath.Dir(hookPath), hookBatFilename)
-		batExisting, err := os.ReadFile(batPath)
-		if err != nil && !errors.Is(err, os.ErrNotExist) {
+	if writeBat {
+		// 0o644: cmd.exe runs .bat by extension via PATHEXT, not by the
+		// POSIX exec bit. A 0o755 here would be harmless but misleading
+		// — leave the file as plain data.
+		if err := os.WriteFile(batPath, []byte(HookScriptContentBat), 0o644); err != nil {
 			return 2, err
-		}
-		if err == nil && string(batExisting) == HookScriptContentBat {
-			batAction = "noop"
-		} else if err == nil && !opts.Force {
-			return 1, userErrorf("hook: %q already exists; pass --force to overwrite", batPath)
-		} else {
-			// 0o644: cmd.exe runs .bat by extension via PATHEXT, not by the
-			// POSIX exec bit. A 0o755 here would be harmless but misleading
-			// — leave the file as plain data.
-			if err := os.WriteFile(batPath, []byte(HookScriptContentBat), 0o644); err != nil {
-				return 2, err
-			}
-			batAction = "installed"
 		}
 	}
 
@@ -146,9 +157,14 @@ func runHookInstall(opts HookOptions, hookPath string) (int, error) {
 }
 
 func runHookUninstall(opts HookOptions, hookPath string) (int, error) {
+	// Pre-flight: read both files, decide remove/noop for each, then commit
+	// removals. Mirrors the install path — never half-uninstall (D8 review
+	// fix). A read error other than ErrNotExist on either side aborts before
+	// any os.Remove.
 	existing, err := os.ReadFile(hookPath)
 	posixAction := ""
 	posixNote := ""
+	removePosix := false
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			posixAction = "noop"
@@ -160,15 +176,14 @@ func runHookUninstall(opts HookOptions, hookPath string) (int, error) {
 		posixAction = "noop"
 		posixNote = "hook content does not match — left untouched"
 	} else {
-		if err := os.Remove(hookPath); err != nil {
-			return 2, err
-		}
 		posixAction = "uninstalled"
+		removePosix = true
 	}
 
 	// PR15: on Windows, also drop the .bat companion if its bytes match. A
 	// user-edited .bat is left alone, mirroring the POSIX rule.
 	batPath, batAction := "", ""
+	removeBat := false
 	if shouldInstallBatCompanion() {
 		batPath = filepath.Join(filepath.Dir(hookPath), hookBatFilename)
 		batExisting, berr := os.ReadFile(batPath)
@@ -181,10 +196,19 @@ func runHookUninstall(opts HookOptions, hookPath string) (int, error) {
 		} else if string(batExisting) != HookScriptContentBat {
 			batAction = "noop"
 		} else {
-			if err := os.Remove(batPath); err != nil {
-				return 2, err
-			}
 			batAction = "uninstalled"
+			removeBat = true
+		}
+	}
+
+	if removePosix {
+		if err := os.Remove(hookPath); err != nil {
+			return 2, err
+		}
+	}
+	if removeBat {
+		if err := os.Remove(batPath); err != nil {
+			return 2, err
 		}
 	}
 
@@ -192,14 +216,12 @@ func runHookUninstall(opts HookOptions, hookPath string) (int, error) {
 	return 0, nil
 }
 
-func emitHookResult(opts HookOptions, action, path, note string) {
-	emitHookResultWithBat(opts, action, path, "", "", note)
-}
-
 // emitHookResultWithBat reports both the POSIX hook outcome and the optional
 // .bat companion outcome. JSON mode emits a single payload with both slots so
 // scripted callers see the whole picture without diffing two messages. Human
-// mode prints two lines when the bat slot is populated.
+// mode prints two lines when the bat slot is populated, except in the
+// "everything is already installed" full-noop case where the note already
+// summarises the complete outcome and a second bat line would be redundant.
 func emitHookResultWithBat(opts HookOptions, action, path, batAction, batPath, note string) {
 	if opts.Output.JSONMode() {
 		opts.Output.JSON(hookPayload{
@@ -216,7 +238,13 @@ func emitHookResultWithBat(opts HookOptions, action, path, batAction, batPath, n
 	} else {
 		opts.Output.Print(fmt.Sprintf("%s: %s", action, path))
 	}
-	if batAction != "" {
+	// Suppress the second line when the note already covers the bat slot —
+	// this happens in the full-noop install path where note is set and
+	// batAction is "noop", so the bat line would only repeat what the note
+	// just said. When batAction reports a different outcome from posix
+	// (installed vs noop, etc.), keep the second line so scripted tail-on-
+	// human output still sees the asymmetry.
+	if batAction != "" && !(note != "" && batAction == "noop") {
 		opts.Output.Print(fmt.Sprintf("%s: %s", batAction, batPath))
 	}
 }

@@ -3,7 +3,6 @@ package commands
 import (
 	"errors"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 )
@@ -94,6 +93,36 @@ func TestUnsafeProjectRoot_AcceptsDriveLetterColon(t *testing.T) {
 	}
 }
 
+// TestUnsafeProjectRoot_RejectsTrailingDotOrSpace pins the D8 review fix:
+// Windows silently strips trailing dots/spaces when opening a path, so
+// `repo.` and `repo ` would alias to `repo` and corrupt the c3p directory
+// bookkeeping. filepath.Clean does NOT normalize these per-segment, so the
+// guard has to catch them itself.
+func TestUnsafeProjectRoot_RejectsTrailingDotOrSpace(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		path string
+		hint string
+	}{
+		{"/home/u/repo./inner", "."},
+		{"/home/u/repo /inner", " "},
+		{`C:\Users\dev.\repo`, "."},
+		{`C:\Users\dev \repo`, " "},
+		{"/home/u/trailing.", "."},
+	}
+	for _, c := range cases {
+		t.Run(c.path, func(t *testing.T) {
+			reason := unsafeProjectRoot(c.path)
+			if reason == "" {
+				t.Fatalf("unsafeProjectRoot(%q) returned empty; expected trailing-%s rejection", c.path, c.hint)
+			}
+			if !strings.Contains(reason, "trailing dots/spaces") {
+				t.Errorf("reason %q missing 'trailing dots/spaces'", reason)
+			}
+		})
+	}
+}
+
 // TestUnsafeProjectRoot_RejectsControlBytes catches NUL and other low
 // control-byte injection (defense-in-depth against unsanitized env vars
 // becoming the project root).
@@ -128,7 +157,7 @@ func TestRunInit_RefusesUnsafeProjectRoot(t *testing.T) {
 	if !strings.Contains(ue.Message, "Windows") {
 		t.Errorf("error message %q should mention Windows", ue.Message)
 	}
-	// runtime.GOOS isn't used here — the guard fires on every host so the
-	// reference is just for the comment trail.
-	_ = runtime.GOOS
+	// Note: this guard intentionally fires on every host (not just GOOS ==
+	// "windows") so a POSIX-authored path that would land on a Windows clone
+	// in a broken state is rejected up front.
 }
