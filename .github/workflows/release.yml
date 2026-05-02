@@ -115,9 +115,14 @@ jobs:
         include:
           - { runner: ubuntu-latest,    goos: linux,   goarch: amd64 }
           - { runner: ubuntu-latest,    goos: linux,   goarch: arm64, qemu: true }
-          # macos-13 is the canonical GitHub-hosted Intel runner and matches
-          # ci.yml's matrix. macos-15-intel is not in the hosted-runner catalogue.
-          - { runner: macos-13,         goos: darwin,  goarch: amd64 }
+          # darwin/amd64 smoke is intentionally omitted: macos-13 (the only
+          # GitHub-hosted Intel runner) had multi-hour queue waits during
+          # the v1.0.0 release attempt — the pool is being deprecated. The
+          # release job still cross-compiles a native darwin/amd64 archive
+          # below; we trade the per-release smoke cell for a release pipeline
+          # that actually completes. macos-14 (darwin/arm64) below exercises
+          # the same Go runtime on macOS, and ci.yml's macos-latest cell
+          # (also M-series) gates the merge before the tag is ever cut.
           - { runner: macos-14,         goos: darwin,  goarch: arm64 }
           - { runner: windows-latest,   goos: windows, goarch: amd64 }
           - { runner: windows-11-arm,   goos: windows, goarch: arm64 }
