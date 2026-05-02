@@ -44,15 +44,24 @@ func Merge(plan *resolver.ResolvedPlan, opts Options) ([]MergedFile, error) {
 		return nil, fmt.Errorf("merge: opts.Read must not be nil (D2 is FS-IO-free; callers supply the byte source)")
 	}
 
+	type groupKey struct {
+		destination resolver.PlanFileDestination
+		relPath     string
+	}
 	type group struct {
 		relPath     string
 		destination resolver.PlanFileDestination
 		entries     []resolver.PlanFile
 	}
-	byKey := map[string]*group{}
+	// Composite struct key (rather than a string-joined one) so the
+	// invariant "destination + relPath uniquely identifies a group" is
+	// enforced by Go's type system instead of by a separator character
+	// that could in principle collide if either field's value space ever
+	// widened (e.g. a relPath containing the previous "::" delimiter).
+	byKey := map[groupKey]*group{}
 	groups := []*group{}
 	for _, f := range plan.Files {
-		key := string(f.Destination) + "::" + f.RelPath
+		key := groupKey{destination: f.Destination, relPath: f.RelPath}
 		g, ok := byKey[key]
 		if !ok {
 			g = &group{relPath: f.RelPath, destination: f.Destination}
@@ -122,11 +131,12 @@ func Merge(plan *resolver.ResolvedPlan, opts Options) ([]MergedFile, error) {
 		}
 
 		out = append(out, MergedFile{
-			Path:         g.relPath,
-			Bytes:        result.Bytes,
-			Contributors: result.Contributors,
-			MergePolicy:  policy,
-			Destination:  g.destination,
+			Path:          g.relPath,
+			Bytes:         result.Bytes,
+			Contributors:  result.Contributors,
+			MergePolicy:   policy,
+			Destination:   g.destination,
+			SchemaVersion: MergedFileSchemaVersion,
 		})
 	}
 

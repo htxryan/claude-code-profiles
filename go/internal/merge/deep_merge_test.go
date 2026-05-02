@@ -173,6 +173,42 @@ func TestDeepMerge_EmitsTrailingNewline(t *testing.T) {
 	}
 }
 
+// Byte-parity guard: object keys must serialize in INSERTION order (not
+// alphabetized), mirroring TS JSON.stringify. This is load-bearing for
+// R18 drift content-hash gates that compare bytes across runtimes.
+func TestDeepMerge_PreservesKeyInsertionOrder(t *testing.T) {
+	// First contributor sets z, b, m (deliberately non-alphabetical).
+	// Second contributor adds a (new key — appends at end) and overrides m.
+	r, err := DeepMergeStrategy("settings.json", []ContributorBytes{
+		{ID: "a", Bytes: []byte(`{"z":1,"b":2,"m":3}`)},
+		{ID: "b", Bytes: []byte(`{"a":99,"m":33}`)},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	got := string(r.Bytes)
+	want := "{\n  \"z\": 1,\n  \"b\": 2,\n  \"m\": 33,\n  \"a\": 99\n}\n"
+	if got != want {
+		t.Fatalf("key order not preserved.\n want: %q\n  got: %q", want, got)
+	}
+}
+
+// Numbers must round-trip through float64 (mirroring JS JSON.parse), so
+// `1.0` collapses to `1` and the result matches TS byte-for-byte.
+func TestDeepMerge_NumbersFloat64Parity(t *testing.T) {
+	r, err := DeepMergeStrategy("settings.json", []ContributorBytes{
+		{ID: "a", Bytes: []byte(`{"int":1,"frac":1.0,"big":1e21,"small":1e-7,"neg":-0}`)},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	got := string(r.Bytes)
+	want := "{\n  \"int\": 1,\n  \"frac\": 1,\n  \"big\": 1e+21,\n  \"small\": 1e-7,\n  \"neg\": 0\n}\n"
+	if got != want {
+		t.Fatalf("number parity broken.\n want: %q\n  got: %q", want, got)
+	}
+}
+
 // Unparseable JSON surfaces InvalidSettingsJsonError naming the contributor.
 func TestDeepMerge_UnparseableSurfacesError(t *testing.T) {
 	_, err := DeepMergeStrategy("settings.json", []ContributorBytes{

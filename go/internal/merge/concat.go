@@ -7,10 +7,14 @@ const concatNewline byte = '\n'
 
 // ConcatStrategy implements R9: concat strategy for *.md.
 //
-// Concatenates each contributor's bytes in canonical order. Each
-// contributor's content is followed by a single newline if it does not
-// already end with one — that is the only "normalization" we apply.
-// Otherwise bytes are passed through verbatim.
+// Concatenates each contributor's bytes in canonical order. A separator
+// newline is inserted BETWEEN contributors only when the preceding chunk
+// does not already end with one — this avoids double-newlines for files
+// already terminated with `\n` while still keeping section boundaries
+// clean otherwise. The trailing chunk's bytes are emitted verbatim: if
+// the last contributor's bytes don't end in `\n`, neither does the merged
+// output. (Callers that require POSIX-style trailing newlines should
+// ensure each contributor source file has one.)
 //
 // Worked example (R9): base ← extended ← profile with
 // profile.includes = [compA, compB] produces concat order
@@ -18,6 +22,8 @@ const concatNewline byte = '\n'
 //
 // Empty contributors are skipped entirely so an empty file does not
 // produce a spurious blank line and does not appear in provenance.
+// (Asymmetry with DeepMergeStrategy, which retains empty-{} contributors,
+// is deliberate — see the comment on DeepMergeStrategy.)
 func ConcatStrategy(relPath string, inputs []ContributorBytes) (StrategyResult, error) {
 	if len(inputs) == 0 {
 		return StrategyResult{}, fmt.Errorf("concat invoked with no inputs for %q", relPath)

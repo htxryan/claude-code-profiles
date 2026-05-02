@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math"
+	"strconv"
 	"strings"
 
 	pipelineerrors "github.com/htxryan/c3p/internal/errors"
@@ -25,26 +27,42 @@ import (
 //     accumulate without clobbering. R12 fires only when both sides at
 //     hooks.<EventName> are arrays.
 //
-// Output bytes are json.MarshalIndent with two-space indent followed by a
-// trailing newline.
+// Output bytes mirror TS's `JSON.stringify(acc, null, 2) + "\n"`:
+//   - Object keys are emitted in insertion order (NOT sorted) so byte-equal
+//     output across the TS and Go runtimes is preserved for identical
+//     contributor inputs (load-bearing for R18 drift content-hash gates).
+//   - Numbers are parsed as float64 (mirroring JSON.parse), so `1.0` →
+//     `1`, integers above 2^53 lose precision the same way they would in
+//     TS. Numbers serialize via `strconv.FormatFloat(_, 'g', -1, 64)` with
+//     JS-style exponent normalization (no zero-padded exponent).
+//
+// Empty / whitespace-only contributors parse to an empty object — they
+// add nothing semantically but are retained in `Contributors` for E5
+// provenance (asymmetry with ConcatStrategy is intentional; see comment
+// below).
 func DeepMergeStrategy(relPath string, inputs []ContributorBytes) (StrategyResult, error) {
 	if len(inputs) == 0 {
 		return StrategyResult{}, fmt.Errorf("deep-merge invoked with no inputs for %q", relPath)
 	}
 
-	parsed := make([]map[string]any, len(inputs))
+	parsed := make([]*orderedObject, len(inputs))
 	contributors := make([]string, len(inputs))
 	for i, in := range inputs {
 		text := strings.TrimSpace(string(in.Bytes))
 		if text == "" {
-			parsed[i] = map[string]any{}
+			// Empty / whitespace-only file → empty {}. Asymmetry with
+			// ConcatStrategy (which drops empty contributors entirely) is
+			// deliberate: a settings.json `{}` is a meaningful "I declare
+			// this file but have no overrides" signal that downstream
+			// provenance (E5) should still attribute, whereas an empty
+			// markdown contributor would just inject a blank line.
+			parsed[i] = newOrderedObject()
 			contributors[i] = in.ID
 			continue
 		}
-		var value any
 		dec := json.NewDecoder(bytes.NewReader(in.Bytes))
-		dec.UseNumber()
-		if err := dec.Decode(&value); err != nil {
+		value, err := decodeJSONValue(dec)
+		if err != nil {
 			return StrategyResult{}, pipelineerrors.NewInvalidSettingsJsonError(relPath, in.ID, err.Error())
 		}
 		// Reject trailing JSON values so a contributor's settings.json
@@ -55,7 +73,7 @@ func DeepMergeStrategy(relPath string, inputs []ContributorBytes) (StrategyResul
 				relPath, in.ID, "trailing data after JSON value",
 			)
 		}
-		obj, ok := value.(map[string]any)
+		obj, ok := value.(*orderedObject)
 		if !ok {
 			return StrategyResult{}, pipelineerrors.NewInvalidSettingsJsonError(
 				relPath, in.ID, "top-level value is not a JSON object",
@@ -65,25 +83,20 @@ func DeepMergeStrategy(relPath string, inputs []ContributorBytes) (StrategyResul
 		contributors[i] = in.ID
 	}
 
-	acc := cloneObject(parsed[0])
+	acc := cloneOrderedValue(parsed[0]).(*orderedObject)
 	for i := 1; i < len(parsed); i++ {
 		merged := mergeAt(nil, acc, parsed[i])
-		// Accumulator at depth 0 is always a map (R8 invariant: a non-object
-		// later contributor would have been rejected upstream as
-		// InvalidSettingsJson). Cast is safe; preserving the type after each
-		// step keeps the recursive merge well-typed.
-		acc = merged.(map[string]any)
+		// Accumulator at depth 0 is always an object (R8 invariant: a
+		// non-object later contributor would have been rejected upstream
+		// as InvalidSettingsJson). Cast is safe.
+		acc = merged.(*orderedObject)
 	}
 
 	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	enc.SetIndent("", "  ")
-	enc.SetEscapeHTML(false)
-	if err := enc.Encode(acc); err != nil {
+	if err := encodeJSONValue(&buf, acc, 0); err != nil {
 		return StrategyResult{}, fmt.Errorf("encoding merged settings %q: %w", relPath, err)
 	}
-	// json.Encoder.Encode appends a trailing newline; that matches the TS
-	// JSON.stringify(..., 2) + "\n" contract.
+	buf.WriteByte('\n') // mirror TS `JSON.stringify(_, null, 2) + "\n"`
 
 	return StrategyResult{
 		Bytes:        buf.Bytes(),
@@ -107,35 +120,247 @@ func mergeAt(pathParts []string, earlier, later any) any {
 		}
 	}
 
-	// Both objects → deep merge field-by-field.
-	earlierObj, earlierOK := earlier.(map[string]any)
-	laterObj, laterOK := later.(map[string]any)
+	// Both objects → deep merge field-by-field, preserving insertion order.
+	earlierObj, earlierOK := earlier.(*orderedObject)
+	laterObj, laterOK := later.(*orderedObject)
 	if earlierOK && laterOK {
 		out := cloneObject(earlierObj)
-		for k, v := range laterObj {
-			if existing, ok := out[k]; ok {
+		for _, k := range laterObj.keys {
+			v := laterObj.values[k]
+			if existing, ok := out.get(k); ok {
 				// Always allocate a fresh path slice rather than relying on
-				// append's no-aliasing behavior in the sequential case. Cheap
-				// (O(depth)) and rules out a latent data race if the merge
-				// loop is ever parallelized by a downstream caller.
+				// append's no-aliasing behavior in the sequential case.
 				next := make([]string, len(pathParts), len(pathParts)+1)
 				copy(next, pathParts)
 				next = append(next, k)
-				out[k] = mergeAt(next, existing, v)
+				out.set(k, mergeAt(next, existing, v))
 			} else {
-				out[k] = cloneValue(v)
+				out.set(k, cloneOrderedValue(v))
 			}
 		}
 		return out
 	}
 
 	// R8 default: arrays replace, scalars/type-mismatch — later wins.
-	return cloneValue(later)
+	return cloneOrderedValue(later)
 }
 
-func cloneValue(v any) any {
+// ─── orderedObject — JSON objects that preserve key insertion order ──────
+
+// orderedObject is the deep-merge engine's stand-in for `map[string]any` —
+// it preserves key insertion order so the encoded bytes mirror TS
+// `JSON.stringify` (which iterates own-string-key properties in insertion
+// order). Without this, Go's default `map` iteration would alphabetize
+// keys, defeating byte-parity gates.
+type orderedObject struct {
+	keys   []string
+	values map[string]any
+}
+
+func newOrderedObject() *orderedObject {
+	return &orderedObject{values: map[string]any{}}
+}
+
+func (o *orderedObject) get(k string) (any, bool) {
+	v, ok := o.values[k]
+	return v, ok
+}
+
+func (o *orderedObject) set(k string, v any) {
+	if _, exists := o.values[k]; !exists {
+		o.keys = append(o.keys, k)
+	}
+	o.values[k] = v
+}
+
+// ─── parsing — JSON → orderedObject / []any / scalars ───────────────────
+
+func decodeJSONValue(dec *json.Decoder) (any, error) {
+	tok, err := dec.Token()
+	if err != nil {
+		return nil, err
+	}
+	return decodeFromToken(dec, tok)
+}
+
+func decodeFromToken(dec *json.Decoder, tok json.Token) (any, error) {
+	switch t := tok.(type) {
+	case json.Delim:
+		switch t {
+		case '{':
+			obj := newOrderedObject()
+			for dec.More() {
+				keyTok, err := dec.Token()
+				if err != nil {
+					return nil, err
+				}
+				key, ok := keyTok.(string)
+				if !ok {
+					return nil, fmt.Errorf("expected string object key, got %T", keyTok)
+				}
+				v, err := decodeJSONValue(dec)
+				if err != nil {
+					return nil, err
+				}
+				obj.set(key, v)
+			}
+			if _, err := dec.Token(); err != nil { // consume '}'
+				return nil, err
+			}
+			return obj, nil
+		case '[':
+			arr := []any{}
+			for dec.More() {
+				v, err := decodeJSONValue(dec)
+				if err != nil {
+					return nil, err
+				}
+				arr = append(arr, v)
+			}
+			if _, err := dec.Token(); err != nil { // consume ']'
+				return nil, err
+			}
+			return arr, nil
+		default:
+			return nil, fmt.Errorf("unexpected delimiter %q", t)
+		}
+	case bool, string, float64, nil:
+		return t, nil
+	default:
+		return nil, fmt.Errorf("unexpected token %T", tok)
+	}
+}
+
+// ─── encoding — orderedObject → JSON bytes (TS JSON.stringify parity) ───
+
+func encodeJSONValue(buf *bytes.Buffer, v any, indent int) error {
 	switch t := v.(type) {
-	case map[string]any:
+	case nil:
+		buf.WriteString("null")
+	case bool:
+		if t {
+			buf.WriteString("true")
+		} else {
+			buf.WriteString("false")
+		}
+	case float64:
+		buf.WriteString(formatJSNumber(t))
+	case string:
+		writeJSONString(buf, t)
+	case []any:
+		encodeJSONArray(buf, t, indent)
+	case *orderedObject:
+		encodeJSONObject(buf, t, indent)
+	default:
+		return fmt.Errorf("unsupported value type %T", v)
+	}
+	return nil
+}
+
+func encodeJSONArray(buf *bytes.Buffer, arr []any, indent int) {
+	if len(arr) == 0 {
+		buf.WriteString("[]")
+		return
+	}
+	pad := strings.Repeat("  ", indent)
+	childPad := strings.Repeat("  ", indent+1)
+	buf.WriteString("[\n")
+	for i, el := range arr {
+		buf.WriteString(childPad)
+		_ = encodeJSONValue(buf, el, indent+1)
+		if i < len(arr)-1 {
+			buf.WriteByte(',')
+		}
+		buf.WriteByte('\n')
+	}
+	buf.WriteString(pad)
+	buf.WriteByte(']')
+}
+
+func encodeJSONObject(buf *bytes.Buffer, obj *orderedObject, indent int) {
+	if len(obj.keys) == 0 {
+		buf.WriteString("{}")
+		return
+	}
+	pad := strings.Repeat("  ", indent)
+	childPad := strings.Repeat("  ", indent+1)
+	buf.WriteString("{\n")
+	for i, k := range obj.keys {
+		buf.WriteString(childPad)
+		writeJSONString(buf, k)
+		buf.WriteString(": ")
+		_ = encodeJSONValue(buf, obj.values[k], indent+1)
+		if i < len(obj.keys)-1 {
+			buf.WriteByte(',')
+		}
+		buf.WriteByte('\n')
+	}
+	buf.WriteString(pad)
+	buf.WriteByte('}')
+}
+
+// writeJSONString writes a JSON-escaped string. Uses encoding/json with
+// HTML escaping disabled so `<`, `>`, `&` round-trip verbatim like
+// TS's JSON.stringify.
+//
+// Residual divergence: Go's encoder still escapes U+2028 / U+2029 (JS line
+// separators) even with SetEscapeHTML(false); JS JSON.stringify does not
+// escape them. Settings files are not expected to contain these code
+// points, so we accept the divergence.
+func writeJSONString(buf *bytes.Buffer, s string) {
+	var inner bytes.Buffer
+	enc := json.NewEncoder(&inner)
+	enc.SetEscapeHTML(false)
+	_ = enc.Encode(s) // appends '\n'
+	out := inner.Bytes()
+	if len(out) > 0 && out[len(out)-1] == '\n' {
+		out = out[:len(out)-1]
+	}
+	buf.Write(out)
+}
+
+// formatJSNumber formats a float64 the way JS Number.prototype.toString
+// (and therefore JSON.stringify) does. NaN / +Inf / -Inf serialize as
+// "null" per the JSON.stringify spec.
+func formatJSNumber(f float64) string {
+	if math.IsNaN(f) || math.IsInf(f, 0) {
+		return "null"
+	}
+	if f == 0 {
+		return "0" // collapse -0 → "0" like JS
+	}
+	s := strconv.FormatFloat(f, 'g', -1, 64)
+	return normalizeJSExponent(s)
+}
+
+// normalizeJSExponent strips Go's zero-padded exponent so the result
+// matches JS's representation (e.g. `1e-07` → `1e-7`, `1e+21` → `1e+21`).
+func normalizeJSExponent(s string) string {
+	idx := strings.IndexByte(s, 'e')
+	if idx < 0 {
+		return s
+	}
+	mantissa := s[:idx]
+	exp := s[idx+1:]
+	sign := "+"
+	if len(exp) > 0 && (exp[0] == '+' || exp[0] == '-') {
+		if exp[0] == '-' {
+			sign = "-"
+		}
+		exp = exp[1:]
+	}
+	exp = strings.TrimLeft(exp, "0")
+	if exp == "" {
+		exp = "0"
+	}
+	return mantissa + "e" + sign + exp
+}
+
+// ─── clone helpers ──────────────────────────────────────────────────────
+
+func cloneOrderedValue(v any) any {
+	switch t := v.(type) {
+	case *orderedObject:
 		return cloneObject(t)
 	case []any:
 		return cloneArray(t)
@@ -144,13 +369,13 @@ func cloneValue(v any) any {
 	}
 }
 
-func cloneObject(in map[string]any) map[string]any {
+func cloneObject(in *orderedObject) *orderedObject {
 	if in == nil {
 		return nil
 	}
-	out := make(map[string]any, len(in))
-	for k, v := range in {
-		out[k] = cloneValue(v)
+	out := newOrderedObject()
+	for _, k := range in.keys {
+		out.set(k, cloneOrderedValue(in.values[k]))
 	}
 	return out
 }
@@ -161,7 +386,7 @@ func cloneArray(in []any) []any {
 	}
 	out := make([]any, len(in))
 	for i, v := range in {
-		out[i] = cloneValue(v)
+		out[i] = cloneOrderedValue(v)
 	}
 	return out
 }

@@ -404,8 +404,8 @@ func TestMerge_ConflictingMergePolicyGroupFails(t *testing.T) {
 	}
 }
 
-// Defensive guard: non-contiguous (relPath, destination) entries fail loud.
-func TestMerge_NonContiguousEntriesFail(t *testing.T) {
+// Defensive guard: equal contributorIndex (duplicate) entries fail loud.
+func TestMerge_DuplicateContributorIndexFails(t *testing.T) {
 	fx := makeFixture(t, fixtureSpec{
 		profiles: map[string]profileSpec{
 			"leaf": {manifest: map[string]any{}, files: map[string]string{"a.txt": "1", "b.txt": "2"}},
@@ -414,6 +414,36 @@ func TestMerge_NonContiguousEntriesFail(t *testing.T) {
 	plan := resolvePlan(t, "leaf", fx.projectRoot)
 	dup := plan.Files[0]
 	plan.Files = append(plan.Files, dup)
+	_, err := merge.Merge(plan, merge.Options{Read: readFromDisk})
+	if err == nil || !strings.Contains(err.Error(), "non-ascending contributorIndex") {
+		t.Fatalf("want non-ascending contributorIndex error, got %v", err)
+	}
+}
+
+// Defensive guard: strictly descending contributorIndex within a group
+// (genuine out-of-order, not just equal) also fails loud.
+func TestMerge_DescendingContributorIndexFails(t *testing.T) {
+	fx := makeFixture(t, fixtureSpec{
+		profiles: map[string]profileSpec{
+			"base": {manifest: map[string]any{}, files: map[string]string{"CLAUDE.md": "B\n"}},
+			"leaf": {manifest: map[string]any{"extends": "base"}, files: map[string]string{"CLAUDE.md": "L\n"}},
+		},
+	})
+	plan := resolvePlan(t, "leaf", fx.projectRoot)
+	// Find the two CLAUDE.md group entries (both .claude destination) and
+	// reverse their contributorIndex values so the second entry's index
+	// is strictly less than the first.
+	var idxs []int
+	for i, f := range plan.Files {
+		if f.RelPath == "CLAUDE.md" {
+			idxs = append(idxs, i)
+		}
+	}
+	if len(idxs) != 2 {
+		t.Fatalf("expected 2 CLAUDE.md entries, got %d", len(idxs))
+	}
+	plan.Files[idxs[0]].ContributorIndex, plan.Files[idxs[1]].ContributorIndex =
+		plan.Files[idxs[1]].ContributorIndex, plan.Files[idxs[0]].ContributorIndex
 	_, err := merge.Merge(plan, merge.Options{Read: readFromDisk})
 	if err == nil || !strings.Contains(err.Error(), "non-ascending contributorIndex") {
 		t.Fatalf("want non-ascending contributorIndex error, got %v", err)

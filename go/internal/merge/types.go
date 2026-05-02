@@ -17,12 +17,15 @@ const MergedFileSchemaVersion = 1
 //   - Destination mirrors the destination of the contributing PlanFiles.
 //     The merge engine groups by (RelPath, Destination) so two MergedFile
 //     entries may share the same Path if their destinations differ (cw6/T3).
+//   - SchemaVersion is stamped from MergedFileSchemaVersion so D5/D7 can
+//     branch on it if the shape ever changes in a breaking way.
 type MergedFile struct {
-	Path         string
-	Bytes        []byte
-	Contributors []string
-	MergePolicy  resolver.MergePolicy
-	Destination  resolver.PlanFileDestination
+	Path          string
+	Bytes         []byte
+	Contributors  []string
+	MergePolicy   resolver.MergePolicy
+	Destination   resolver.PlanFileDestination
+	SchemaVersion int
 }
 
 // ContributorBytes is one contributor's bytes for a given relPath. Strategies
