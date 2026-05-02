@@ -24,3 +24,10 @@ site/.claude/
 # IV — diffs captured on a visual mismatch. The baselines themselves
 # (under test-baselines/{light,dark}/*.png) are committed.
 site/test-baselines/**/*.actual.png
+
+# Go (rewrite under go/; epic Z removes the prefix at cutover).
+# Binaries built locally; release artifacts go through goreleaser, never
+# committed. *.test catches binaries `go test -c` leaves behind.
+go/c3p
+go/c3p.exe
+go/**/*.test

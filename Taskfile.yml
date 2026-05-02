@@ -56,6 +56,39 @@ tasks:
     dir: site
     cmd: pnpm audit --audit-level=high
 
+  # ── go (rewrite under go/) ────────────────────────────────────────────────
+  # During the rewrite, Go lives at go/. Post-cutover (epic Z) it moves to
+  # the repo root and these tasks lose the dir: prefix. CGO_ENABLED=0 is the
+  # PR20 default — release builds do not introduce a CGO dependency.
+
+  go:tidy:
+    desc: Resolve Go module dependencies
+    dir: go
+    cmd: go mod tidy
+
+  go:vet:
+    desc: Static-analyse Go packages
+    dir: go
+    cmd: go vet ./...
+
+  go:build:
+    desc: Build the Go CLI binary (CGO_ENABLED=0)
+    dir: go
+    env:
+      CGO_ENABLED: "0"
+    cmd: go build ./...
+
+  go:test:
+    desc: Run Go unit + integration suite
+    dir: go
+    env:
+      CGO_ENABLED: "0"
+    cmd: go test ./...
+
+  go:audit:
+    desc: Helper-parity audit (PR4) — diff TS vs Go test harness public surfaces
+    cmd: bash scripts/helper_parity_audit.sh
+
   # ── ci ─────────────────────────────────────────────────────────────────────
 
   ci:
@@ -66,3 +99,7 @@ tasks:
       - task: test
       - task: audit
       - task: audit:site
+      - task: go:vet
+      - task: go:build
+      - task: go:test
+      - task: go:audit

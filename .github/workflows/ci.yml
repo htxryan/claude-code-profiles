@@ -72,6 +72,42 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  go:
+    # F1 (epic claude-code-profiles-248) — Go rewrite lives at go/ during
+    # the rewrite. This job runs the Go suite and the helper-parity audit
+    # (PR4) on every PR. Post-cutover (epic Z) the working-directory
+    # prefix goes away and this job folds back into build-test.
+    name: go
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Task
+        uses: arduino/setup-task@v2
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: true
+          cache-dependency-path: go/go.sum
+
+      - name: Vet
+        run: task go:vet
+
+      - name: Build
+        run: task go:build
+
+      - name: Test
+        run: task go:test
+
+      - name: Helper-parity audit (PR4)
+        run: task go:audit
+
   site:
     name: site (build + IV offline)
     runs-on: ubuntu-latest
