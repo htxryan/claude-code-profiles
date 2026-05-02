@@ -18,7 +18,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/htxryan/c3p/tests/integration/helpers"
+	"github.com/htxryan/claude-code-config-profiles/tests/integration/helpers"
 )
 
 // TestSectionOwnership_E2E_FullTranscript pins the full happy path.

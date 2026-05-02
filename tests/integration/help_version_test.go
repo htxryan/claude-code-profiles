@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/htxryan/c3p/tests/integration/helpers"
+	"github.com/htxryan/claude-code-config-profiles/tests/integration/helpers"
 )
 
 // TestVersionPrintsAndExitsZero is the IV translation of TS

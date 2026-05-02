@@ -1,8 +1,8 @@
 package commands
 
 import (
-	"github.com/htxryan/c3p/internal/cli/service"
-	"github.com/htxryan/c3p/internal/state"
+	"github.com/htxryan/claude-code-config-profiles/internal/cli/service"
+	"github.com/htxryan/claude-code-config-profiles/internal/state"
 )
 
 // RunSync implements `c3p sync`. Same orchestration as `use <activeProfile>`.

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/htxryan/c3p/tests/integration/helpers"
+	"github.com/htxryan/claude-code-config-profiles/tests/integration/helpers"
 )
 
 // IV translation of TS epipe.test.ts (claude-code-profiles-qga). Read-only

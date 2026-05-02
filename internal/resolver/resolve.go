@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"sort"
 
-	pipelineerrors "github.com/htxryan/c3p/internal/errors"
+	pipelineerrors "github.com/htxryan/claude-code-config-profiles/internal/errors"
 )
 
 // ResolveOptions configures a Resolve call.

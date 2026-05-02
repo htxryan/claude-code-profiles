@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/htxryan/c3p/internal/drift"
+	"github.com/htxryan/claude-code-config-profiles/internal/drift"
 )
 
 // PR24: drift snapshot immutability across the gate.

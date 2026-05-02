@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/htxryan/c3p/tests/integration/helpers"
+	"github.com/htxryan/claude-code-config-profiles/tests/integration/helpers"
 )
 
 // TestExitCode_VersionZero — IV translation of TS exit-codes.test.ts

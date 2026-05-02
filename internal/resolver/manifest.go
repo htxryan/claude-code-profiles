@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	pipelineerrors "github.com/htxryan/c3p/internal/errors"
+	pipelineerrors "github.com/htxryan/claude-code-config-profiles/internal/errors"
 )
 
 var knownManifestFields = map[string]struct{}{

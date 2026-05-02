@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/htxryan/c3p/internal/merge"
-	"github.com/htxryan/c3p/internal/state"
+	"github.com/htxryan/claude-code-config-profiles/internal/merge"
+	"github.com/htxryan/claude-code-config-profiles/internal/state"
 )
 
 // TestPersistTransactional_RecoversFromMidPersistCrash is the R22b fitness

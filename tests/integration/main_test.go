@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/htxryan/c3p/tests/integration/helpers"
+	"github.com/htxryan/claude-code-config-profiles/tests/integration/helpers"
 )
 
 // TestMain owns the shared c3p binary built by helpers.BinPath plus the

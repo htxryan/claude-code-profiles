@@ -17,8 +17,11 @@ site/.claude/
 site/test-baselines/**/*.actual.png
 
 # Go — binaries built locally; release artifacts go through goreleaser,
-# never committed. *.test catches binaries `go test -c` leaves behind.
+# never committed. The internal/**/*.test and tests/**/*.test patterns
+# catch binaries `go test -c` leaves behind without ignoring fixtures
+# (e.g. site/) that may legitimately end in .test.
 /c3p
 /c3p.exe
-**/*.test
+internal/**/*.test
+tests/**/*.test
 dist/

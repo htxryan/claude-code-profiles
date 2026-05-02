@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/htxryan/c3p/tests/integration/helpers"
+	"github.com/htxryan/claude-code-config-profiles/tests/integration/helpers"
 )
 
 // TestPreviewSnapshots — IV/T3 translation of TS preview-snapshots.test.ts.

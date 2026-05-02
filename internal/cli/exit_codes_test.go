@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	pipelineerrors "github.com/htxryan/c3p/internal/errors"
-	"github.com/htxryan/c3p/internal/state"
+	pipelineerrors "github.com/htxryan/claude-code-config-profiles/internal/errors"
+	"github.com/htxryan/claude-code-config-profiles/internal/state"
 )
 
 // TestExitCodeMatrix is the PR6 + R29 fitness function: every error class

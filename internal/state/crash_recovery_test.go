@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/htxryan/c3p/internal/merge"
-	"github.com/htxryan/c3p/internal/state"
+	"github.com/htxryan/claude-code-config-profiles/internal/merge"
+	"github.com/htxryan/claude-code-config-profiles/internal/state"
 )
 
 // crashInjectionMerged is the canonical materialize input for the crash

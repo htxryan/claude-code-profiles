@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/htxryan/c3p/tests/integration/helpers"
+	"github.com/htxryan/claude-code-config-profiles/tests/integration/helpers"
 )
 
 // IV translation of TS doctor.test.ts (claude-code-profiles-0zn). Doctor is

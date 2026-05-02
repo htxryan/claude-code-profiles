@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/htxryan/c3p/internal/resolver"
+	"github.com/htxryan/claude-code-config-profiles/internal/resolver"
 )
 
 func TestListProfiles_EmptyWhenNoProfilesDir(t *testing.T) {

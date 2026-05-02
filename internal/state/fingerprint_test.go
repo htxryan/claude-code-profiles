@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/htxryan/c3p/internal/merge"
-	"github.com/htxryan/c3p/internal/state"
+	"github.com/htxryan/claude-code-config-profiles/internal/merge"
+	"github.com/htxryan/claude-code-config-profiles/internal/state"
 )
 
 func TestHashBytes_Sha256Hex(t *testing.T) {

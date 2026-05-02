@@ -7,7 +7,7 @@ import (
 	"math"
 	"strings"
 
-	pipelineerrors "github.com/htxryan/c3p/internal/errors"
+	pipelineerrors "github.com/htxryan/claude-code-config-profiles/internal/errors"
 )
 
 // DeepMergeStrategy implements R8 (deep-merge for settings.json) plus the

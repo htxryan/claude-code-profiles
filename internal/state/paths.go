@@ -10,7 +10,7 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/htxryan/c3p/internal/resolver"
+	"github.com/htxryan/claude-code-config-profiles/internal/resolver"
 )
 
 // StatePaths is the canonical bundle of on-disk paths owned by the state

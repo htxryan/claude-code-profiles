@@ -3,7 +3,7 @@ package resolver_test
 import (
 	"testing"
 
-	"github.com/htxryan/c3p/internal/resolver"
+	"github.com/htxryan/claude-code-config-profiles/internal/resolver"
 )
 
 func TestPolicyFor(t *testing.T) {

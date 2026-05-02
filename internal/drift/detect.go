@@ -6,8 +6,8 @@ import (
 	"os"
 	"sort"
 
-	"github.com/htxryan/c3p/internal/markers"
-	"github.com/htxryan/c3p/internal/state"
+	"github.com/htxryan/claude-code-config-profiles/internal/markers"
+	"github.com/htxryan/claude-code-config-profiles/internal/state"
 )
 
 // DetectDrift runs drift detection on the live .claude/ tree against the

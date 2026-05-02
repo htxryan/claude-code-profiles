@@ -1,6 +1,6 @@
 package merge
 
-import "github.com/htxryan/c3p/internal/resolver"
+import "github.com/htxryan/claude-code-config-profiles/internal/resolver"
 
 // MergedFileSchemaVersion is the schemaVersion stamp for MergedFile. Bumped
 // only when consumers (D5/D7) must update for a breaking shape change.

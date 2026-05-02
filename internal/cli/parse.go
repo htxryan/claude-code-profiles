@@ -20,7 +20,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/htxryan/c3p/internal/drift"
+	"github.com/htxryan/claude-code-config-profiles/internal/drift"
 )
 
 // ParseError carries the human-readable message and a help-requested flag.

@@ -10,7 +10,7 @@
 package drift
 
 import (
-	"github.com/htxryan/c3p/internal/state"
+	"github.com/htxryan/claude-code-config-profiles/internal/state"
 )
 
 // DriftReportSchemaVersion is the schema stamp on every DriftReport. Bumped

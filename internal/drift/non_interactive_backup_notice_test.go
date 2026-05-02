@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/htxryan/c3p/internal/drift"
-	"github.com/htxryan/c3p/internal/state"
+	"github.com/htxryan/claude-code-config-profiles/internal/drift"
+	"github.com/htxryan/claude-code-config-profiles/internal/state"
 )
 
 // PR25: backup notice on --quiet/--json non-interactive discard.

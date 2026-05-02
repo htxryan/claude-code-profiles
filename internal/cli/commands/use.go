@@ -4,11 +4,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/htxryan/c3p/internal/cli/service"
-	"github.com/htxryan/c3p/internal/drift"
-	pipelineerrors "github.com/htxryan/c3p/internal/errors"
-	"github.com/htxryan/c3p/internal/resolver"
-	"github.com/htxryan/c3p/internal/state"
+	"github.com/htxryan/claude-code-config-profiles/internal/cli/service"
+	"github.com/htxryan/claude-code-config-profiles/internal/drift"
+	pipelineerrors "github.com/htxryan/claude-code-config-profiles/internal/errors"
+	"github.com/htxryan/claude-code-config-profiles/internal/resolver"
+	"github.com/htxryan/claude-code-config-profiles/internal/state"
 )
 
 type usePayload struct {

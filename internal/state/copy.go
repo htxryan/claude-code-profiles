@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/htxryan/c3p/internal/merge"
+	"github.com/htxryan/claude-code-config-profiles/internal/merge"
 )
 
 // dirMtime is the post-order mtime restoration record. We collect one per

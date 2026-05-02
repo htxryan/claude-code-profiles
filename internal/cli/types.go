@@ -3,7 +3,7 @@
 // compare per-verb behavior across both binaries.
 package cli
 
-import "github.com/htxryan/c3p/internal/drift"
+import "github.com/htxryan/claude-code-config-profiles/internal/drift"
 
 // CommandKind is one of the 13 public verbs plus help/version.
 type CommandKind string

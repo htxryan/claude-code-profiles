@@ -1,10 +1,9 @@
-// Package integration_test is the Go-side spawn-only integration suite.
-// F1 lands a smoke test that proves the test harness works end-to-end:
-// fixture creation, EnsureBuilt, RunCli, exit-code surface. D7 + IV
-// translate the 16 TS spawn tests into this directory.
+// Package integration_test is the spawn-based CLI integration suite. The
+// smoke test below proves the harness works end-to-end: fixture creation,
+// EnsureBuilt, RunCli, exit-code surface.
 //
-// Every *_test.go in this directory MUST call helpers.EnsureBuilt(t) (the
-// F1 fitness function — verified by helper_parity_audit.sh).
+// Every *_test.go in this directory MUST call helpers.EnsureBuilt(t) so the
+// binary under test reflects the current source tree.
 package integration_test
 
 import (
@@ -14,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/htxryan/c3p/tests/integration/helpers"
+	"github.com/htxryan/claude-code-config-profiles/tests/integration/helpers"
 )
 
 func TestEnsureBuiltAndVersion(t *testing.T) {

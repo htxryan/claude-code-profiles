@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/htxryan/c3p/tests/integration/helpers"
+	"github.com/htxryan/claude-code-config-profiles/tests/integration/helpers"
 )
 
 // BC-1: profile with only .claude/CLAUDE.md leaves project-root byte-identical.

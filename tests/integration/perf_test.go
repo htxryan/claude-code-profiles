@@ -46,7 +46,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/htxryan/c3p/tests/integration/helpers"
+	"github.com/htxryan/claude-code-config-profiles/tests/integration/helpers"
 )
 
 // coldStartSamples is the sample count from PR18. Discarding min and max

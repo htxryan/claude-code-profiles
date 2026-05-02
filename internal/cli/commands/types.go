@@ -3,7 +3,7 @@
 // (exitCode, error). Mirrors src/cli/commands/*.ts.
 package commands
 
-import "github.com/htxryan/c3p/internal/drift"
+import "github.com/htxryan/claude-code-config-profiles/internal/drift"
 
 // OutputChannel is the minimal interface commands need. The cli package
 // implements it; tests can inject a buffer-backed double. Defined here to

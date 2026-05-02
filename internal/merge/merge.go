@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"sort"
 
-	pipelineerrors "github.com/htxryan/c3p/internal/errors"
-	"github.com/htxryan/c3p/internal/resolver"
+	pipelineerrors "github.com/htxryan/claude-code-config-profiles/internal/errors"
+	"github.com/htxryan/claude-code-config-profiles/internal/resolver"
 )
 
 // ReadFunc returns the bytes for a contributor file referenced by absPath.

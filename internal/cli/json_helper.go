@@ -1,6 +1,6 @@
 package cli
 
-import "github.com/htxryan/c3p/internal/cli/jsonout"
+import "github.com/htxryan/claude-code-config-profiles/internal/cli/jsonout"
 
 // marshalJSONLine routes through the jsonout package — the single
 // deterministic marshaller. Lives in cli/ so output.go can call it without

@@ -10,7 +10,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/htxryan/c3p/tests/integration/helpers"
+	"github.com/htxryan/claude-code-config-profiles/tests/integration/helpers"
 )
 
 // IV translation of TS concurrent.test.ts (E7 S14, R41/R41a). Two CLI

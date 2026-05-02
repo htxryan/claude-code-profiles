@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/htxryan/c3p/internal/drift"
-	"github.com/htxryan/c3p/internal/merge"
-	"github.com/htxryan/c3p/internal/resolver"
-	"github.com/htxryan/c3p/internal/state"
+	"github.com/htxryan/claude-code-config-profiles/internal/drift"
+	"github.com/htxryan/claude-code-config-profiles/internal/merge"
+	"github.com/htxryan/claude-code-config-profiles/internal/resolver"
+	"github.com/htxryan/claude-code-config-profiles/internal/state"
 )
 
 // makeDriftPlan builds a minimal ResolvedPlan for drift tests. Two

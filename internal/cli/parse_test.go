@@ -3,7 +3,7 @@ package cli
 import (
 	"testing"
 
-	"github.com/htxryan/c3p/internal/drift"
+	"github.com/htxryan/claude-code-config-profiles/internal/drift"
 )
 
 func TestParseTopLevelHelp(t *testing.T) {

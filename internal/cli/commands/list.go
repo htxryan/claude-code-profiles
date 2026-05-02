@@ -3,8 +3,8 @@ package commands
 import (
 	"fmt"
 
-	"github.com/htxryan/c3p/internal/resolver"
-	"github.com/htxryan/c3p/internal/state"
+	"github.com/htxryan/claude-code-config-profiles/internal/resolver"
+	"github.com/htxryan/claude-code-config-profiles/internal/state"
 )
 
 // listEntryPayload is the per-row JSON shape emitted under --json.

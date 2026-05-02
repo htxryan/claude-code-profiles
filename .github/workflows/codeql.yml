@@ -1,13 +1,11 @@
 name: CodeQL
 
-# JS/TS static analysis. Complements `pnpm audit` (which only flags
-# known-vulnerable transitive deps) by scanning our own source for
-# common security issues — injection sinks, prototype pollution, unsafe
-# regex, path traversal, etc. Findings land in the repo's Security tab,
-# not as inline PR comments.
+# Static analysis for both halves of the repo:
+#   - go: the c3p CLI binary at the repo root (security-relevant; pkg
+#     traversal, manifest parsing, atomic file ops)
+#   - javascript-typescript: the docs site under site/ (Astro SSG)
 #
-# `javascript-typescript` is a single CodeQL language pack covering both
-# .js and .ts; no separate analysis pass is needed.
+# Findings land in the repo's Security tab, not as inline PR comments.
 
 on:
   push:
@@ -32,30 +30,38 @@ permissions:
 
 jobs:
   analyze:
-    name: CodeQL
+    name: CodeQL (${{ matrix.language }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [go, javascript-typescript]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Setup Go
+        if: matrix.language == 'go'
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
-          languages: javascript-typescript
+          languages: ${{ matrix.language }}
           # `security-and-quality` adds maintainability/correctness queries
           # on top of the default `security-extended` set. Cheap to run
-          # against a small JS/TS codebase; high signal for catching subtle
-          # bugs (e.g. unused variables that mask real intent).
+          # against a small codebase; high signal for catching subtle bugs.
           queries: security-and-quality
 
       - name: Autobuild
-        # JS/TS doesn't need a build step for CodeQL — the analyzer reads
-        # source directly. Autobuild is a no-op here but the action
-        # documents it as the canonical path; keeping it in place means a
-        # future move to a compiled language Just Works.
+        # JS/TS doesn't need a build step (analyzer reads source directly).
+        # Go is autobuildable from go.mod via `go build ./...`.
         uses: github/codeql-action/autobuild@v3
 
       - name: Analyze
         uses: github/codeql-action/analyze@v3
         with:
-          category: "/language:javascript-typescript"
+          category: "/language:${{ matrix.language }}"

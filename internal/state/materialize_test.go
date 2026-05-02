@@ -7,11 +7,11 @@ import (
 	"strings"
 	"testing"
 
-	c3perr "github.com/htxryan/c3p/internal/errors"
-	"github.com/htxryan/c3p/internal/markers"
-	"github.com/htxryan/c3p/internal/merge"
-	"github.com/htxryan/c3p/internal/resolver"
-	"github.com/htxryan/c3p/internal/state"
+	c3perr "github.com/htxryan/claude-code-config-profiles/internal/errors"
+	"github.com/htxryan/claude-code-config-profiles/internal/markers"
+	"github.com/htxryan/claude-code-config-profiles/internal/merge"
+	"github.com/htxryan/claude-code-config-profiles/internal/resolver"
+	"github.com/htxryan/claude-code-config-profiles/internal/state"
 )
 
 // makePlan builds a minimal ResolvedPlan suitable for materialize tests.

@@ -1,22 +1,20 @@
 // c3p — protocol module, configuration division.
 //
-// Top-level binary entry. F1 lands the cobra root + dispatch skeleton; verb
-// logic is filled in by D7 (CLI) and the per-domain epics. The skeleton
-// routes argv → cobra → exit code, including:
+// Top-level binary entry. Routes argv → hand-rolled parser → dispatcher →
+// exit code, including:
 //
 //   - --cwd= override (works for every subcommand without per-handler wiring)
 //   - --non-interactive flag and CI=true env auto-detection
-//   - exit-code mapping via internal/errors
+//   - exit-code mapping via internal/cli/exit.go
 //
-// Subcommand handlers print a "not implemented" notice and return a sentinel
-// exit code (3 — internal error) so any test that accidentally exercises a
-// real verb fails loudly instead of silently passing.
+// The parser is hand-rolled (not cobra) for byte-equivalence with the
+// pre-1.0 TS implementation — see internal/cli/parse.go for the rationale.
 package main
 
 import (
 	"os"
 
-	"github.com/htxryan/c3p/internal/cli"
+	"github.com/htxryan/claude-code-config-profiles/internal/cli"
 )
 
 // version is overridden at build time via -ldflags for release builds; the

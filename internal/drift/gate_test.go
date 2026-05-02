@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/htxryan/c3p/internal/drift"
+	"github.com/htxryan/claude-code-config-profiles/internal/drift"
 )
 
 func cleanReport() drift.DriftReport {

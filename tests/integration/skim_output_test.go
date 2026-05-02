@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/htxryan/c3p/tests/integration/helpers"
+	"github.com/htxryan/claude-code-config-profiles/tests/integration/helpers"
 )
 
 // IV/T6 — skim-output translation. TS test pinned the human + JSON output of

@@ -7,8 +7,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/htxryan/c3p/internal/cli/commands"
-	"github.com/htxryan/c3p/internal/drift"
+	"github.com/htxryan/claude-code-config-profiles/internal/cli/commands"
+	"github.com/htxryan/claude-code-config-profiles/internal/drift"
 )
 
 // DispatchContext carries the shared runtime state every handler needs.

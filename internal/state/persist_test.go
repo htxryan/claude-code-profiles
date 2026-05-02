@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/htxryan/c3p/internal/markers"
-	"github.com/htxryan/c3p/internal/merge"
-	"github.com/htxryan/c3p/internal/state"
+	"github.com/htxryan/claude-code-config-profiles/internal/markers"
+	"github.com/htxryan/claude-code-config-profiles/internal/merge"
+	"github.com/htxryan/claude-code-config-profiles/internal/state"
 )
 
 // TestPersistLiveIntoProfile_HappyPath asserts the per-profile pending/prior

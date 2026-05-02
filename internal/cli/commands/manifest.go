@@ -1,8 +1,8 @@
 package commands
 
 import (
-	"github.com/htxryan/c3p/internal/cli/jsonout"
-	"github.com/htxryan/c3p/internal/resolver"
+	"github.com/htxryan/claude-code-config-profiles/internal/cli/jsonout"
+	"github.com/htxryan/claude-code-config-profiles/internal/resolver"
 )
 
 // marshalManifest serialises a ProfileManifest to JSON via the central

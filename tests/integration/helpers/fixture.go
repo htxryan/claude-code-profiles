@@ -1,15 +1,8 @@
-// Package helpers provides the Go integration-test harness. F1 ships
-// MakeFixture (semantic-equivalent to TS fixture.ts) and RunCli
-// (semantic-equivalent to TS spawn.ts:runCli).
+// Package helpers provides the Go integration-test harness: MakeFixture
+// builds an isolated project root under t.TempDir() and RunCli spawns the
+// built c3p binary against it.
 //
-// Helper-parity audit (PR4): scripts/helper_parity_audit.sh diffs the
-// public surfaces of fixture.ts and fixture.go on every PR. Adding a field
-// or method here without a corresponding TS change (or vice versa) fails
-// CI — the spec is "false-green tests are the worst kind of green".
-//
-// MH1 closure: every Fixture uses t.TempDir() for isolation; we never
-// share state with TS fixtures, so a test that passes in Go but fails in
-// TS reflects a real binary difference, not harness drift.
+// Every Fixture uses t.TempDir() for isolation; tests never share state.
 package helpers
 
 import (

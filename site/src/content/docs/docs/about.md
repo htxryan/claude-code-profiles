@@ -27,8 +27,9 @@ between you and any unintended overwrite.
 
 ## Project status
 
-C3P is on the `0.x` line. The CLI surface is stable; non-breaking improvements
-land on `main` and ship via `release-please`. See the
+C3P is on the 1.x line. The CLI surface is stable; non-breaking improvements
+land on `main` and ship as cosign-signed Go binaries via Homebrew, WinGet,
+GitHub Releases, and `go install`. See the
 [CHANGELOG](https://github.com/htxryan/claude-code-config-profiles/blob/main/CHANGELOG.md)
 for the canonical history and the latest version.
 

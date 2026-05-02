@@ -7,7 +7,7 @@ the conventional-commit prefix on the title — reviewers shall thank you.
 ## Repo layout
 
 ```
-cmd/c3p/             # main package (cobra root + dispatch entry)
+cmd/c3p/             # main package (binary entry — hand-rolled parser, no cobra)
 internal/
 ├── resolver/        # parse profile.json, walk extends/includes, build the file list
 ├── merge/           # merge strategies (last-wins, JSON merge, etc.)

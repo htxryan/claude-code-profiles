@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/htxryan/c3p/internal/state"
+	"github.com/htxryan/claude-code-config-profiles/internal/state"
 )
 
 // TestWindows_LockFileExExclusion covers the Windows-conditional fitness cell

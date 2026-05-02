@@ -14,8 +14,8 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/htxryan/c3p/internal/cli/commands"
-	"github.com/htxryan/c3p/tests/integration/helpers"
+	"github.com/htxryan/claude-code-config-profiles/internal/cli/commands"
+	"github.com/htxryan/claude-code-config-profiles/tests/integration/helpers"
 )
 
 // TestHookByteEquality_HookInstallWritesCanonicalBytes — IV translation

@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/htxryan/c3p/internal/drift"
-	pipelineerrors "github.com/htxryan/c3p/internal/errors"
-	"github.com/htxryan/c3p/internal/state"
+	"github.com/htxryan/claude-code-config-profiles/internal/drift"
+	pipelineerrors "github.com/htxryan/claude-code-config-profiles/internal/errors"
+	"github.com/htxryan/claude-code-config-profiles/internal/state"
 )
 
 // TestSwapMissingProfileSurfacesPipelineError ensures resolution failures

@@ -8,7 +8,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/htxryan/c3p/tests/integration/helpers"
+	"github.com/htxryan/claude-code-config-profiles/tests/integration/helpers"
 )
 
 // IV translation of TS status.test.ts (R31, R40, R42, R43). Pins

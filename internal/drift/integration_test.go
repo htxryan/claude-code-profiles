@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/htxryan/c3p/internal/drift"
-	"github.com/htxryan/c3p/internal/state"
+	"github.com/htxryan/claude-code-config-profiles/internal/drift"
+	"github.com/htxryan/claude-code-config-profiles/internal/state"
 )
 
 // S3: drift gate — discard → live tree replaced, edits in snapshot.

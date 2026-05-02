@@ -87,9 +87,12 @@ signs:
 #
 # Note: goreleaser deprecated `brews:` (formulas) in v2.10 in favour of
 # `homebrew_casks:` (https://goreleaser.com/deprecations#brews). Casks
-# install pre-compiled binaries — the same UX our spec describes — and
-# avoid the formula-as-binary anti-pattern goreleaser used to emit. The
-# `brew install htxryan/tap/c3p` user-facing command is identical.
+# install pre-compiled binaries and avoid the formula-as-binary anti-pattern
+# goreleaser used to emit. The `brew install htxryan/tap/c3p` user-facing
+# command is identical on macOS.
+#
+# Tradeoff: Homebrew Casks are macOS-only — Linux Homebrew (Linuxbrew) users
+# must fall back to GitHub Releases or `go install`. README.md documents this.
 homebrew_casks:
   - name: c3p
     binaries: [c3p]

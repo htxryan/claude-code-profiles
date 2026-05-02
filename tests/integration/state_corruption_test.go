@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/htxryan/c3p/tests/integration/helpers"
+	"github.com/htxryan/claude-code-config-profiles/tests/integration/helpers"
 )
 
 // IV/T8 — translation of TS state-corruption.test.ts (F2 gap closure #7).

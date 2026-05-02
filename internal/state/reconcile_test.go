@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/htxryan/c3p/internal/state"
+	"github.com/htxryan/claude-code-config-profiles/internal/state"
 )
 
 func TestReconcileMaterialize_NoneWhenAllAbsent(t *testing.T) {

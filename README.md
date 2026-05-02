@@ -9,7 +9,7 @@
 
 Fluent in many forms of `.claude/` configuration.
 
-> **Binary**: `c3p` &nbsp;·&nbsp; **Distribution**: Homebrew · WinGet · GitHub Releases · `go install`
+> **Binary**: `c3p` &nbsp;·&nbsp; **Distribution**: Homebrew (macOS) · WinGet (Windows) · GitHub Releases · `go install`
 
 C3P lets you maintain multiple named `.claude/` configurations in a project —
 for example a `dev` profile with verbose agents and looser permissions, and a
@@ -24,11 +24,14 @@ uncommitted edits to the active `.claude/` are never lost when switching.
 
 ## Install
 
-### Homebrew (macOS, Linux)
+### Homebrew (macOS)
 
 ```bash
 brew install htxryan/tap/c3p
 ```
+
+> Linux Homebrew (Linuxbrew) is not supported by the tap; use the GitHub
+> Releases archive or `go install` instead.
 
 ### WinGet (Windows)
 
@@ -61,7 +64,7 @@ The same release page hosts:
 ### From source (`go install`)
 
 ```bash
-go install github.com/htxryan/c3p/cmd/c3p@latest
+go install github.com/htxryan/claude-code-config-profiles/cmd/c3p@latest
 ```
 
 Requires Go 1.25+.

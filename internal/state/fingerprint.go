@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/htxryan/c3p/internal/merge"
-	"github.com/htxryan/c3p/internal/resolver"
+	"github.com/htxryan/claude-code-config-profiles/internal/merge"
+	"github.com/htxryan/claude-code-config-profiles/internal/resolver"
 )
 
 // FingerprintSchemaVersion is the schema stamp for the fingerprint format.

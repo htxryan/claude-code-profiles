@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	pipelineerrors "github.com/htxryan/c3p/internal/errors"
+	pipelineerrors "github.com/htxryan/claude-code-config-profiles/internal/errors"
 )
 
 // ResolverPaths holds the canonical paths derived from a project root.

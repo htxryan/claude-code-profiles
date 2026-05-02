@@ -15,7 +15,7 @@ Install via Homebrew (`brew install htxryan/tap/c3p`),
 WinGet (`winget install htxryan.c3p`),
 GitHub Releases (cosign-signed archives for
 {linux, darwin, windows} × {amd64, arm64}),
-or `go install github.com/htxryan/c3p/cmd/c3p@latest`.
+or `go install github.com/htxryan/claude-code-config-profiles/cmd/c3p@latest`.
 
 ### Features
 

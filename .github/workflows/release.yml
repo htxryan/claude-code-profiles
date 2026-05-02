@@ -115,7 +115,9 @@ jobs:
         include:
           - { runner: ubuntu-latest,    goos: linux,   goarch: amd64 }
           - { runner: ubuntu-latest,    goos: linux,   goarch: arm64, qemu: true }
-          - { runner: macos-15-intel,   goos: darwin,  goarch: amd64 }
+          # macos-13 is the canonical GitHub-hosted Intel runner and matches
+          # ci.yml's matrix. macos-15-intel is not in the hosted-runner catalogue.
+          - { runner: macos-13,         goos: darwin,  goarch: amd64 }
           - { runner: macos-14,         goos: darwin,  goarch: arm64 }
           - { runner: windows-latest,   goos: windows, goarch: amd64 }
           - { runner: windows-11-arm,   goos: windows, goarch: arm64 }

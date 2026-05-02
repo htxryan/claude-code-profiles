@@ -9,7 +9,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/htxryan/c3p/internal/drift"
+	"github.com/htxryan/claude-code-config-profiles/internal/drift"
 )
 
 // GatePromptOptions configures the interactive prompt.

@@ -5,10 +5,10 @@ package cli
 import (
 	"errors"
 
-	"github.com/htxryan/c3p/internal/cli/commands"
-	"github.com/htxryan/c3p/internal/cli/service"
-	pipelineerrors "github.com/htxryan/c3p/internal/errors"
-	"github.com/htxryan/c3p/internal/state"
+	"github.com/htxryan/claude-code-config-profiles/internal/cli/commands"
+	"github.com/htxryan/claude-code-config-profiles/internal/cli/service"
+	pipelineerrors "github.com/htxryan/claude-code-config-profiles/internal/errors"
+	"github.com/htxryan/claude-code-config-profiles/internal/state"
 )
 
 // Exit codes are the public CLI surface (E5 fitness function).

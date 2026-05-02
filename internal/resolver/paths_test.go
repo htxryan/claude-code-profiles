@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	pipelineerrors "github.com/htxryan/c3p/internal/errors"
-	"github.com/htxryan/c3p/internal/resolver"
+	pipelineerrors "github.com/htxryan/claude-code-config-profiles/internal/errors"
+	"github.com/htxryan/claude-code-config-profiles/internal/resolver"
 )
 
 func TestClassifyInclude_Component(t *testing.T) {

@@ -77,7 +77,10 @@ tasks:
   # ── ci ─────────────────────────────────────────────────────────────────────
 
   ci:
-    desc: Run full CI suite locally (mirrors GitHub Actions)
+    desc: Run the Go CI suite locally (mirrors the `go` job in .github/workflows/ci.yml)
+    # Note: the `site` job (build:site + test:site) is run separately because
+    # it requires pnpm install + a chromium download. Use `task build:site`
+    # and `task test:site` from site/ to mirror that job.
     cmds:
       - task: vet
       - task: build

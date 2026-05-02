@@ -6,10 +6,10 @@ import (
 	"os"
 	"strings"
 
-	pipelineerrors "github.com/htxryan/c3p/internal/errors"
-	"github.com/htxryan/c3p/internal/merge"
-	"github.com/htxryan/c3p/internal/resolver"
-	"github.com/htxryan/c3p/internal/state"
+	pipelineerrors "github.com/htxryan/claude-code-config-profiles/internal/errors"
+	"github.com/htxryan/claude-code-config-profiles/internal/merge"
+	"github.com/htxryan/claude-code-config-profiles/internal/resolver"
+	"github.com/htxryan/claude-code-config-profiles/internal/state"
 )
 
 type validateResult struct {

@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/htxryan/c3p/tests/integration/helpers"
+	"github.com/htxryan/claude-code-config-profiles/tests/integration/helpers"
 )
 
 // IV/T8 — translation of TS sigint-bin.test.ts (F2 gap closure #2). The TS

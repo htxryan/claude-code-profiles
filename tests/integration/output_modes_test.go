@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/htxryan/c3p/tests/integration/helpers"
+	"github.com/htxryan/claude-code-config-profiles/tests/integration/helpers"
 )
 
 // TestOutputModes_* — IV/T7 translation of TS output-modes.test.ts

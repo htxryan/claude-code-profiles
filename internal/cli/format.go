@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	pipelineerrors "github.com/htxryan/c3p/internal/errors"
-	"github.com/htxryan/c3p/internal/resolver"
+	pipelineerrors "github.com/htxryan/claude-code-config-profiles/internal/errors"
+	"github.com/htxryan/claude-code-config-profiles/internal/resolver"
 )
 
 // RelativeTime returns "3h ago" / "5d ago" / "just now" for the given timestamp.
