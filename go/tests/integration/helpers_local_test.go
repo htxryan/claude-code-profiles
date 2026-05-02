@@ -1,0 +1,76 @@
+package integration_test
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"fmt"
+	"os"
+	"os/exec"
+	"runtime"
+	"testing"
+	"time"
+
+	"github.com/htxryan/c3p/tests/integration/helpers"
+)
+
+// mustRun is a thin wrapper over helpers.RunCli that t.Fatals on
+// harness-level failures and returns the SpawnResult on c3p-level errors
+// (nonzero exits surface as result.ExitCode, never as an err). Cuts the
+// noise floor in tests that don't need to introspect the err.
+func mustRun(t *testing.T, opts helpers.SpawnOptions) helpers.SpawnResult {
+	t.Helper()
+	r, err := helpers.RunCli(context.Background(), opts, t)
+	if err != nil {
+		t.Fatalf("RunCli: %v", err)
+	}
+	return r
+}
+
+// runBin spawns an arbitrary binary path with args, env, and stdin —
+// used for symlink tests where we deliberately want to invoke c3p via a
+// path other than helpers.BinPath. Mirrors helpers.RunCli's shape.
+func runBin(t *testing.T, bin string, args []string, env map[string]string, stdin string) helpers.SpawnResult {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, bin, args...)
+	if env != nil {
+		e := os.Environ()
+		for k, v := range env {
+			e = append(e, fmt.Sprintf("%s=%s", k, v))
+		}
+		cmd.Env = e
+	}
+	if stdin != "" {
+		cmd.Stdin = bytes.NewBufferString(stdin)
+	}
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	res := helpers.SpawnResult{
+		Stdout: stdout.String(),
+		Stderr: stderr.String(),
+	}
+	if cmd.ProcessState != nil {
+		res.ExitCode = cmd.ProcessState.ExitCode()
+	}
+	var exitErr *exec.ExitError
+	if err != nil && !errors.As(err, &exitErr) {
+		t.Fatalf("runBin %q: %v", bin, err)
+	}
+	return res
+}
+
+// shellAvailable returns true if `cmd` resolves on PATH. Mirrors TS's
+// `which()` helper. Used to gate shell-completion tests behind shell
+// availability rather than failing on minimal CI runners.
+func shellAvailable(cmd string) bool {
+	_, err := exec.LookPath(cmd)
+	return err == nil
+}
+
+// isWindows is a tiny helper so tests don't need to import runtime
+// individually for one-off platform gates.
+func isWindows() bool { return runtime.GOOS == "windows" }
