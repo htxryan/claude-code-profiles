@@ -29,15 +29,15 @@ import (
 type Code string
 
 const (
-	CodeMissingProfile    Code = "MissingProfile"
-	CodeCycle             Code = "Cycle"
-	CodeMissingInclude    Code = "MissingInclude"
-	CodeConflict          Code = "Conflict"
-	CodeInvalidManifest   Code = "InvalidManifest"
-	CodeInvalidSettings   Code = "InvalidSettingsJson"
-	CodeMergeReadFailed   Code = "MergeReadFailed"
-	CodeRootMarkers       Code = "RootClaudeMdMarkersMissing"
-	CodePathTraversal     Code = "PathTraversal"
+	CodeMissingProfile  Code = "MissingProfile"
+	CodeCycle           Code = "Cycle"
+	CodeMissingInclude  Code = "MissingInclude"
+	CodeConflict        Code = "Conflict"
+	CodeInvalidManifest Code = "InvalidManifest"
+	CodeInvalidSettings Code = "InvalidSettingsJson"
+	CodeMergeReadFailed Code = "MergeReadFailed"
+	CodeRootMarkers     Code = "RootClaudeMdMarkersMissing"
+	CodePathTraversal   Code = "PathTraversal"
 )
 
 // PipelineError is the common interface implemented by every typed pipeline
@@ -68,9 +68,9 @@ type base struct {
 	message string
 }
 
-func (b base) Error() string     { return b.message }
-func (b base) ErrorCode() Code   { return b.code }
-func (b base) Phase() Phase      { return b.phase }
+func (b base) Error() string   { return b.message }
+func (b base) ErrorCode() Code { return b.code }
+func (b base) Phase() Phase    { return b.phase }
 
 // ResolverError marks resolver-phase failures. Sub-types embed it so a
 // single errors.As(err, *ResolverError) check classifies any resolver
@@ -211,6 +211,63 @@ func NewInvalidManifestError(path, detail string) *InvalidManifestError {
 		ResolverError: ResolverError{base{code: CodeInvalidManifest, phase: PhaseResolver, message: msg}},
 		Path:          path,
 		Detail:        detail,
+	}
+}
+
+// InvalidSettingsJsonError reports a settings.json contributor whose bytes did
+// not parse as a JSON object during deep-merge. Triggered both by syntactically
+// invalid JSON and by valid JSON whose top-level value is not a JSON object
+// (array/null/scalar). Names the contributor and relPath per §7 quality bar.
+//
+// E5 dispatch: surface as a config error (the contributor's settings file
+// itself is malformed) — distinct from MergeReadFailedError which is a runtime
+// IO fault.
+type InvalidSettingsJsonError struct {
+	MergeError
+	RelPath     string
+	Contributor string
+	Detail      string
+}
+
+func NewInvalidSettingsJsonError(relPath, contributor, detail string) *InvalidSettingsJsonError {
+	msg := fmt.Sprintf(
+		"Settings file %q from contributor %q is not valid JSON: %s",
+		relPath, contributor, detail,
+	)
+	return &InvalidSettingsJsonError{
+		MergeError:  MergeError{base{code: CodeInvalidSettings, phase: PhaseMerge, message: msg}},
+		RelPath:     relPath,
+		Contributor: contributor,
+		Detail:      detail,
+	}
+}
+
+// MergeReadFailedError reports a contributor's file (declared in the
+// ResolvedPlan) that could not be read at merge time. Indicates plan/disk
+// drift between resolution and merge — most often a contributor file was
+// deleted while a swap was in flight.
+//
+// E5 dispatch: surface as a transient/runtime error distinct from manifest
+// config errors — re-running resolve will refresh the plan.
+type MergeReadFailedError struct {
+	MergeError
+	RelPath     string
+	Contributor string
+	AbsPath     string
+	Detail      string
+}
+
+func NewMergeReadFailedError(relPath, contributor, absPath, detail string) *MergeReadFailedError {
+	msg := fmt.Sprintf(
+		"Failed to read %q from contributor %q (%s): %s",
+		relPath, contributor, absPath, detail,
+	)
+	return &MergeReadFailedError{
+		MergeError:  MergeError{base{code: CodeMergeReadFailed, phase: PhaseMerge, message: msg}},
+		RelPath:     relPath,
+		Contributor: contributor,
+		AbsPath:     absPath,
+		Detail:      detail,
 	}
 }
 

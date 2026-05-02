@@ -99,6 +99,36 @@ func TestPhaseClassification(t *testing.T) {
 	}
 }
 
+func TestInvalidSettingsJsonError(t *testing.T) {
+	e := NewInvalidSettingsJsonError("settings.json", "team", "unexpected token")
+	if e.ErrorCode() != CodeInvalidSettings {
+		t.Fatalf("code: want %q, got %q", CodeInvalidSettings, e.ErrorCode())
+	}
+	if e.Phase() != PhaseMerge {
+		t.Fatalf("phase: want %q, got %q", PhaseMerge, e.Phase())
+	}
+	for _, want := range []string{"settings.json", "team", "unexpected token"} {
+		if !strings.Contains(e.Error(), want) {
+			t.Fatalf("message missing %q: %q", want, e.Error())
+		}
+	}
+}
+
+func TestMergeReadFailedError(t *testing.T) {
+	e := NewMergeReadFailedError("CLAUDE.md", "leaf", "/abs/path", "ENOENT")
+	if e.ErrorCode() != CodeMergeReadFailed {
+		t.Fatalf("code: want %q, got %q", CodeMergeReadFailed, e.ErrorCode())
+	}
+	if e.Phase() != PhaseMerge {
+		t.Fatalf("phase: want %q, got %q", PhaseMerge, e.Phase())
+	}
+	for _, want := range []string{"CLAUDE.md", "leaf", "/abs/path", "ENOENT"} {
+		if !strings.Contains(e.Error(), want) {
+			t.Fatalf("message missing %q: %q", want, e.Error())
+		}
+	}
+}
+
 // errors.As classification works through the AsPipelineError helper
 // rather than against the embedded ResolverError struct (Go's embed +
 // errors.As do not compose cleanly enough for that to be the canonical
