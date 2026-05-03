@@ -169,13 +169,13 @@ winget:
           owner: microsoft
           name: winget-pkgs
           branch: master
-    # Hardcoded skip until WINGET_PKGS_TOKEN is bootstrapped per
-    # docs/release-runbook.md (PR8.1, fine-grained PAT scoped to the
-    # winget-pkgs fork only). Flip to 'false' once the secret exists in
-    # this repo's Actions secrets. The `env` template function isn't
-    # available in this field on goreleaser v2.15.x so we can't gate the
-    # value dynamically the way the original config attempted.
-    skip_upload: 'true'
+    # WINGET_PKGS_TOKEN bootstrapped 2026-05-02 per docs/release-runbook.md
+    # (PR8.1, fine-grained PAT scoped to htxryan/winget-pkgs only,
+    # ≤90-day expiration; rotate per PR27 cadence). The `env`/`envOrDefault`
+    # template functions aren't available in this field on goreleaser
+    # v2.15.x so we can't dynamically gate on whether the secret is set;
+    # set to 'false' here to enable WinGet PR opening on every release.
+    skip_upload: 'false'
 
 release:
   github:
