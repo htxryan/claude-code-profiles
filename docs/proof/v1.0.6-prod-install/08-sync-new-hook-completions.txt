@@ -1,0 +1,77 @@
+=== c3p sync (R4: re-materialize active profile) ===
+resolving plan...
+merging contributors...
+checking drift...
+re-checking drift under lock...
+synced default
+exit code: 0
+
+=== c3p new minimal (scaffold a new profile) ===
+created profile "minimal" at /var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/c3p-prod-e2e.XXXXXX.6CrXXm0CsH/.claude-profiles/minimal
+Edit profile.json to set extends/includes/tags. Add files under .claude/.
+exit code: 0
+
+=== Created profile.json ===
+{"name":"minimal"}
+
+=== c3p hook uninstall (PR15 atomic removal) ===
+uninstalled: /var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/c3p-prod-e2e.XXXXXX.6CrXXm0CsH/.git/hooks/pre-commit
+ls: /var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/c3p-prod-e2e.XXXXXX.6CrXXm0CsH/.git/hooks/pre-commit: No such file or directory
+
+=== c3p hook install (atomic re-install) ===
+installed: /var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/c3p-prod-e2e.XXXXXX.6CrXXm0CsH/.git/hooks/pre-commit
+#!/usr/bin/env sh
+# c3p pre-commit drift warner. Fail-open: never blocks a commit.
+# Managed by 'c3p hook install'. To uninstall: 'c3p hook uninstall'.
+if command -v c3p >/dev/null 2>&1; then
+  c3p drift --pre-commit-warn 2>&1 || true
+fi
+exit 0
+
+=== c3p completions bash (sourceable shell completion) ===
+# c3p bash completion. Source this file or eval its output:
+#   eval "$(c3p completions bash)"
+_c3p_complete() {
+  local cur=${COMP_WORDS[COMP_CWORD]}
+  local prev=${COMP_WORDS[COMP_CWORD-1]}
+  local verbs="init list use status drift diff new validate sync hook doctor completions help"
+  case "$prev" in
+    use|diff|validate)
+      if [ -d ".claude-profiles" ]; then
+        COMPREPLY=( $(compgen -W "$(ls .claude-profiles 2>/dev/null | grep -v '^\\.\\|^_')" -- "$cur") )
+        return 0
+      fi
+      ;;
+    hook)
+      COMPREPLY=( $(compgen -W "install uninstall" -- "$cur") )
+      return 0
+      ;;
+    completions)
+      COMPREPLY=( $(compgen -W "bash zsh fish" -- "$cur") )
+      return 0
+...
+
+=== c3p completions zsh ===
+# c3p zsh completion. Save as ~/.zfunc/_c3p (or eval).
+#compdef c3p
+_c3p() {
+  local -a verbs
+  verbs=(init list use status drift diff new validate sync hook doctor completions help)
+  _arguments -C \
+    '1: :->verb' \
+    '*: :->args'
+  case $state in
+    verb) _describe 'command' verbs ;;
+...
+
+=== c3p completions fish ===
+# c3p fish completion. Save to ~/.config/fish/completions/c3p.fish
+function __c3p_profiles
+  if test -d .claude-profiles
+    ls .claude-profiles 2>/dev/null | grep -v '^\.\|^_'
+  end
+end
+complete -c c3p -n '__fish_use_subcommand' -a 'init list use status drift diff new validate sync hook doctor completions help'
+complete -c c3p -n '__fish_seen_subcommand_from use diff validate' -a '(__c3p_profiles)'
+complete -c c3p -n '__fish_seen_subcommand_from hook' -a 'install uninstall'
+complete -c c3p -n '__fish_seen_subcommand_from completions' -a 'bash zsh fish'

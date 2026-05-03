@@ -1,0 +1,8 @@
+==> Tapping htxryan/tap
+Cloning into '/opt/homebrew/Library/Taps/htxryan/homebrew-tap'...
+Tapped 1 cask (14 files, 11.4KB).
+==> Fetching downloads for: htxryan/tap/c3p
+✔︎ Cask c3p (1.0.6)
+==> Installing Cask c3p
+==> Linking Binary 'c3p' to '/opt/homebrew/bin/c3p'
+🍺  c3p was successfully installed!

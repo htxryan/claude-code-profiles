@@ -1,0 +1,83 @@
+=== c3p use strict-plus (R1: resolve extends → merge → drift-check → materialize) ===
+resolving plan...
+merging contributors...
+checking drift...
+re-checking drift under lock...
+switched to strict-plus
+exit code: 0
+
+=== Materialized .claude/settings.json (deep-merged: strict ∪ strict-plus) ===
+{
+  "permissions": {
+    "allow": [
+      "Grep"
+    ],
+    "deny": [
+      "Bash",
+      "Write"
+    ]
+  }
+}
+
+=== Root CLAUDE.md (strict-plus inherits CLAUDE.md from strict via extends) ===
+<!-- c3p:v1:begin -->
+<!-- Managed block. Do not edit between markers — changes are overwritten on next `c3p use`. -->
+
+# Strict profile
+Read-only context for review sessions.
+
+<!-- c3p:v1:end -->
+
+=== State file ===
+{
+  "schemaVersion": 1,
+  "activeProfile": "strict-plus",
+  "materializedAt": "2026-05-03T04:31:12.685Z",
+  "resolvedSources": [
+    {
+      "id": "strict",
+      "kind": "ancestor",
+      "rootPath": "/var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/c3p-prod-e2e.XXXXXX.6CrXXm0CsH/.claude-profiles/strict",
+      "external": false
+    },
+    {
+      "id": "strict-plus",
+      "kind": "profile",
+      "rootPath": "/var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/c3p-prod-e2e.XXXXXX.6CrXXm0CsH/.claude-profiles/strict-plus",
+      "external": false
+    }
+  ],
+  "fingerprint": {
+    "schemaVersion": 1,
+    "files": {
+      "settings.json": {
+        "size": 110,
+        "mtimeMs": 1777782672681,
+        "contentHash": "2efc1505042b05e01f65557471e240bf07669abff968e769846a15500c38d108"
+      }
+    }
+  },
+  "externalTrustNotices": [],
+  "rootClaudeMdSection": {
+    "size": 158,
+    "contentHash": "1120a1147aea25e5e858001d870831b9531025894233235afd5f7b17583721ad"
+  },
+  "sourceFingerprint": {
+    "fileCount": 3,
+    "aggregateHash": "d3dc8e82b39d0dd9b33a2d2531a9cc91cc32accf53502831aa3c3cf4250743e5"
+  }
+}
+
+=== c3p status ===
+active profile: strict-plus
+materialized:   2026-05-03T04:31:12.685Z
+drift:          none
+
+=== c3p status --json ===
+{"activeProfile":"strict-plus","materializedAt":"2026-05-03T04:31:12.685Z","drift":{"fingerprintOk":true,"modified":0,"added":0,"deleted":0,"unrecoverable":0,"total":0},"sourceFresh":null,"sourceFingerprint":{"fileCount":3,"aggregateHash":"d3dc8e82b39d0dd9b33a2d2531a9cc91cc32accf53502831aa3c3cf4250743e5"},"warnings":[]}
+
+=== c3p list (* indicates active) ===
+NAME           DESCRIPTION                            TAGS       META
+  default      starter profile created by `c3p init`             
+  strict       read-only review profile               review,ci  
+* strict-plus  strict + grep                          review     extends strict · last 2026-05-03T04:31:12.685Z
