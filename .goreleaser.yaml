@@ -163,12 +163,15 @@ winget:
       # constraint applies here. `.Env.NAME` is the only env access that
       # works in this field on goreleaser v2.15.x.
       token: '{{ .Env.WINGET_PKGS_TOKEN }}'
-      pull_request:
-        enabled: true
-        base:
-          owner: microsoft
-          name: winget-pkgs
-          branch: master
+      # pull_request opening upstream against microsoft/winget-pkgs is
+      # disabled because GitHub fine-grained PATs cannot grant cross-org
+      # permissions — the WINGET_PKGS_TOKEN can only push branches into
+      # htxryan/winget-pkgs (where it's scoped), not open PRs in
+      # microsoft/winget-pkgs. After each release, manually open the
+      # upstream PR from the auto-pushed branch:
+      #   https://github.com/htxryan/winget-pkgs/compare/master...c3p-<version>
+      # Click "Pull request" and target microsoft/winget-pkgs:master.
+      # This is documented in docs/release-runbook.md as a manual step.
     # WINGET_PKGS_TOKEN bootstrapped 2026-05-02 per docs/release-runbook.md
     # (PR8.1, fine-grained PAT scoped to htxryan/winget-pkgs only,
     # ≤90-day expiration; rotate per PR27 cadence). The `env`/`envOrDefault`
