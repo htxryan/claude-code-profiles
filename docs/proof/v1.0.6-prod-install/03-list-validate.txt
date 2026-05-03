@@ -1,0 +1,20 @@
+=== c3p list (text) ===
+NAME           DESCRIPTION                            TAGS       META
+  default      starter profile created by `c3p init`             
+  strict       read-only review profile               review,ci  
+  strict-plus  strict + grep                          review     extends strict
+
+=== c3p list --json (PR3 deterministic JSON) ===
+{"profiles":[{"name":"default","active":false,"description":"starter profile created by `c3p init`","extends":"","includes":[],"tags":[],"lastMaterialized":""},{"name":"strict","active":false,"description":"read-only review profile","extends":"","includes":[],"tags":["review","ci"],"lastMaterialized":""},{"name":"strict-plus","active":false,"description":"strict + grep","extends":"strict","includes":[],"tags":["review"],"lastMaterialized":""}],"stateWarning":""}
+
+=== c3p validate strict-plus ===
+PASS  strict-plus
+validated 1 profile(s) cleanly
+exit code: 0
+
+=== c3p validate (no args = all profiles) ===
+PASS  default
+PASS  strict
+PASS  strict-plus
+validated 3 profile(s) cleanly
+exit code: 0

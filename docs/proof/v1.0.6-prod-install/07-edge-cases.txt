@@ -1,0 +1,33 @@
+=== c3p use stric (PR6 #1: typo suggestion + exit 1) ===
+resolving plan...
+c3p: Profile "stric" does not exist (I do beg your pardon. Did you perhaps mean: strict?)
+exit code: 1
+
+=== c3p use nope (no near-match) ===
+resolving plan...
+c3p: Profile "nope" does not exist
+exit code: 1
+
+=== c3p init twice (refuse to overwrite) ===
+c3p: init: "/var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/c3p-prod-e2e.XXXXXX.6CrXXm0CsH/.claude-profiles" already exists with profiles inside — refusing to overwrite
+exit code: 1
+
+=== c3p doctor (R7 health check) ===
+CHECK                           STATUS  DETAIL
+profiles directory exists       OK      /var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/c3p-prod-e2e.XXXXXX.6CrXXm0CsH/.claude-profiles
+state.json schema               OK      active=default
+project lock                    OK      lock file present but free
+.gitignore entries              OK      all required entries present
+git pre-commit hook             OK      installed and canonical
+backup count <= 5               OK      2 snapshots
+project-root CLAUDE.md markers  OK      markers valid
+active profile resolves         OK      default
+exit code: 0
+
+=== c3p doctor --json (machine shape) ===
+{"pass":true,"checks":[{"id":"profiles-dir","label":"profiles directory exists","status":"ok","detail":"/var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/c3p-prod-e2e.XXXXXX.6CrXXm0CsH/.claude-profiles"},{"id":"state-file","label":"state.json schema","status":"ok","detail":"active=default"},{"id":"lock","label":"project lock","status":"ok","detail":"lock file present but free"},{"id":"gitignore","label":".gitignore entries","status":"ok","detail":"all required entries present"},{"id":"pre-commit-hook","label":"git pre-commit hook","status":"ok","detail":"installed and canonical"},{"id":"backup-retention","label":"backup count <= 5","status":"ok","detail":"2 snapshots"},{"id":"root-claude-md","label":"project-root CLAUDE.md markers","status":"ok","detail":"markers valid"},{"id":"active-resolves","label":"active profile resolves","status":"ok","detail":"default"}]}
+
+=== c3p diff default strict-plus ===
+diff: default vs strict-plus
+  ~  CLAUDE.md
+  ~  settings.json

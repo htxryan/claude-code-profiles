@@ -1,0 +1,23 @@
+=== Cold-start performance (brew-installed binary) ===
+real 0.00
+real 0.00
+real 0.00
+real 0.00
+real 0.00
+
+=== Precise timing (subprocess) ===
+min: 2.41 ms, max: 3.37 ms, mean: 2.75 ms, median: 2.70 ms
+
+=== Binary size ===
+-rwxr-xr-x@ 1 redhale  admin  3038002 May  2 23:10 /opt/homebrew/Caskroom/c3p/1.0.6/c3p
+2.9M	/opt/homebrew/Caskroom/c3p/1.0.6/c3p
+
+=== Quarantine xattr removed (cask postflight ran) ===
+com.apple.provenance: 
+
+=== Bash completions actually source cleanly ===
+_c3p_complete is a function
+_c3p_complete () 
+{ 
+    local cur=${COMP_WORDS[COMP_CWORD]};
+    local prev=${COMP_WORDS[COMP_CWORD-1]};

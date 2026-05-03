@@ -1,0 +1,53 @@
+=== c3p drift (clean baseline) ===
+drift: clean (active=strict-plus, scanned=1)
+
+=== Modify .claude/settings.json (R20: drift via content edit) ===
+live content:
+{"permissions":{"allow":["Read","NewTool"],"deny":[]}}
+
+=== c3p drift (1 modified file detected) ===
+drift: 1 file(s) in .claude/ vs active profile "strict-plus"
+  M  settings.json
+exit code: 0
+
+=== c3p drift --json (full provenance + fast/slow path counts) ===
+{"schemaVersion":1,"active":"strict-plus","fingerprintOk":true,"entries":[{"relPath":"settings.json","status":"modified","provenance":[{"id":"strict","kind":"ancestor","rootPath":"/var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/c3p-prod-e2e.XXXXXX.6CrXXm0CsH/.claude-profiles/strict","external":false},{"id":"strict-plus","kind":"profile","rootPath":"/var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/c3p-prod-e2e.XXXXXX.6CrXXm0CsH/.claude-profiles/strict-plus","external":false}],"destination":".claude"}],"scannedFiles":1,"fastPathHits":0,"slowPathHits":1,"addedBytes":0,"removedBytes":0,"changedBytes":0}
+
+=== c3p drift --preview (R-preview row format) ===
+drift: 1 file(s) in .claude/ vs active profile "strict-plus"
+  M  settings.json
+
+=== R21/PR29 hard-block: non-TTY use without --on-drift exits 1 ===
+resolving plan...
+merging contributors...
+checking drift...
+drift detected and no --on-drift= passed in non-interactive mode (R21 hard-block); pass --on-drift=discard|persist|abort or run interactively
+c3p: drift detected and no --on-drift= passed in non-interactive mode (R21 hard-block); pass --on-drift=discard|persist|abort or run interactively
+exit code: 1
+
+=== c3p use default --on-drift=discard (drop drifted edits, swap profile) ===
+resolving plan...
+merging contributors...
+checking drift...
+re-checking drift under lock...
+switched to default
+backup: /var/folders/_z/mrnvcw_j25746h9mwn9rqv8r0000gn/T/c3p-prod-e2e.XXXXXX.6CrXXm0CsH/.claude-profiles/.meta/backup/2026-05-03T04-31-30.069Z
+exit code: 0
+
+=== Materialized .claude/settings.json (now default's content) ===
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Edit",
+      "Bash"
+    ],
+    "deny": []
+  }
+}
+
+=== Backup snapshot retained ===
+total 0
+drwxr-xr-x@ 3 redhale  staff   96 May  2 23:31 .
+drwxr-xr-x@ 6 redhale  staff  192 May  2 23:31 ..
+drwxr-xr-x@ 3 redhale  staff   96 May  2 23:31 2026-05-03T04-31-30.069Z
