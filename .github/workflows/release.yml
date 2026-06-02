@@ -68,12 +68,12 @@ jobs:
         # Schema-level validation. Catches deprecated-field regressions
         # (e.g. brews→homebrew_casks rename) that snapshot tolerates but
         # a real release-tag run would reject.
-        uses: goreleaser/goreleaser-action@v6
+        uses: goreleaser/goreleaser-action@v7
         with:
           version: '~> v2.15'
           args: check
       - name: Goreleaser snapshot
-        uses: goreleaser/goreleaser-action@v6
+        uses: goreleaser/goreleaser-action@v7
         with:
           version: '~> v2.15'
           args: release --snapshot --clean --skip=publish,sign,announce
@@ -82,7 +82,7 @@ jobs:
         # debugging when the snapshot fails. if: always() so this also
         # runs after a goreleaser non-zero exit.
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dist-snapshot
           path: dist/
@@ -138,7 +138,7 @@ jobs:
           cache-dependency-path: go.sum
       - name: Setup QEMU (cross-arch smoke for non-native targets)
         if: matrix.qemu == true
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
         with:
           platforms: arm64
       - name: Build c3p for ${{ matrix.goos }}/${{ matrix.goarch }}
@@ -185,7 +185,7 @@ jobs:
         # Pin to the v2 major. `version: latest` would silently break the
         # pipeline on a goreleaser v3 release (config-format breaks have
         # historically gated each major bump).
-        uses: goreleaser/goreleaser-action@v6
+        uses: goreleaser/goreleaser-action@v7
         with:
           version: '~> v2.15'
           args: release --clean
@@ -254,7 +254,7 @@ jobs:
         # Preserve partial archives + manifests for debugging when goreleaser
         # exits non-zero between build and publish.
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dist-release
           path: dist/
