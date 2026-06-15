@@ -22,18 +22,18 @@
     "iv:update-baselines": "node scripts/iv.mjs --skip-lighthouse --update-baselines"
   },
   "dependencies": {
-    "@astrojs/starlight": "0.38.4",
-    "astro": "6.2.1"
+    "@astrojs/starlight": "0.40.0",
+    "astro": "6.4.7"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.4",
     "@axe-core/playwright": "^4.11.3",
     "chrome-launcher": "^1.2.1",
-    "lighthouse": "^13.1.0",
-    "mermaid": "^11.14.0",
-    "playwright": "^1.59.1",
+    "lighthouse": "^13.4.0",
+    "mermaid": "^11.15.0",
+    "playwright": "^1.61.0",
     "rehype-mermaid": "^3.0.0",
-    "sharp": "^0.34.0",
+    "sharp": "^0.35.1",
     "typescript": "^5.7.2"
   }
 }
