@@ -46,7 +46,7 @@ jobs:
         os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, windows-latest]
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           # gitleaks (Secret scan, ubuntu-latest only) needs full history to
           # scan the range from PR base to HEAD; default shallow clone fails
@@ -84,7 +84,7 @@ jobs:
 
       - name: Secret scan
         if: matrix.os == 'ubuntu-latest'
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -99,7 +99,7 @@ jobs:
         working-directory: site
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Install Task
         uses: arduino/setup-task@v2
